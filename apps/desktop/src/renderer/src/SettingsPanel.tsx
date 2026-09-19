@@ -8,7 +8,7 @@ type SettingsPanelProps = {
   onClose: () => void;
 };
 
-const themes = ['Augur Dark+', 'Midnight', 'Light'];
+const themes = ['Geared Dark', 'Midnight', 'Light'];
 
 export function SettingsPanel({
   settings,

@@ -31,7 +31,7 @@ type TerminalTab = {
 const defaultSettings: SettingsRecord = {
   schemaVersion: 1,
   language: 'system',
-  theme: 'Augur Dark+',
+  theme: 'Geared Dark',
   terminalFontSize: 14,
   terminalLineHeight: 1.2,
   terminalCursor: 'block',

@@ -61,7 +61,7 @@ export type Environment = z.infer<typeof EnvironmentSchema>;
 export const defaultSettings: Settings = {
   schemaVersion: settingsSchemaVersion,
   language: 'system',
-  theme: 'Augur Dark+',
+  theme: 'Geared Dark',
   terminalFontSize: 14,
   terminalLineHeight: 1.2,
   terminalCursor: 'block',
