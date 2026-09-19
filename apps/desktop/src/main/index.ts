@@ -3,6 +3,7 @@ import { mkdir as fsMkdir } from 'node:fs/promises';
 import { basename, join, posix } from 'node:path';
 import {
   AppInfoSchema,
+  BUILTIN_THEME_NAMES,
   AiConnectionDeleteRequestSchema,
   AiConnectionInputSchema,
   AiConnectionRecordSchema,
@@ -79,6 +80,7 @@ import { KnownHostsStore } from './ssh/known-hosts';
 import { SshSessionManager } from './ssh/ssh-session';
 import { buildRemoteFileCommand } from './sftp/remote-commands';
 import { TransferManager } from './sftp/transfers';
+import { buildApplicationMenu, type MenuLocale } from './menu';
 import { discoverWsl } from './wsl/discovery';
 import { probeEnvironment } from './environment/probe';
 
@@ -95,6 +97,51 @@ const themesDirectory = join(isDevelopment ? process.cwd() : app.getPath('userDa
 
 function sendToRenderer(channel: string, payload: unknown): void {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, payload);
+}
+
+function resolveMenuLocale(language: 'system' | 'en-US' | 'zh-CN'): MenuLocale {
+  if (language !== 'system') return language;
+  return app.getLocale().toLowerCase().startsWith('zh') ? 'zh-CN' : 'en-US';
+}
+
+function showAboutDialog(locale: MenuLocale): void {
+  const aboutLabels = {
+    'en-US': { title: 'About Geared Term', detail: 'A secure Electron terminal application.' },
+    'zh-CN': { title: '关于 Geared Term', detail: '一个安全的 Electron 终端应用。' }
+  } as const;
+  void dialog.showMessageBox({
+    type: 'info',
+    title: aboutLabels[locale].title,
+    message: `Geared Term ${app.getVersion()}`,
+    detail: `${aboutLabels[locale].detail}\nElectron ${process.versions.electron} · Chromium ${process.versions.chrome} · Node ${process.versions.node}`
+  });
+}
+
+async function rebuildApplicationMenu(): Promise<void> {
+  const settings = storage.settingsSnapshot();
+  const locale = resolveMenuLocale(settings.language);
+  const userThemes = await loadUserThemes(themesDirectory).catch(() => ({
+    themes: [],
+    invalid: []
+  }));
+  buildApplicationMenu(
+    {
+      locale,
+      language: settings.language,
+      theme: settings.theme,
+      themeNames: [
+        ...new Set([...BUILTIN_THEME_NAMES, ...userThemes.themes.map((theme) => theme.name)])
+      ],
+      isDevelopment
+    },
+    {
+      onCommand: (command) => sendToRenderer('menu-command', command),
+      onOpenConfigFolder: () => {
+        void shell.openPath(app.getPath('userData'));
+      },
+      onAbout: () => showAboutDialog(locale)
+    }
+  );
 }
 
 function isAllowedExternalUrl(value: string): boolean {
@@ -289,7 +336,9 @@ function registerIpc(): void {
   ipcMain.handle('settings:get', () => SettingsRecordSchema.parse(storage.settingsSnapshot()));
   ipcMain.handle('settings:save', async (_event, input: unknown) => {
     const settings = SettingsRecordSchema.parse(input);
-    return SettingsRecordSchema.parse(await storage.saveSettings(settings));
+    const saved = SettingsRecordSchema.parse(await storage.saveSettings(settings));
+    await rebuildApplicationMenu();
+    return saved;
   });
   ipcMain.handle('sftp:list', async (_event, input: unknown) => {
     const request = SftpListRequestSchema.parse(input);
@@ -711,6 +760,7 @@ void app.whenReady().then(async () => {
   );
   installSecurityHandlers();
   registerIpc();
+  await rebuildApplicationMenu();
   mainWindow = createWindow();
   logger.info('app', 'Application ready', { packaged: app.isPackaged });
 });

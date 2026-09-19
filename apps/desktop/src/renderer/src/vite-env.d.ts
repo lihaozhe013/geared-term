@@ -132,6 +132,7 @@ declare global {
       revealLocalPath: (path: string) => Promise<SftpOperationResult>;
       onSftpTransferEvent: (listener: (event: SftpTransferEvent) => void) => () => void;
       onSftpCd: (listener: (event: SftpCdEvent) => void) => () => void;
+      onMenuCommand: (listener: (command: string) => void) => () => void;
       listUserThemes: () => Promise<UserThemeList>;
       openThemesFolder: () => Promise<SftpOperationResult>;
       getRuntimeInfo: () => Promise<RuntimeInfo>;

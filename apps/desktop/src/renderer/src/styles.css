@@ -1083,13 +1083,55 @@ button:disabled {
   line-height: 1.8;
 }
 
-.terminal-surface > .terminal-host {
+.terminal-surface > .terminal-wrapper {
   grid-row: 1;
   grid-column: 1;
+  min-height: 0;
 }
 
-.terminal-surface > .terminal-host[hidden] {
+.terminal-wrapper {
+  position: relative;
+  min-height: 360px;
+  min-width: 0;
+}
+
+.terminal-wrapper > .terminal-host {
+  height: 100%;
+  min-height: 360px;
+}
+
+.terminal-surface > .terminal-wrapper[hidden] {
   display: none;
+}
+
+.terminal-search {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--gt-border-strong, #344157);
+  border-radius: 7px;
+  background: var(--gt-panel, #12151c);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4);
+}
+
+.terminal-search input {
+  width: 200px;
+  padding: 5px 7px;
+  border: 1px solid var(--gt-border-strong, #344157);
+  border-radius: 5px;
+  outline: none;
+  color: var(--gt-text, #e4eaf3);
+  background: var(--gt-input-bg, #0f141c);
+  font-size: 12px;
+}
+
+.terminal-search input:focus {
+  border-color: var(--gt-accent, #5c8ea5);
 }
 
 .terminal-surface > .terminal-line {

@@ -387,6 +387,78 @@ export function App(): React.JSX.Element {
     }
   }, []);
 
+  const menuHandlers = useRef({
+    addLocalTab,
+    openQuickSshDialog: (): void => setShowQuickSsh(true),
+    toggleAssistant,
+    toggleSftp,
+    toggleEnvironment,
+    uiState,
+    setUiState,
+    settings,
+    saveSettings
+  });
+  menuHandlers.current = {
+    addLocalTab,
+    openQuickSshDialog: (): void => setShowQuickSsh(true),
+    toggleAssistant,
+    toggleSftp,
+    toggleEnvironment,
+    uiState,
+    setUiState,
+    settings,
+    saveSettings
+  };
+
+  useEffect(() => {
+    return window.geared.onMenuCommand((command) => {
+      const handlers = menuHandlers.current;
+      if (command === 'new-local') {
+        handlers.addLocalTab();
+        return;
+      }
+      if (command === 'quick-ssh') {
+        handlers.openQuickSshDialog();
+        return;
+      }
+      if (command === 'toggle-assistant') {
+        handlers.toggleAssistant();
+        return;
+      }
+      if (command === 'toggle-sftp') {
+        handlers.toggleSftp();
+        return;
+      }
+      if (command === 'toggle-environment') {
+        handlers.toggleEnvironment();
+        return;
+      }
+      if (command === 'cycle-panels') {
+        const order = ['assistant', 'sftp', 'environment'] as const;
+        const index = order.indexOf(handlers.uiState.rightPanel as (typeof order)[number]);
+        const next = order[(index + 1) % order.length] as 'assistant' | 'sftp' | 'environment';
+        const nextState: UiStateRecord = {
+          ...handlers.uiState,
+          rightPanel: handlers.uiState.rightPanel === next ? null : next
+        };
+        handlers.setUiState(nextState);
+        void window.geared.saveUiState(nextState).catch(() => undefined);
+        return;
+      }
+      if (command.startsWith('theme:')) {
+        const name = command.slice(6);
+        void handlers.saveSettings({ ...handlers.settings, theme: name }).catch(() => undefined);
+        return;
+      }
+      if (command.startsWith('language:')) {
+        const value = command.slice(9) as SettingsRecord['language'];
+        void handlers
+          .saveSettings({ ...handlers.settings, language: value })
+          .catch(() => undefined);
+      }
+    });
+  }, []);
+
   const handleState = useCallback(
     (tabId: string, message: TerminalPortMessage & { kind: 'state' }): void => {
       setTabs((current) =>

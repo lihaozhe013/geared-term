@@ -511,6 +511,15 @@ When terminal focus is active, the following behavior is required:
 - **SET-008**: A language change MUST refresh windows, menus, dialogs, and errors without requiring
   a process restart where technically practical.
 
+The theme directory is `<userData>/themes/` (the working directory in development). Each `*.json`
+file there MUST contain a single user theme object with a `name` and a `colors` object holding
+six-digit hex colors: `background`, `foreground`, and `cursor` are required; `selection`, `accent`,
+`bright`, `panel`, `panelAlt`, `shell`, `divider`, `border`, `borderStrong`, `inputBackground`,
+`hover`, `text`, `textDim`, `textMuted`, `danger`, and a 16-entry `ansi` array are optional and
+default to values derived from the base colors. A user theme overrides a built-in theme of the same
+name; malformed or schema-invalid files are ignored and reported in Settings without blocking
+startup.
+
 ## 19. Persistence
 
 ### 19.1 General persistence rules

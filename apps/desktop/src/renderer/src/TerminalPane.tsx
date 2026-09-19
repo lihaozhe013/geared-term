@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FitAddon } from '@xterm/addon-fit';
 import { SearchAddon } from '@xterm/addon-search';
 import { Terminal } from '@xterm/xterm';
@@ -65,6 +65,10 @@ export function TerminalPane({
 }: TerminalPaneProps): React.JSX.Element {
   const hostRef = useRef<HTMLDivElement>(null);
   const fitRef = useRef<FitAddon | null>(null);
+  const searchRef = useRef<SearchAddon | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchText, setSearchText] = useState('');
   const terminalRef = useRef<Terminal | null>(null);
   const clientRef = useRef<TerminalClient | null>(null);
   const activeRef = useRef(active);
@@ -97,8 +101,38 @@ export function TerminalPane({
     });
     const fit = new FitAddon();
     terminal.loadAddon(fit);
-    terminal.loadAddon(new SearchAddon());
+    const search = new SearchAddon();
+    searchRef.current = search;
+    terminal.loadAddon(search);
     terminal.open(host);
+    terminal.attachCustomKeyEventHandler((event) => {
+      if (event.type !== 'keydown' || (!event.ctrlKey && !event.metaKey)) return true;
+      const isMacCopyPaste = event.metaKey && !event.shiftKey && process.platform === 'darwin';
+      const key = event.key.toLowerCase();
+      if (key === 'c' && ((event.ctrlKey && event.shiftKey) || isMacCopyPaste)) {
+        if (terminal.getSelection()) void navigator.clipboard.writeText(terminal.getSelection());
+        return false;
+      }
+      if (key === 'v' && ((event.ctrlKey && event.shiftKey) || isMacCopyPaste)) {
+        void navigator.clipboard
+          .readText()
+          .then((text) => terminal.paste(text))
+          .catch(() => undefined);
+        return false;
+      }
+      if (key === 'a' && ((event.ctrlKey && event.shiftKey) || isMacCopyPaste)) {
+        terminal.selectAll();
+        return false;
+      }
+      if (key === 'f' && (event.ctrlKey || (event.metaKey && process.platform === 'darwin'))) {
+        setShowSearch((current) => {
+          if (!current) requestAnimationFrame(() => searchInputRef.current?.focus());
+          return !current;
+        });
+        return false;
+      }
+      return true;
+    });
     fit.fit();
     fitRef.current = fit;
     terminalRef.current = terminal;
@@ -206,6 +240,7 @@ export function TerminalPane({
       client?.close();
       terminal.dispose();
       fitRef.current = null;
+      searchRef.current = null;
       terminalRef.current = null;
       clientRef.current = null;
     };
@@ -236,18 +271,73 @@ export function TerminalPane({
     return () => cancelAnimationFrame(frame);
   }, [active]);
 
+  const closeSearch = (): void => {
+    setShowSearch(false);
+    searchRef.current?.clearDecorations();
+    terminalRef.current?.focus();
+  };
+
   return (
-    <div
-      ref={hostRef}
-      className="terminal-host"
-      aria-label={
-        isSshRequest(request)
-          ? isSavedSshRequest(request)
-            ? 'Saved SSH terminal'
-            : `SSH terminal ${request.host}`
-          : 'Local terminal'
-      }
-      hidden={!active}
-    />
+    <div className="terminal-wrapper" hidden={!active}>
+      {showSearch ? (
+        <div className="terminal-search" role="search">
+          <input
+            ref={searchInputRef}
+            value={searchText}
+            placeholder="Search terminal"
+            aria-label="Search terminal"
+            spellCheck={false}
+            onChange={(event) => {
+              const value = event.target.value;
+              setSearchText(value);
+              if (value) searchRef.current?.findNext(value, { incremental: true });
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                if (event.shiftKey) searchRef.current?.findPrevious(searchText, {});
+                else searchRef.current?.findNext(searchText, {});
+              } else if (event.key === 'Escape') {
+                closeSearch();
+              }
+            }}
+          />
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="Previous match"
+            onClick={() => searchRef.current?.findPrevious(searchText, {})}
+          >
+            ↑
+          </button>
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="Next match"
+            onClick={() => searchRef.current?.findNext(searchText, {})}
+          >
+            ↓
+          </button>
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="Close search"
+            onClick={closeSearch}
+          >
+            ×
+          </button>
+        </div>
+      ) : null}
+      <div
+        ref={hostRef}
+        className="terminal-host"
+        aria-label={
+          isSshRequest(request)
+            ? isSavedSshRequest(request)
+              ? 'Saved SSH terminal'
+              : `SSH terminal ${request.host}`
+            : 'Local terminal'
+        }
+      />
+    </div>
   );
 }

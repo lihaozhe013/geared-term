@@ -354,6 +354,13 @@ const api = Object.freeze({
     ipcRenderer.on('sftp:cd', handler);
     return () => ipcRenderer.removeListener('sftp:cd', handler);
   },
+  onMenuCommand: (listener: (command: string) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, command: unknown): void => {
+      if (typeof command === 'string') listener(command);
+    };
+    ipcRenderer.on('menu-command', handler);
+    return () => ipcRenderer.removeListener('menu-command', handler);
+  },
   listUserThemes: async () => UserThemeListSchema.parse(await ipcRenderer.invoke('themes:list')),
   openThemesFolder: async () =>
     SftpOperationResultSchema.parse(await ipcRenderer.invoke('themes:open-folder')),

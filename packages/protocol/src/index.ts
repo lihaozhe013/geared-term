@@ -553,6 +553,16 @@ export const LocalOpenRequestSchema = z
   })
   .strict();
 
+export const BUILTIN_THEME_NAMES = [
+  'Geared Dark',
+  'Midnight',
+  'Light',
+  'Catppuccin Mocha',
+  'Catppuccin Macchiato',
+  'Catppuccin Frappé',
+  'Catppuccin Latte'
+] as const;
+
 const ThemeColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/u);
 
 export const ThemeColorsSchema = z
