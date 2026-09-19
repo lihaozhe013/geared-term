@@ -100,8 +100,8 @@ export class SftpService {
   public async ensureDir(path: string): Promise<void> {
     const normalized = posix.normalize(path);
     if (normalized === '/' || normalized === '.') return;
-    const segments = normalized.replace(/^\//u, '').split('/');
-    let current = normalized.startsWith('/') ? '' : '.';
+    const segments = normalized.split('/').filter((segment) => segment.length > 0);
+    let current = normalized.startsWith('/') ? '/' : '.';
     for (const segment of segments) {
       if (!segment) continue;
       current = posix.join(current, segment);
