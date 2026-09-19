@@ -55,10 +55,11 @@ export class SftpService {
   public constructor(private readonly sftp: SFTPWrapper) {}
 
   public async list(directory: string): Promise<RemoteEntry[]> {
+    const normalizedDirectory = posix.normalize(directory || '.');
     const entries = await call<FileEntryWithStats[]>((callback) =>
-      this.sftp.readdir(directory, callback)
+      this.sftp.readdir(normalizedDirectory, callback)
     );
-    return entries.map((entry) => mapEntry(directory, entry));
+    return entries.map((entry) => mapEntry(normalizedDirectory, entry));
   }
 
   public async mkdir(path: string): Promise<void> {
@@ -71,7 +72,7 @@ export class SftpService {
 
   public async remove(path: string): Promise<void> {
     const stats = await call<{ isDirectory(): boolean; isSymbolicLink(): boolean }>((callback) =>
-      this.sftp.stat(path, callback)
+      this.sftp.lstat(path, callback)
     );
     if (stats.isDirectory() && !stats.isSymbolicLink()) {
       for (const entry of await this.list(path)) await this.remove(entry.path);
