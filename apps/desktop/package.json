@@ -18,6 +18,7 @@
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run --passWithNoTests",
     "test:e2e": "playwright test -c playwright.config.ts",
+    "audit:security": "node scripts/security-audit.mjs",
     "postinstall": "electron-builder install-app-deps",
     "package": "pnpm run build && electron-builder --config electron-builder.yml"
   },
