@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { commandRevision, parseCommandBlock, splitCommandBlock } from './index';
+import { commandRevision, commandRisk, parseCommandBlock, splitCommandBlock } from './index';
 
 describe('conservative command parsing', () => {
   it('recognizes explicit shell fences', () => {
@@ -9,6 +9,7 @@ describe('conservative command parsing', () => {
     expect(result.exactText).toBe('printf hello');
     expect(result.stability).toBe('stable');
     expect(result.revision).toBe(commandRevision(result.exactText));
+    expect(result.risk).toBe('normal');
   });
 
   it('withholds execution for data fences', () => {
@@ -48,5 +49,12 @@ describe('conservative command parsing', () => {
       splitAllowed: false,
       fallbackReason: 'incomplete'
     });
+  });
+
+  it('marks destructive commands for Insert-only handling', () => {
+    expect(commandRisk('rm -rf ./build', 'bash')).toBe('destructive');
+    expect(parseCommandBlock('```powershell\nRemove-Item -Recurse -Force .\\build\n```').risk).toBe(
+      'destructive'
+    );
   });
 });

@@ -5,6 +5,7 @@ export type CommandCandidate = {
   exactText: string;
   revision: string;
   stability: 'stable' | 'incomplete' | 'unsafe';
+  risk: 'normal' | 'destructive';
   confidence: 'high' | 'medium' | 'low';
   complete: boolean;
   runAllowed: boolean;
@@ -17,6 +18,47 @@ export type CommandSplitResult = {
   splitAllowed: boolean;
   fallbackReason?: 'ambiguous' | 'incomplete' | 'oversized';
 };
+
+export function commandRisk(value: string, shell: SupportedShell): 'normal' | 'destructive' {
+  const patterns: Record<SupportedShell, RegExp[]> = {
+    bash: [
+      /(^|\s)sudo\b/i,
+      /(^|\s)rm\s+(?:-[a-z]*[rf][a-z]*\s+)+/i,
+      /(^|\s)(?:mkfs|shutdown|reboot)\b/i,
+      /\bdd\s+if=/i,
+      /git\s+reset\s+--hard/i,
+      />\s*\/dev\//i
+    ],
+    zsh: [
+      /(^|\s)sudo\b/i,
+      /(^|\s)rm\s+(?:-[a-z]*[rf][a-z]*\s+)+/i,
+      /(^|\s)(?:mkfs|shutdown|reboot)\b/i,
+      /\bdd\s+if=/i,
+      /git\s+reset\s+--hard/i,
+      />\s*\/dev\//i
+    ],
+    fish: [
+      /(^|\s)sudo\b/i,
+      /(^|\s)rm\s+(?:-[a-z]*[rf][a-z]*\s+)+/i,
+      /(^|\s)(?:mkfs|shutdown|reboot)\b/i,
+      /\bdd\s+if=/i,
+      /git\s+reset\s+--hard/i,
+      />\s*\/dev\//i
+    ],
+    powershell: [
+      /Remove-Item[\s\S]*-(?:Recurse|Force)/i,
+      /(?:Stop-Computer|Restart-Computer|Clear-Disk|Format-Volume)\b/i,
+      /Set-ExecutionPolicy\s+Unrestricted/i
+    ],
+    cmd: [
+      /(?:^|\s)(?:del|erase)\s+[\s\S]*\/(?:s|q)/i,
+      /(?:^|\s)rmdir\s+[\s\S]*\/s/i,
+      /(?:^|\s)(?:format|shutdown)\b/i
+    ],
+    unknown: []
+  };
+  return patterns[shell].some((pattern) => pattern.test(value)) ? 'destructive' : 'normal';
+}
 
 const maxInputBytes = 256 * 1024;
 const shellLabels = new Map<string, SupportedShell>([
@@ -198,6 +240,7 @@ export function parseCommandBlock(input: string): CommandCandidate {
       exactText: '',
       revision: commandRevision(''),
       stability: 'incomplete',
+      risk: 'normal',
       confidence: 'low',
       complete: false,
       runAllowed: false,
@@ -214,6 +257,7 @@ export function parseCommandBlock(input: string): CommandCandidate {
       exactText: normalized,
       revision: commandRevision(normalized),
       stability: 'unsafe',
+      risk: 'normal',
       confidence: 'high',
       complete: true,
       runAllowed: false,
@@ -229,6 +273,7 @@ export function parseCommandBlock(input: string): CommandCandidate {
     exactText: normalized,
     revision: commandRevision(normalized),
     stability: complete && shell !== 'unknown' ? 'stable' : complete ? 'unsafe' : 'incomplete',
+    risk: commandRisk(normalized, shell),
     confidence,
     complete,
     runAllowed: complete && confidence === 'high',

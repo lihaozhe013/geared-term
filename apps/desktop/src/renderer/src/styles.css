@@ -469,6 +469,22 @@ textarea {
   padding-right: 3px;
 }
 
+.assistant-context {
+  margin-bottom: 10px;
+  padding: 7px 8px;
+  border: 1px solid #31505c;
+  border-radius: 5px;
+  color: #9fe6d5;
+  background: #102329;
+  font-size: 10px;
+}
+
+.assistant-context p {
+  margin: 6px 0 0;
+  color: #b5c4d4;
+  line-height: 1.4;
+}
+
 .assistant-message {
   margin-bottom: 10px;
   padding: 8px 9px;

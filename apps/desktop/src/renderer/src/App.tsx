@@ -573,7 +573,10 @@ export function App(): React.JSX.Element {
           </div>
         </section>
         {uiState.rightPanel === 'assistant' ? (
-          <AssistantPanel targetSessionId={activeTab?.id} />
+          <AssistantPanel
+            targetSessionId={activeTab?.id}
+            environmentTargetKey={environmentTarget(activeTab?.request)?.targetKey}
+          />
         ) : null}
         {uiState.rightPanel === 'sftp' && activeTab && supportsSftp(activeTab.request) ? (
           <SftpPanel sessionId={activeTab.id} onClose={toggleSftp} />

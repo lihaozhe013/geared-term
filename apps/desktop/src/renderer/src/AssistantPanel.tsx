@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { parseCommandBlock, type CommandCandidate } from '@geared-term/command-parser';
-import type { AiConnectionRecord, AiStreamEvent } from '@geared-term/protocol';
+import type { AiConnectionRecord, AiStreamEvent, EnvironmentRecord } from '@geared-term/protocol';
 
 type Message = {
   role: 'user' | 'assistant';
@@ -9,6 +9,7 @@ type Message = {
 
 type AssistantPanelProps = {
   targetSessionId?: string;
+  environmentTargetKey?: string;
 };
 
 function commandCandidates(content: string): CommandCandidate[] {
@@ -34,7 +35,10 @@ function CommandCard({
 }): React.JSX.Element {
   const insertAllowed = Boolean(targetSessionId) && candidate.stability === 'stable';
   const runAllowed =
-    Boolean(targetSessionId) && candidate.runAllowed && candidate.stability === 'stable';
+    Boolean(targetSessionId) &&
+    candidate.runAllowed &&
+    candidate.stability === 'stable' &&
+    candidate.risk === 'normal';
 
   const copy = async (): Promise<void> => {
     try {
@@ -68,7 +72,9 @@ function CommandCard({
         <small>
           {candidate.shell} · {candidate.confidence} confidence
         </small>
-        <small>{candidate.stability}</small>
+        <small>
+          {candidate.stability} · {candidate.risk}
+        </small>
       </div>
       <pre>{candidate.exactText}</pre>
       <div className="command-card-actions">
@@ -109,7 +115,10 @@ function CommandCard({
   );
 }
 
-export function AssistantPanel({ targetSessionId }: AssistantPanelProps): React.JSX.Element {
+export function AssistantPanel({
+  targetSessionId,
+  environmentTargetKey
+}: AssistantPanelProps): React.JSX.Element {
   const [connections, setConnections] = useState<AiConnectionRecord[]>([]);
   const [selectedId, setSelectedId] = useState('');
   const [name, setName] = useState('Local model');
@@ -123,6 +132,7 @@ export function AssistantPanel({ targetSessionId }: AssistantPanelProps): React.
   const [source, setSource] = useState<string | undefined>();
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [attachedEnvironment, setAttachedEnvironment] = useState<EnvironmentRecord | null>(null);
   const streamRef = useRef<{ cancel: () => void } | null>(null);
 
   useEffect(() => {
@@ -144,6 +154,24 @@ export function AssistantPanel({ targetSessionId }: AssistantPanelProps): React.
       );
     return () => streamRef.current?.cancel();
   }, []);
+
+  useEffect(() => {
+    if (!environmentTargetKey) {
+      setAttachedEnvironment(null);
+      return;
+    }
+    void window.geared
+      .listEnvironments()
+      .then((saved) =>
+        setAttachedEnvironment(
+          saved.find((record) => record.targetKey === environmentTargetKey && record.attachToAi) ??
+            null
+        )
+      )
+      .catch((reason: unknown) =>
+        setError(reason instanceof Error ? reason.message : 'Unable to load AI environment context')
+      );
+  }, [environmentTargetKey]);
 
   const handleSelect = (id: string): void => {
     const connection = connections.find((item) => item.id === id);
@@ -207,6 +235,23 @@ export function AssistantPanel({ targetSessionId }: AssistantPanelProps): React.
     const text = composer.trim();
     if (!text || !selectedId || !model || streaming) return;
     const nextMessages: Message[] = [...messages, { role: 'user', content: text }];
+    const requestMessages = attachedEnvironment
+      ? [
+          {
+            role: 'system' as const,
+            content: `Environment context for ${attachedEnvironment.targetKey}:\n${JSON.stringify(
+              {
+                ...attachedEnvironment.facts,
+                notes: attachedEnvironment.notes,
+                instructions: attachedEnvironment.instructions
+              },
+              null,
+              2
+            )}`
+          },
+          ...nextMessages
+        ]
+      : nextMessages;
     setMessages([...nextMessages, { role: 'assistant', content: '' }]);
     setComposer('');
     setReasoning('');
@@ -215,7 +260,7 @@ export function AssistantPanel({ targetSessionId }: AssistantPanelProps): React.
     setStreaming(true);
     const streamId = crypto.randomUUID();
     streamRef.current = window.geared.streamAi(
-      { streamId, connectionId: selectedId, model, messages: nextMessages },
+      { streamId, connectionId: selectedId, model, messages: requestMessages },
       (event) => {
         const parsed = event as AiStreamEvent;
         receiveEvent(parsed);
@@ -298,6 +343,15 @@ export function AssistantPanel({ targetSessionId }: AssistantPanelProps): React.
       </div>
 
       <div className="assistant-messages" aria-live="polite">
+        {attachedEnvironment ? (
+          <details className="assistant-context">
+            <summary>Environment context attached</summary>
+            <p>
+              {attachedEnvironment.targetKey}: {attachedEnvironment.facts.os ?? 'unknown OS'} ·{' '}
+              {attachedEnvironment.facts.hostname ?? 'unknown host'}
+            </p>
+          </details>
+        ) : null}
         {messages.length === 0 ? (
           <p className="muted">Configure a connection, then ask a question.</p>
         ) : null}

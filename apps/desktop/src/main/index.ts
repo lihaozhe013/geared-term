@@ -239,7 +239,11 @@ function registerIpc(): void {
     }
     if (request.action === 'run') {
       const candidate = parseCommandBlock(`\`\`\`${request.shell}\n${request.payload}\n\`\`\``);
-      if (!candidate.runAllowed || candidate.exactText !== request.payload) {
+      if (
+        !candidate.runAllowed ||
+        candidate.risk === 'destructive' ||
+        candidate.exactText !== request.payload
+      ) {
         throw new Error('The command is not safe to run');
       }
     }

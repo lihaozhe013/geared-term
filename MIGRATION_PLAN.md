@@ -34,6 +34,9 @@ directory listing in a capability-gated panel. The eighth checkpoint adds bounde
 environment probes, versioned environment records, and an editable context panel.
 The ninth checkpoint adds content revisions, explicit command cards, and a validated main-process
 action path that keeps Insert separate from one-submit Run.
+The tenth checkpoint adds conservative destructive-command classification (Run is withheld while
+Insert remains available) and attaches explicitly enabled environment context to AI requests with a
+renderer-visible preview.
 
 ## 2. Delivery rules
 
