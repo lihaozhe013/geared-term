@@ -258,6 +258,7 @@ textarea {
 
 .sftp-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
 }
 
@@ -295,6 +296,11 @@ textarea {
 
 .sftp-entry:hover {
   background: #202b3c;
+}
+
+.sftp-entry[data-selected='true'] {
+  outline: 1px solid #5c8ea5;
+  background: #1a3040;
 }
 
 .sftp-entry-name {

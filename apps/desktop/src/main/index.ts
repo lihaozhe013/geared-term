@@ -1,5 +1,5 @@
-import { app, BrowserWindow, ipcMain, screen, session, shell } from 'electron';
-import { join } from 'node:path';
+import { app, BrowserWindow, dialog, ipcMain, screen, session, shell } from 'electron';
+import { basename, join, posix } from 'node:path';
 import {
   AppInfoSchema,
   AiConnectionDeleteRequestSchema,
@@ -17,7 +17,10 @@ import {
   SessionProfileSaveRequestSchema,
   SettingsRecordSchema,
   SftpListRequestSchema,
+  SftpDownloadRequestSchema,
+  SftpOperationResultSchema,
   SftpRemoteEntrySchema,
+  SftpUploadRequestSchema,
   SshProfileTerminalRequestSchema,
   TerminalCommandActionSchema,
   UiStateRecordSchema,
@@ -226,6 +229,34 @@ function registerIpc(): void {
     return SftpRemoteEntrySchema.array().parse(
       await sshSessions.listSftp(request.sessionId, request.directory)
     );
+  });
+  ipcMain.handle('sftp:upload', async (_event, input: unknown) => {
+    const request = SftpUploadRequestSchema.parse(input);
+    if (!mainWindow) throw new Error('Application window is not available');
+    const selection = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openFile'],
+      title: 'Select a file to upload'
+    });
+    if (selection.canceled || !selection.filePaths[0]) {
+      return SftpOperationResultSchema.parse({ accepted: false });
+    }
+    const localPath = selection.filePaths[0];
+    const remotePath = posix.join(request.remoteDirectory || '.', basename(localPath));
+    await sshSessions.uploadSftp(request.sessionId, localPath, remotePath);
+    return SftpOperationResultSchema.parse({ accepted: true });
+  });
+  ipcMain.handle('sftp:download', async (_event, input: unknown) => {
+    const request = SftpDownloadRequestSchema.parse(input);
+    if (!mainWindow) throw new Error('Application window is not available');
+    const selection = await dialog.showSaveDialog(mainWindow, {
+      defaultPath: request.suggestedName,
+      title: 'Save remote file'
+    });
+    if (selection.canceled || !selection.filePath) {
+      return SftpOperationResultSchema.parse({ accepted: false });
+    }
+    await sshSessions.downloadSftp(request.sessionId, request.remotePath, selection.filePath);
+    return SftpOperationResultSchema.parse({ accepted: true });
   });
   ipcMain.handle('environment:list', () =>
     EnvironmentRecordSchema.array().parse(storage.environmentSnapshot())

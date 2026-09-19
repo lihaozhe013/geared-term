@@ -15,8 +15,11 @@ import {
   SessionProfileRecordSchema,
   SessionProfileSaveRequestSchema,
   SettingsRecordSchema,
+  SftpDownloadRequestSchema,
   SftpListRequestSchema,
+  SftpOperationResultSchema,
   SftpRemoteEntrySchema,
+  SftpUploadRequestSchema,
   SshProfileTerminalRequestSchema,
   SshTerminalRequestSchema,
   TerminalCommandActionSchema,
@@ -35,6 +38,8 @@ import {
   type SessionProfileSaveRequest,
   type SettingsRecord,
   type SftpListRequest,
+  type SftpDownloadRequest,
+  type SftpUploadRequest,
   type TerminalCommandAction,
   type SshProfileTerminalRequest,
   type SshTerminalRequest,
@@ -202,6 +207,14 @@ const api = Object.freeze({
   listSftp: async (input: SftpListRequest) => {
     const request = SftpListRequestSchema.parse(input);
     return SftpRemoteEntrySchema.array().parse(await ipcRenderer.invoke('sftp:list', request));
+  },
+  uploadSftp: async (input: SftpUploadRequest) => {
+    const request = SftpUploadRequestSchema.parse(input);
+    return SftpOperationResultSchema.parse(await ipcRenderer.invoke('sftp:upload', request));
+  },
+  downloadSftp: async (input: SftpDownloadRequest) => {
+    const request = SftpDownloadRequestSchema.parse(input);
+    return SftpOperationResultSchema.parse(await ipcRenderer.invoke('sftp:download', request));
   },
   executeCommandAction: async (input: TerminalCommandAction) => {
     const action = TerminalCommandActionSchema.parse(input);

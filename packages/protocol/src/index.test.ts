@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   AppInfoSchema,
+  SftpDownloadRequestSchema,
   SftpListRequestSchema,
+  SftpOperationResultSchema,
   SftpRemoteEntrySchema,
+  SftpUploadRequestSchema,
   SessionProfileSaveRequestSchema,
   TerminalCommandActionSchema,
   TerminalPortMessageSchema
@@ -44,6 +47,18 @@ describe('protocol schemas', () => {
         modifiedAt: null
       }).success
     ).toBe(true);
+    expect(SftpUploadRequestSchema.parse({ sessionId: 'ssh-1', remoteDirectory: '/tmp' })).toEqual({
+      sessionId: 'ssh-1',
+      remoteDirectory: '/tmp'
+    });
+    expect(
+      SftpDownloadRequestSchema.safeParse({
+        sessionId: 'ssh-1',
+        remotePath: '/tmp/notes.txt',
+        suggestedName: 'notes.txt'
+      }).success
+    ).toBe(true);
+    expect(SftpOperationResultSchema.parse({ accepted: false })).toEqual({ accepted: false });
   });
 
   it('requires an explicit shell and revision for command actions', () => {

@@ -40,7 +40,9 @@ checkpoint adds a session profile editor for local, WSL, and SSH targets, transi
 validation, Vault initialization/unlock/lock controls, and main-process-only encrypted credential
 replacement and cleanup. The twelfth checkpoint adds a non-persistent SSH connection dialog that
 keeps one-shot credentials in the active tab only and reuses the same host-key and SFTP capability
-paths as saved SSH sessions.
+paths as saved SSH sessions. The thirteenth checkpoint adds main-owned local file dialogs for SFTP
+upload/download, selected remote-file state, and validated transfer IPC without exposing arbitrary
+filesystem APIs to the renderer.
 
 ## 2. Delivery rules
 

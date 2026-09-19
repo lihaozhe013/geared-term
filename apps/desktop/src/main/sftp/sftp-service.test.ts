@@ -42,4 +42,27 @@ describe('SFTP path handling', () => {
     await service.remove('/home/alice/link');
     expect(unlink).toHaveBeenCalledWith('/home/alice/link', expect.any(Function));
   });
+
+  it('delegates bounded file transfers to the SFTP channel', async () => {
+    const fastPut = vi.fn(
+      (local: string, remote: string, callback: (error?: Error | null) => void) => callback(null)
+    );
+    const fastGet = vi.fn(
+      (remote: string, local: string, callback: (error?: Error | null) => void) => callback(null)
+    );
+    const service = new SftpService({ fastPut, fastGet } as unknown as SFTPWrapper);
+
+    await service.upload('C:\\tmp\\notes.txt', '/home/alice/notes.txt');
+    await service.download('/home/alice/notes.txt', 'C:\\tmp\\copy.txt');
+    expect(fastPut).toHaveBeenCalledWith(
+      'C:\\tmp\\notes.txt',
+      '/home/alice/notes.txt',
+      expect.any(Function)
+    );
+    expect(fastGet).toHaveBeenCalledWith(
+      '/home/alice/notes.txt',
+      'C:\\tmp\\copy.txt',
+      expect.any(Function)
+    );
+  });
 });

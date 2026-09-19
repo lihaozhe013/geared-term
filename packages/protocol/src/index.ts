@@ -301,6 +301,23 @@ export const SftpListRequestSchema = z
   })
   .strict();
 
+export const SftpUploadRequestSchema = z
+  .object({
+    sessionId: IdSchema,
+    remoteDirectory: z.string().min(1).max(4096).default('.')
+  })
+  .strict();
+
+export const SftpDownloadRequestSchema = z
+  .object({
+    sessionId: IdSchema,
+    remotePath: z.string().min(1).max(8192),
+    suggestedName: z.string().min(1).max(4096)
+  })
+  .strict();
+
+export const SftpOperationResultSchema = z.object({ accepted: z.boolean() }).strict();
+
 export const SftpRemoteEntrySchema = z
   .object({
     name: z.string().min(1).max(4096),
@@ -376,6 +393,9 @@ export type TerminalClientMessage = z.infer<typeof TerminalClientMessageSchema>;
 export type SshTerminalRequest = z.infer<typeof SshTerminalRequestSchema>;
 export type SshProfileTerminalRequest = z.infer<typeof SshProfileTerminalRequestSchema>;
 export type SftpListRequest = z.infer<typeof SftpListRequestSchema>;
+export type SftpUploadRequest = z.infer<typeof SftpUploadRequestSchema>;
+export type SftpDownloadRequest = z.infer<typeof SftpDownloadRequestSchema>;
+export type SftpOperationResult = z.infer<typeof SftpOperationResultSchema>;
 export type SftpRemoteEntry = z.infer<typeof SftpRemoteEntrySchema>;
 export type TerminalCommandAction = z.infer<typeof TerminalCommandActionSchema>;
 export type EnvironmentFacts = z.infer<typeof EnvironmentFactsSchema>;

@@ -139,6 +139,26 @@ export class SshSessionManager {
     return service.list(directory);
   }
 
+  public async uploadSftp(sessionId: string, localPath: string, remotePath: string): Promise<void> {
+    const session = this.sessions.get(sessionId);
+    if (!session || session.closed) throw new Error('SSH session is not available for SFTP');
+    const service = await session.sftpReady;
+    if (session.closed) throw new Error('SSH session is no longer available for SFTP');
+    await service.upload(localPath, remotePath);
+  }
+
+  public async downloadSftp(
+    sessionId: string,
+    remotePath: string,
+    localPath: string
+  ): Promise<void> {
+    const session = this.sessions.get(sessionId);
+    if (!session || session.closed) throw new Error('SSH session is not available for SFTP');
+    const service = await session.sftpReady;
+    if (session.closed) throw new Error('SSH session is no longer available for SFTP');
+    await service.download(remotePath, localPath);
+  }
+
   public sendInput(sessionId: string, data: string): void {
     const session = this.sessions.get(sessionId);
     if (!session || session.closed || !session.channel) {
