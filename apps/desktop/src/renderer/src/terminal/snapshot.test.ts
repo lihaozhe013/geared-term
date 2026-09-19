@@ -7,7 +7,10 @@ import {
   type SnapshotTerminal
 } from './snapshot';
 
-function makeTerminal(lines: string[], overrides: Partial<SnapshotTerminal> = {}): SnapshotTerminal {
+function makeTerminal(
+  lines: string[],
+  overrides: Partial<SnapshotTerminal> = {}
+): SnapshotTerminal {
   const buffer: SnapshotBuffer = {
     type: 'normal',
     viewportY: Math.max(0, lines.length - 4),

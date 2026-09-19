@@ -179,9 +179,7 @@ describe('profile database', () => {
     new ProfileDatabase(root, logger).close();
     // Simulate an older schema: version 0 with an empty schema_info table.
     const raw = new Database(join(root, 'geared-term.db'));
-    raw
-      .prepare("UPDATE schema_info SET value = '0' WHERE key = 'schema_version'")
-      .run();
+    raw.prepare("UPDATE schema_info SET value = '0' WHERE key = 'schema_version'").run();
     raw.close();
     // Version 0 has no tables according to the migration list, so recreating
     // the store must re-apply migration 1 after a backup was taken.
@@ -222,7 +220,11 @@ describe('profile database', () => {
       },
       '2026-01-01T00:00:00.000Z'
     );
-    expect(database.listProfiles()[0]?.args).toEqual(['-NoLogo', '-File', 'C:\\Program Files\\x\\run.ps1']);
+    expect(database.listProfiles()[0]?.args).toEqual([
+      '-NoLogo',
+      '-File',
+      'C:\\Program Files\\x\\run.ps1'
+    ]);
     database.close();
   });
 

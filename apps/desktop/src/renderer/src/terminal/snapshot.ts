@@ -99,10 +99,7 @@ export function extractSnapshot(
   };
 }
 
-function enforceLimit(
-  text: string,
-  maxBytes: number
-): { text: string; truncated: boolean } {
+function enforceLimit(text: string, maxBytes: number): { text: string; truncated: boolean } {
   const byteLength = Buffer.byteLength(text, 'utf8');
   if (byteLength <= maxBytes) {
     return { text, truncated: false };

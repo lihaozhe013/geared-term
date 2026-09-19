@@ -60,7 +60,9 @@ export async function discoverModels(request: DiscoveryRequest): Promise<Discove
         .text()
         .then((value) => value.slice(0, 200))
         .catch(() => '');
-      throw new Error(`Responses test request failed (${response.status})${body ? `: ${body}` : ''}`);
+      throw new Error(
+        `Responses test request failed (${response.status})${body ? `: ${body}` : ''}`
+      );
     }
     return { models: [model] };
   } catch (error) {
@@ -76,7 +78,7 @@ export async function discoverModels(request: DiscoveryRequest): Promise<Discove
 function parseModelList(payload: unknown): string[] {
   const source =
     payload && typeof payload === 'object' && Array.isArray((payload as { data?: unknown }).data)
-      ? ((payload as { data: unknown[] }).data)
+      ? (payload as { data: unknown[] }).data
       : Array.isArray(payload)
         ? payload
         : [];

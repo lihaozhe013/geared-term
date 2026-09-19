@@ -24,8 +24,24 @@ import {
   SettingsRecordSchema,
   SftpDownloadRequestSchema,
   SftpListRequestSchema,
+  SftpListResultSchema,
+  SftpMkdirRequestSchema,
+  SftpRenameRequestSchema,
+  SftpDeleteRequestSchema,
+  SftpUploadPathsRequestSchema,
+  SftpDownloadPathsRequestSchema,
+  SftpTransferIdRequestSchema,
+  SftpTransferSchema,
+  SftpTransferEventSchema,
+  SftpRemoteCommandRequestSchema,
+  SftpCdEventSchema,
+  LocalListRequestSchema,
+  LocalEntrySchema,
+  LocalMkdirRequestSchema,
+  LocalRenameRequestSchema,
+  LocalDeleteRequestSchema,
+  LocalOpenRequestSchema,
   SftpOperationResultSchema,
-  SftpRemoteEntrySchema,
   SftpUploadRequestSchema,
   SshProfileTerminalRequestSchema,
   SshTerminalRequestSchema,
@@ -53,6 +69,16 @@ import {
   type SftpListRequest,
   type SftpDownloadRequest,
   type SftpUploadRequest,
+  type SftpMkdirRequest,
+  type SftpRenameRequest,
+  type SftpDeleteRequest,
+  type SftpUploadPathsRequest,
+  type SftpDownloadPathsRequest,
+  type SftpTransferEvent,
+  type SftpRemoteCommandRequest,
+  type SftpCdEvent,
+  type LocalMkdirRequest,
+  type LocalRenameRequest,
   type TerminalCommandAction,
   type SshProfileTerminalRequest,
   type SshTerminalRequest,
@@ -178,8 +204,7 @@ const api = Object.freeze({
     const request = AiDiscoverModelsRequestSchema.parse(input);
     return AiDiscoveredModelsSchema.parse(await ipcRenderer.invoke('ai:discover-models', request));
   },
-  listAiHistory: async () =>
-    AiHistoryListSchema.parse(await ipcRenderer.invoke('ai:history:list')),
+  listAiHistory: async () => AiHistoryListSchema.parse(await ipcRenderer.invoke('ai:history:list')),
   loadAiHistory: async (input: AiHistoryLoadRequest) => {
     const request = AiHistoryLoadRequestSchema.parse(input);
     return AiHistoryLoadResultSchema.parse(await ipcRenderer.invoke('ai:history:load', request));
@@ -249,7 +274,83 @@ const api = Object.freeze({
   },
   listSftp: async (input: SftpListRequest) => {
     const request = SftpListRequestSchema.parse(input);
-    return SftpRemoteEntrySchema.array().parse(await ipcRenderer.invoke('sftp:list', request));
+    return SftpListResultSchema.parse(await ipcRenderer.invoke('sftp:list', request));
+  },
+  sftpMkdir: async (input: SftpMkdirRequest) => {
+    const request = SftpMkdirRequestSchema.parse(input);
+    return SftpOperationResultSchema.parse(await ipcRenderer.invoke('sftp:mkdir', request));
+  },
+  sftpRename: async (input: SftpRenameRequest) => {
+    const request = SftpRenameRequestSchema.parse(input);
+    return SftpOperationResultSchema.parse(await ipcRenderer.invoke('sftp:rename', request));
+  },
+  sftpDelete: async (input: SftpDeleteRequest) => {
+    const request = SftpDeleteRequestSchema.parse(input);
+    return SftpOperationResultSchema.parse(await ipcRenderer.invoke('sftp:delete', request));
+  },
+  uploadPathsSftp: async (input: SftpUploadPathsRequest) => {
+    const request = SftpUploadPathsRequestSchema.parse(input);
+    return SftpTransferSchema.array().parse(await ipcRenderer.invoke('sftp:upload-paths', request));
+  },
+  downloadPathsSftp: async (input: SftpDownloadPathsRequest) => {
+    const request = SftpDownloadPathsRequestSchema.parse(input);
+    return SftpTransferSchema.array().parse(
+      await ipcRenderer.invoke('sftp:download-paths', request)
+    );
+  },
+  listSftpTransfers: async (sessionId?: string) =>
+    SftpTransferSchema.array().parse(await ipcRenderer.invoke('sftp:transfers', { sessionId })),
+  cancelSftpTransfer: async (transferId: string) => {
+    const request = SftpTransferIdRequestSchema.parse({ transferId });
+    return SftpOperationResultSchema.parse(
+      await ipcRenderer.invoke('sftp:cancel-transfer', request)
+    );
+  },
+  runRemoteFileCommand: async (input: SftpRemoteCommandRequest) => {
+    const request = SftpRemoteCommandRequestSchema.parse(input);
+    return SftpOperationResultSchema.parse(
+      await ipcRenderer.invoke('sftp:remote-command', request)
+    );
+  },
+  listLocalFiles: async (directory: string | null) => {
+    const request = LocalListRequestSchema.parse({ directory });
+    return LocalEntrySchema.array().parse(await ipcRenderer.invoke('local:list', request));
+  },
+  makeLocalDirectory: async (input: LocalMkdirRequest) => {
+    const request = LocalMkdirRequestSchema.parse(input);
+    return SftpOperationResultSchema.parse(await ipcRenderer.invoke('local:mkdir', request));
+  },
+  renameLocalPath: async (input: LocalRenameRequest) => {
+    const request = LocalRenameRequestSchema.parse(input);
+    return SftpOperationResultSchema.parse(await ipcRenderer.invoke('local:rename', request));
+  },
+  deleteLocalPaths: async (paths: string[]) => {
+    const request = LocalDeleteRequestSchema.parse({ paths });
+    return SftpOperationResultSchema.parse(await ipcRenderer.invoke('local:delete', request));
+  },
+  openLocalPath: async (path: string) => {
+    const request = LocalOpenRequestSchema.parse({ path });
+    return SftpOperationResultSchema.parse(await ipcRenderer.invoke('local:open', request));
+  },
+  revealLocalPath: async (path: string) => {
+    const request = LocalOpenRequestSchema.parse({ path });
+    return SftpOperationResultSchema.parse(await ipcRenderer.invoke('local:reveal', request));
+  },
+  onSftpTransferEvent: (listener: (event: SftpTransferEvent) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, payload: unknown): void => {
+      const result = SftpTransferEventSchema.safeParse(payload);
+      if (result.success) listener(result.data);
+    };
+    ipcRenderer.on('sftp:transfer-event', handler);
+    return () => ipcRenderer.removeListener('sftp:transfer-event', handler);
+  },
+  onSftpCd: (listener: (event: SftpCdEvent) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, payload: unknown): void => {
+      const result = SftpCdEventSchema.safeParse(payload);
+      if (result.success) listener(result.data);
+    };
+    ipcRenderer.on('sftp:cd', handler);
+    return () => ipcRenderer.removeListener('sftp:cd', handler);
   },
   uploadSftp: async (input: SftpUploadRequest) => {
     const request = SftpUploadRequestSchema.parse(input);

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { parseRemoteFileCommands } from '@geared-term/protocol';
 import type {
   LocalTerminalRequest,
   SessionProfileRecord,
@@ -37,7 +38,8 @@ const defaultSettings: SettingsRecord = {
   terminalCursor: 'block',
   defaultTerm: 'xterm-256color',
   splitCommandPresentation: false,
-  terminalContextPrecedingLines: 100
+  terminalContextPrecedingLines: 100,
+  remoteFileCommands: 'cat\nless\nvim'
 };
 
 const defaultUiState: UiStateRecord = {
@@ -142,6 +144,7 @@ export function App(): React.JSX.Element {
   const [info, setInfo] = useState<AppInfo | null>(null);
   const [profiles, setProfiles] = useState<SessionProfileRecord[]>([]);
   const [settings, setSettings] = useState<SettingsRecord>(defaultSettings);
+  const [alternateScreens, setAlternateScreens] = useState<Record<string, boolean>>({});
   const [uiState, setUiState] = useState<UiStateRecord>(defaultUiState);
   const [wslDistributions, setWslDistributions] = useState<WslDistribution[]>([]);
   const [wslLoading, setWslLoading] = useState(false);
@@ -636,6 +639,9 @@ export function App(): React.JSX.Element {
                     snapshotExtractors.current.delete(tab.id);
                   }
                 }}
+                onAlternateScreen={(value) =>
+                  setAlternateScreens((current) => ({ ...current, [tab.id]: value }))
+                }
               />
             ))}
             {info ? (
@@ -658,7 +664,12 @@ export function App(): React.JSX.Element {
           />
         ) : null}
         {uiState.rightPanel === 'sftp' && activeTab && supportsSftp(activeTab.request) ? (
-          <SftpPanel sessionId={activeTab.id} onClose={toggleSftp} />
+          <SftpPanel
+            sessionId={activeTab.id}
+            remoteFileCommands={parseRemoteFileCommands(settings.remoteFileCommands)}
+            alternateScreen={Boolean(alternateScreens[activeTab.id])}
+            onClose={toggleSftp}
+          />
         ) : null}
         {uiState.rightPanel === 'environment' && activeTab ? (
           <>

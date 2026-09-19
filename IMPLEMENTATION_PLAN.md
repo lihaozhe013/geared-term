@@ -190,19 +190,19 @@ service is called. TypeScript types are inferred from the schemas rather than du
 
 Use main-process-owned, versioned storage under the platform-standard Geared Term directories:
 
-| Artifact                              | Engine              | Contents                                                        |
-| ------------------------------------- | ------------------- | --------------------------------------------------------------- |
-| `geared-term.db`                      | SQLite (WAL)        | Session profiles, vault-encrypted secrets, AI connections, environments |
-| `settings.json`                       | Versioned JSON      | Non-secret application preferences                              |
-| `ui-state.json`                       | Versioned JSON      | Window and panel state                                          |
-| `known-hosts.json`                    | Versioned JSON      | Parsed host keys and metadata                                   |
-| `ai-history/`                         | Markdown files      | Human-readable conversation history                             |
-| `themes/`                             | JSON files          | User themes                                                     |
-| `logs/`                               | Rotated text files  | Diagnostics                                                     |
+| Artifact           | Engine             | Contents                                                                |
+| ------------------ | ------------------ | ----------------------------------------------------------------------- |
+| `geared-term.db`   | SQLite (WAL)       | Session profiles, vault-encrypted secrets, AI connections, environments |
+| `settings.json`    | Versioned JSON     | Non-secret application preferences                                      |
+| `ui-state.json`    | Versioned JSON     | Window and panel state                                                  |
+| `known-hosts.json` | Versioned JSON     | Parsed host keys and metadata                                           |
+| `ai-history/`      | Markdown files     | Human-readable conversation history                                     |
+| `themes/`          | JSON files         | User themes                                                             |
+| `logs/`            | Rotated text files | Diagnostics                                                             |
 
 Each mutable JSON file keeps write-to-sibling, flush, atomic rename, and a last-known-good backup.
-Settings and UI state remain JSON deliberately: they are small documents written frequently
-(window bounds churn) and are consumed whole at startup.
+Settings and UI state remain JSON deliberately: they are small documents written frequently (window
+bounds churn) and are consumed whole at startup.
 
 ### 5.2 SQLite profile store
 
@@ -338,16 +338,16 @@ must be recorded in an architecture decision before the feature is enabled.
 
 ## 6. Workstreams
 
-| Workstream                     | Depends on                                | Primary result                                       |
-| ------------------------------ | ----------------------------------------- | ---------------------------------------------------- |
-| Protocol and security boundary | Foundation                                | Typed IPC, ports, structured errors                  |
-| SQLite persistence and vault   | Protocol                                  | Embedded profile store and the secret lifecycle      |
-| Terminal transport and xterm   | Protocol                                  | Local terminal vertical slice                        |
-| Workspace UI                   | Foundation, domain                        | Sidebar, tabs, panels, settings                      |
-| SSH and SFTP                   | Session contract, vault                   | Remote terminal and file workflow                    |
-| AI and environment             | Protocol, vault, terminal snapshots       | Provider-neutral streaming assistant                 |
-| Command parser                 | Foundation only                           | Pure tested parser and risk metadata                 |
-| Packaging and release          | All vertical slices                       | Supported artifacts and smoke tests                  |
+| Workstream                     | Depends on                          | Primary result                                  |
+| ------------------------------ | ----------------------------------- | ----------------------------------------------- |
+| Protocol and security boundary | Foundation                          | Typed IPC, ports, structured errors             |
+| SQLite persistence and vault   | Protocol                            | Embedded profile store and the secret lifecycle |
+| Terminal transport and xterm   | Protocol                            | Local terminal vertical slice                   |
+| Workspace UI                   | Foundation, domain                  | Sidebar, tabs, panels, settings                 |
+| SSH and SFTP                   | Session contract, vault             | Remote terminal and file workflow               |
+| AI and environment             | Protocol, vault, terminal snapshots | Provider-neutral streaming assistant            |
+| Command parser                 | Foundation only                     | Pure tested parser and risk metadata            |
+| Packaging and release          | All vertical slices                 | Supported artifacts and smoke tests             |
 
 No workstream may invent its own identifier, error, cancellation, or persistence conventions.
 
@@ -377,9 +377,9 @@ No workstream may invent its own identifier, error, cancellation, or persistence
 - Implement the connection bootstrap (pragmas, `schema_info`, migrations, quarantine) and the schema
   version 1 DDL from Section 5.2.
 - Implement the repository behind the existing `AppStorage` facade so the public surface
-  (`profileSnapshot`, `saveProfile`, `deleteProfile`, secret lifecycle, AI and environment snapshots,
-  `resolveSshProfile`, `resolveAiConnection`) is unchanged; IPC handlers, preload, and renderer are
-  untouched.
+  (`profileSnapshot`, `saveProfile`, `deleteProfile`, secret lifecycle, AI and environment
+  snapshots, `resolveSshProfile`, `resolveAiConnection`) is unchanged; IPC handlers, preload, and
+  renderer are untouched.
 - Implement the one-time adoption migration from `profile.json`.
 - Implement the secret-reference sweep and transaction wrappers for every mutation.
 - Add repository, migration, adoption, corruption-quarantine, and transaction-atomicity tests.
@@ -452,8 +452,8 @@ No workstream may invent its own identifier, error, cancellation, or persistence
 
 ### Exit gate
 
-- Every file operation passes against the controlled SFTP server, including cancellation and
-  Unicode names; terminal I/O stays responsive during large transfers.
+- Every file operation passes against the controlled SFTP server, including cancellation and Unicode
+  names; terminal I/O stays responsive during large transfers.
 
 ## 13. Phase 6 - Settings and appearance completion
 
@@ -474,8 +474,8 @@ No workstream may invent its own identifier, error, cancellation, or persistence
 
 ### Work
 
-- Complete modal focus containment, focus return, tab close confirmations, and error feedback
-  bounds (APP-013 through APP-018).
+- Complete modal focus containment, focus return, tab close confirmations, and error feedback bounds
+  (APP-013 through APP-018).
 - Complete the A11Y group: keyboard reachability, stable focus during streaming, disabled-action
   reasons, and scaling checks.
 
@@ -506,13 +506,13 @@ No workstream may invent its own identifier, error, cancellation, or persistence
 
 ### 16.1 Test layers
 
-| Layer              | Tooling                           | Scope                                                            |
-| ------------------ | --------------------------------- | ---------------------------------------------------------------- |
-| Pure unit          | Vitest                            | Domain state, parser, schemas, URL building, settings migrations |
-| Main integration   | Vitest in Node/Electron harness   | Vault, SQLite store, PTY, SSH/SFTP, AI adapters                  |
-| Renderer component | Vitest plus DOM testing utilities | Focus, command cards, settings, panel state                      |
-| Electron E2E       | Playwright                        | Window, preload boundary, terminal workflows, dialogs, tabs      |
-| Package smoke      | Platform CI scripts               | Installed/packaged launch and native module execution            |
+| Layer              | Tooling                           | Scope                                                              |
+| ------------------ | --------------------------------- | ------------------------------------------------------------------ |
+| Pure unit          | Vitest                            | Domain state, parser, schemas, URL building, settings migrations   |
+| Main integration   | Vitest in Node/Electron harness   | Vault, SQLite store, PTY, SSH/SFTP, AI adapters                    |
+| Renderer component | Vitest plus DOM testing utilities | Focus, command cards, settings, panel state                        |
+| Electron E2E       | Playwright                        | Window, preload boundary, terminal workflows, dialogs, tabs        |
+| Package smoke      | Platform CI scripts               | Installed/packaged launch and native module execution              |
 | Manual             | Versioned checklists              | IME, DPI, fonts, multiple displays, platform chrome, accessibility |
 
 ### 16.2 Determinism
@@ -551,22 +551,22 @@ No workstream may invent its own identifier, error, cancellation, or persistence
 
 ## 18. Risk register
 
-| Risk                            | Detection                                        | Mitigation                                                           | Release blocker                                        |
-| ------------------------------- | ------------------------------------------------ | -------------------------------------------------------------------- | ------------------------------------------------------ |
-| electron-vite 6 beta regression | Clean build/package failure or HMR/main mismatch | Pin an exact beta, keep a minimal reproduction, upgrade separately   | Package or production build failure                    |
-| TypeScript 7 tooling gap        | Lint/plugin/compiler API errors                  | Keep TS as typechecker, isolate incompatible non-blocking tooling    | Typecheck or source-map correctness failure            |
-| Native module ABI failure       | Packaged smoke fails                             | Rebuild `node-pty` and `better-sqlite3` for Electron ABI per platform | Any supported artifact cannot start a PTY or open the database |
-| xterm font/IME regression       | Manual matrix or buffer/render mismatch          | Font fallback fixtures, IME testing, WebGL fallback                  | Input loss, unreadable CJK, or incorrect cell geometry |
-| Port backpressure bug           | Memory growth, latency, missing sequence         | Credit/ack protocol, stress tests, explicit overload state           | Lost terminal bytes or unbounded growth                |
-| `ssh2` behavior gap             | Controlled-server scenario fails                 | Adapter state machine, interoperability fixtures, scoped feature set | Auth, host trust, PTY, or resize failure               |
-| SFTP blocks terminal            | Latency/stress metrics                           | Separate channels/tasks and bounded transfer events                  | Terminal becomes unresponsive during transfer          |
-| Changed-host handling weakens   | Host-key fixtures fail                           | Fail closed, serialize store changes, show both fingerprints         | Mismatch accepted without explicit approval            |
-| Parser changes command meaning  | Fixture/fuzz failure                             | Shell-specific parsers and whole-block fallback                      | Runnable incorrect candidate                           |
-| Stale command targets wrong tab | Race E2E failure                                 | Session and revision validation in main                              | Any demonstrated cross-session send                    |
-| SQLite migration corrupts data  | Migration or interrupted-write test fails        | Transactional migrations, `VACUUM INTO` backups, quarantine          | Data loss or a partially migrated database             |
-| Secret leakage                  | Log/IPC/bundle scanning                          | Main-only secrets, redaction, synthetic canary tests                 | Any plaintext secret outside approved memory path      |
-| Linux auto-unlock is weak       | `safeStorage` reports basic backend              | Disable or require explicit warned fallback                          | Silent insecure auto-unlock                            |
-| Feature creep from Web integration | Dependency or IPC review                      | Separate milestone and capability boundary                           | Web content obtains terminal capability                |
+| Risk                               | Detection                                        | Mitigation                                                            | Release blocker                                                |
+| ---------------------------------- | ------------------------------------------------ | --------------------------------------------------------------------- | -------------------------------------------------------------- |
+| electron-vite 6 beta regression    | Clean build/package failure or HMR/main mismatch | Pin an exact beta, keep a minimal reproduction, upgrade separately    | Package or production build failure                            |
+| TypeScript 7 tooling gap           | Lint/plugin/compiler API errors                  | Keep TS as typechecker, isolate incompatible non-blocking tooling     | Typecheck or source-map correctness failure                    |
+| Native module ABI failure          | Packaged smoke fails                             | Rebuild `node-pty` and `better-sqlite3` for Electron ABI per platform | Any supported artifact cannot start a PTY or open the database |
+| xterm font/IME regression          | Manual matrix or buffer/render mismatch          | Font fallback fixtures, IME testing, WebGL fallback                   | Input loss, unreadable CJK, or incorrect cell geometry         |
+| Port backpressure bug              | Memory growth, latency, missing sequence         | Credit/ack protocol, stress tests, explicit overload state            | Lost terminal bytes or unbounded growth                        |
+| `ssh2` behavior gap                | Controlled-server scenario fails                 | Adapter state machine, interoperability fixtures, scoped feature set  | Auth, host trust, PTY, or resize failure                       |
+| SFTP blocks terminal               | Latency/stress metrics                           | Separate channels/tasks and bounded transfer events                   | Terminal becomes unresponsive during transfer                  |
+| Changed-host handling weakens      | Host-key fixtures fail                           | Fail closed, serialize store changes, show both fingerprints          | Mismatch accepted without explicit approval                    |
+| Parser changes command meaning     | Fixture/fuzz failure                             | Shell-specific parsers and whole-block fallback                       | Runnable incorrect candidate                                   |
+| Stale command targets wrong tab    | Race E2E failure                                 | Session and revision validation in main                               | Any demonstrated cross-session send                            |
+| SQLite migration corrupts data     | Migration or interrupted-write test fails        | Transactional migrations, `VACUUM INTO` backups, quarantine           | Data loss or a partially migrated database                     |
+| Secret leakage                     | Log/IPC/bundle scanning                          | Main-only secrets, redaction, synthetic canary tests                  | Any plaintext secret outside approved memory path              |
+| Linux auto-unlock is weak          | `safeStorage` reports basic backend              | Disable or require explicit warned fallback                           | Silent insecure auto-unlock                                    |
+| Feature creep from Web integration | Dependency or IPC review                         | Separate milestone and capability boundary                            | Web content obtains terminal capability                        |
 
 ## 19. Progress reporting
 

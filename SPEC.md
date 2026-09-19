@@ -21,8 +21,8 @@ The key words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are normative.
 
 The specification was derived from:
 
-1. the product goals of a dependable daily-use terminal with integrated file transfer and an
-   AI assistant;
+1. the product goals of a dependable daily-use terminal with integrated file transfer and an AI
+   assistant;
 2. [`docs/web-llm-page-support-requirements.md`](docs/web-llm-page-support-requirements.md), only to
    keep that separate feature out of this product.
 
@@ -68,30 +68,30 @@ The initial release MUST NOT include:
 
 These decisions define behavior that a straightforward implementation might otherwise get wrong.
 
-| Area | Geared Term requirement |
-| --- | --- |
-| Terminal engine | xterm.js owns VT state, display, selection, and scrollback. |
-| AI command action | Copy, Insert, and Run are separate. Insert MUST never submit. Run requires an explicit click. |
-| Implicit submit | No setting may cause inserted command text to be submitted automatically. |
-| Command splitting | Optional shell-aware parsing by top-level statement, with a conservative whole-block fallback. |
-| Terminal context | Selection remains preferred; viewport and a user-bounded amount of preceding scrollback are supported with preview and truncation disclosure. |
-| External AI consent | The first request to a normalized endpoint requires consent whether or not a snapshot is attached. Endpoint changes require renewed consent. |
-| Workspace restore | Window and panel layout only. Do not auto-reconnect or silently reopen live sessions. |
+| Area                | Geared Term requirement                                                                                                                               |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Terminal engine     | xterm.js owns VT state, display, selection, and scrollback.                                                                                           |
+| AI command action   | Copy, Insert, and Run are separate. Insert MUST never submit. Run requires an explicit click.                                                         |
+| Implicit submit     | No setting may cause inserted command text to be submitted automatically.                                                                             |
+| Command splitting   | Optional shell-aware parsing by top-level statement, with a conservative whole-block fallback.                                                        |
+| Terminal context    | Selection remains preferred; viewport and a user-bounded amount of preceding scrollback are supported with preview and truncation disclosure.         |
+| External AI consent | The first request to a normalized endpoint requires consent whether or not a snapshot is attached. Endpoint changes require renewed consent.          |
+| Workspace restore   | Window and panel layout only. Do not auto-reconnect or silently reopen live sessions.                                                                 |
 | SFTP command launch | A configured command runs against a quoted remote path only as an explicit SFTP context-menu action. It is separate from AI command Insert/Run rules. |
-| Structured storage | Session profiles, vault-encrypted secrets, AI connections, and environment records live in one embedded SQLite database owned by the main process. |
+| Structured storage  | Session profiles, vault-encrypted secrets, AI connections, and environment records live in one embedded SQLite database owned by the main process.    |
 
 ## 6. Supported release platforms
 
 The initial release MUST build and smoke-test these artifacts:
 
-| Platform | Minimum release artifact | Required session backends |
-| --- | --- | --- |
-| Windows x86-64 | Installer; portable archive SHOULD also be available | Local ConPTY, WSL, SSH |
-| macOS arm64 | `.app` and DMG | Local PTY, SSH |
-| Linux x86-64 | AppImage | Local PTY, SSH |
+| Platform       | Minimum release artifact                             | Required session backends |
+| -------------- | ---------------------------------------------------- | ------------------------- |
+| Windows x86-64 | Installer; portable archive SHOULD also be available | Local ConPTY, WSL, SSH    |
+| macOS arm64    | `.app` and DMG                                       | Local PTY, SSH            |
+| Linux x86-64   | AppImage                                             | Local PTY, SSH            |
 
-The application architecture SHOULD remain portable to additional architectures, but an
-architecture is not supported until its packaged application passes the same smoke tests.
+The application architecture SHOULD remain portable to additional architectures, but an architecture
+is not supported until its packaged application passes the same smoke tests.
 
 ## 7. Application shell and workspace
 
@@ -131,25 +131,26 @@ architecture is not supported until its packaged application passes the same smo
   remain unexpectedly active on non-text controls.
 - **APP-017**: Success and failure feedback MUST be visible and bounded. Errors MUST NOT fail
   silently.
-- **APP-018**: Destructive SFTP and WSL actions MUST use a confirmation dialog that names the target.
+- **APP-018**: Destructive SFTP and WSL actions MUST use a confirmation dialog that names the
+  target.
 
 ### 7.4 Menus and keyboard behavior
 
-The native application menu MUST provide File, Edit, View, Window, and Help functions appropriate
-to each platform, including settings, temporary connection, config location, theme, language,
-terminal mode, and About.
+The native application menu MUST provide File, Edit, View, Window, and Help functions appropriate to
+each platform, including settings, temporary connection, config location, theme, language, terminal
+mode, and About.
 
 When terminal focus is active, the following behavior is required:
 
-| Action | Windows/Linux | macOS |
-| --- | --- | --- |
-| Send interrupt | `Ctrl+C` | `Ctrl+C` |
-| Copy terminal selection | `Ctrl+Shift+C` | `Cmd+C` |
-| Paste | `Ctrl+Shift+V` | `Cmd+V` |
-| Select all | `Ctrl+Shift+A` | `Cmd+A` |
-| Search | `Ctrl+F` | `Cmd+F` |
-| Send Tab/backtab | `Tab` / `Shift+Tab` | `Tab` / `Shift+Tab` |
-| Cycle terminal mode | `F6` / `Shift+F6` | `F6` / `Shift+F6` |
+| Action                  | Windows/Linux       | macOS               |
+| ----------------------- | ------------------- | ------------------- |
+| Send interrupt          | `Ctrl+C`            | `Ctrl+C`            |
+| Copy terminal selection | `Ctrl+Shift+C`      | `Cmd+C`             |
+| Paste                   | `Ctrl+Shift+V`      | `Cmd+V`             |
+| Select all              | `Ctrl+Shift+A`      | `Cmd+A`             |
+| Search                  | `Ctrl+F`            | `Cmd+F`             |
+| Send Tab/backtab        | `Tab` / `Shift+Tab` | `Tab` / `Shift+Tab` |
+| Cycle terminal mode     | `F6` / `Shift+F6`   | `F6` / `Shift+F6`   |
 
 - **APP-019**: `Ctrl+C` in terminal context MUST send ETX and MUST NOT be captured by a root copy
   binding.
@@ -170,13 +171,13 @@ When terminal focus is active, the following behavior is required:
   invalidate or switch to the corresponding environment-context record safely.
 - **SES-004**: Every session MUST have a stable identifier, display name, group, TERM value, and a
   type-specific target.
-- **SES-005**: An empty SSH display name defaults to `user@host`; an empty local name defaults to the
-  program basename or `Local Shell`; an empty WSL name defaults to the distribution name.
+- **SES-005**: An empty SSH display name defaults to `user@host`; an empty local name defaults to
+  the program basename or `Local Shell`; an empty WSL name defaults to the distribution name.
 - **SES-006**: Supported TERM choices MUST include `xterm-256color`, `xterm`, `vt520`, `linux`, and
   `screen`.
-- **SES-007**: Deleting a local or WSL saved session MUST also delete its private environment record.
-  Deleting an SSH session MUST not delete a host environment shared with another session having the
-  same `user@host:port` key.
+- **SES-007**: Deleting a local or WSL saved session MUST also delete its private environment
+  record. Deleting an SSH session MUST not delete a host environment shared with another session
+  having the same `user@host:port` key.
 
 ### 8.2 Temporary SSH connections
 
@@ -195,8 +196,8 @@ When terminal focus is active, the following behavior is required:
 - **VLT-001**: Saved SSH passwords, private keys, private-key passphrases, and AI API keys MUST be
   encrypted at rest.
 - **VLT-002**: The renderer MUST never receive stored ciphertext, a vault key, or decrypted secrets.
-- **VLT-003**: First use MUST allow creation of a master password. Subsequent use MUST require unlock
-  unless password-free unlock was explicitly enabled.
+- **VLT-003**: First use MUST allow creation of a master password. Subsequent use MUST require
+  unlock unless password-free unlock was explicitly enabled.
 - **VLT-004**: Master-password derivation MUST use an approved password KDF with recorded, versioned
   parameters.
 - **VLT-005**: Secret encryption MUST use authenticated encryption with a unique nonce per value.
@@ -229,9 +230,9 @@ When terminal focus is active, the following behavior is required:
 
 ### 10.2 xterm.js behavior
 
-- **TERM-007**: The terminal MUST support common VT/xterm behavior, 16/256/true color, Unicode,
-  CJK, emoji, wide characters, combining characters, Powerline/Nerd Font glyphs, cursor styles,
-  mouse reporting, and alternate-screen applications.
+- **TERM-007**: The terminal MUST support common VT/xterm behavior, 16/256/true color, Unicode, CJK,
+  emoji, wide characters, combining characters, Powerline/Nerd Font glyphs, cursor styles, mouse
+  reporting, and alternate-screen applications.
 - **TERM-008**: The implementation MUST support selection, copy, paste, select all, visible
   scrollbar, scrollback, search with current-match navigation, and web links.
 - **TERM-009**: WebGL rendering SHOULD be used when available and MUST fall back without losing the
@@ -243,13 +244,13 @@ When terminal focus is active, the following behavior is required:
 - **TERM-012**: Per-tab mode cycling MUST preserve the defined `F6` behavior.
 - **TERM-013**: `Ctrl+wheel` terminal zoom MUST remain bounded to a usable font-size range and MUST
   trigger a correct PTY resize.
-- **TERM-014**: Pasted and inserted text MUST normalize platform line endings predictably. NUL,
-  DEL, ESC, BEL, and unsupported control characters MUST NOT be injected by command actions.
+- **TERM-014**: Pasted and inserted text MUST normalize platform line endings predictably. NUL, DEL,
+  ESC, BEL, and unsupported control characters MUST NOT be injected by command actions.
 - **TERM-015**: Bracketed paste mode MUST be respected. Multi-line paste outside bracketed paste
   SHOULD require a review/confirmation step.
-- **TERM-016**: A terminal component unmount MUST dispose all DOM, xterm, addon, resize, and transport
-  subscriptions exactly once without implicitly closing a session that is being retained by its
-  owning tab.
+- **TERM-016**: A terminal component unmount MUST dispose all DOM, xterm, addon, resize, and
+  transport subscriptions exactly once without implicitly closing a session that is being retained
+  by its owning tab.
 
 ### 10.3 Terminal context snapshots
 
@@ -258,13 +259,13 @@ When terminal focus is active, the following behavior is required:
 - **TERM-018**: A non-empty selection takes precedence over the viewport.
 - **TERM-019**: Users MAY include a configured, bounded number of lines preceding the viewport. The
   default MUST NOT include the complete scrollback.
-- **TERM-020**: Snapshot text MUST join wrapped rows correctly, remove style escape sequences, retain
-  meaningful internal blank lines, trim display padding, and distinguish normal and alternate
+- **TERM-020**: Snapshot text MUST join wrapped rows correctly, remove style escape sequences,
+  retain meaningful internal blank lines, trim display padding, and distinguish normal and alternate
   buffers.
-- **TERM-021**: The user MUST see the selected source, truncation state, line/character bounds, and a
-  preview before externally transmitting terminal content.
-- **TERM-022**: One snapshot MUST be limited to 256 KiB unless a future schema migration deliberately
-  changes the limit.
+- **TERM-021**: The user MUST see the selected source, truncation state, line/character bounds, and
+  a preview before externally transmitting terminal content.
+- **TERM-022**: One snapshot MUST be limited to 256 KiB unless a future schema migration
+  deliberately changes the limit.
 
 ## 11. Local shell sessions
 
@@ -298,9 +299,9 @@ When terminal focus is active, the following behavior is required:
   `wsl --shutdown` MUST NOT be exposed.
 - **WSL-006**: Saved WSL sessions MUST support distribution, optional distro user, optional starting
   directory, name, group, and TERM.
-- **WSL-007**: An omitted starting directory MUST map to the Linux home (`--cd ~`). Windows and Linux
-  path styles MUST be passed through to `wsl.exe --cd` without treating a Linux path as a Windows
-  process cwd.
+- **WSL-007**: An omitted starting directory MUST map to the Linux home (`--cd ~`). Windows and
+  Linux path styles MUST be passed through to `wsl.exe --cd` without treating a Linux path as a
+  Windows process cwd.
 - **WSL-008**: WSL environment detection MUST execute the POSIX probe inside the selected
   distribution.
 - **WSL-009**: WSL sessions MUST NOT advertise SFTP capability in the initial release.
@@ -319,8 +320,8 @@ When terminal focus is active, the following behavior is required:
   trusted key only after explicit approval.
 - **SSH-006**: A changed host key MUST show old and new fingerprints, default to rejection, and
   replace only the matching stored host entry after explicit approval.
-- **SSH-007**: Host-key files and updates MUST be serialized so concurrent connections cannot corrupt
-  them.
+- **SSH-007**: Host-key files and updates MUST be serialized so concurrent connections cannot
+  corrupt them.
 - **SSH-008**: Authentication rejection, key format, passphrase, host-key, connection, PTY, shell,
   and channel failures MUST map to localized structured errors.
 - **SSH-009**: Closing a session MUST cancel terminal, SFTP, environment-probe, and pending host-key
@@ -334,11 +335,11 @@ When terminal focus is active, the following behavior is required:
   SFTP latency or failure MUST not block terminal data.
 - **SFTP-002**: The SFTP view MUST show remote and local panes with path, name, type, permissions or
   equivalent metadata, size, selection, navigation, and refresh.
-- **SFTP-003**: Windows local browsing MUST expose a drive overview and MUST protect drive roots from
-  rename or deletion.
-- **SFTP-004**: The panel MUST support upload and download of files and directory trees, new folders,
-  rename, recursive delete without following remote symlinks, local open/open-location, and copying
-  selected paths.
+- **SFTP-003**: Windows local browsing MUST expose a drive overview and MUST protect drive roots
+  from rename or deletion.
+- **SFTP-004**: The panel MUST support upload and download of files and directory trees, new
+  folders, rename, recursive delete without following remote symlinks, local open/open-location, and
+  copying selected paths.
 - **SFTP-005**: Multi-selection MUST be supported for listing, download, and deletion. Destructive
   operations MUST identify the item or count and warn that they cannot be undone.
 - **SFTP-006**: Transfers MUST have stable IDs, byte progress when available, success/failure state,
@@ -347,15 +348,15 @@ When terminal focus is active, the following behavior is required:
   as the panel location.
 - **SFTP-008**: The remote panel SHOULD follow successfully submitted shell `cd` commands. Relative,
   home, parent, and absolute changes MUST resolve from the last authoritative remote directory.
-- **SFTP-009**: Directory sync MUST pause in the alternate screen, allow explicit detach, and support
-  a user-requested re-sync after returning to the primary shell screen.
+- **SFTP-009**: Directory sync MUST pause in the alternate screen, allow explicit detach, and
+  support a user-requested re-sync after returning to the primary shell screen.
 - **SFTP-010**: A failed optimistic directory change MUST recover without leaving terminal echo
   disabled or exposing hidden probe output.
 - **SFTP-011**: Users MUST be able to configure deduplicated, one-per-line remote-file commands such
   as `cat` or `less`. Selecting one MUST append a safely quoted full remote path and execute only
   after the explicit context-menu action.
-- **SFTP-012**: File names containing unsupported terminal control characters MUST be rejected rather
-  than injected.
+- **SFTP-012**: File names containing unsupported terminal control characters MUST be rejected
+  rather than injected.
 - **SFTP-013**: `Ctrl+wheel` in either file pane MUST zoom both pane lists within bounded limits.
 
 ## 15. Terminal environment context
@@ -364,8 +365,8 @@ When terminal focus is active, the following behavior is required:
   architecture, shell, shell version, user, hostname, notes, environment-specific instructions,
   verification state, attachment state, and detection time.
 - **ENV-002**: SSH environment records MUST be keyed by `user@host:port`. Saved local records MUST
-  use `local:<session-id>`. Saved WSL records MUST use `wsl:<session-id>` and quick WSL records SHOULD
-  use `wsl:distro:<name>`.
+  use `local:<session-id>`. Saved WSL records MUST use `wsl:<session-id>` and quick WSL records
+  SHOULD use `wsl:distro:<name>`.
 - **ENV-003**: Detection is best effort and MUST ignore banner noise, unknown fields, control
   characters, and unreasonable field lengths.
 - **ENV-004**: POSIX and Windows probes MUST have bounded timeouts and MUST not depend on the user's
@@ -375,8 +376,8 @@ When terminal focus is active, the following behavior is required:
   reconfirmation.
 - **ENV-006**: Editing a session target MUST prevent an environment draft from being silently saved
   under the wrong target key.
-- **ENV-007**: Environment context is sent to AI only when attachment is enabled. The request preview
-  MUST distinguish detected facts from user-authored instructions.
+- **ENV-007**: Environment context is sent to AI only when attachment is enabled. The request
+  preview MUST distinguish detected facts from user-authored instructions.
 
 ## 16. AI assistant
 
@@ -389,26 +390,25 @@ When terminal focus is active, the following behavior is required:
   optional encrypted API key, models, default model, and accepted normalized endpoint.
 - **AI-004**: Query strings, fragments, non-HTTPS remote endpoints, and malformed URLs MUST be
   rejected.
-- **AI-005**: Chat Completions connections MUST support model discovery through `/models`.
-  Responses connections MUST support a minimal, explicitly disclosed test request with storage
-  disabled.
+- **AI-005**: Chat Completions connections MUST support model discovery through `/models`. Responses
+  connections MUST support a minimal, explicitly disclosed test request with storage disabled.
 - **AI-006**: Responses models MUST support defaults for reasoning effort, verbosity, reasoning
   summary, and web search. A chat MAY override reasoning effort.
 
 ### 16.2 Request and streaming behavior
 
 - **AI-007**: Request construction MUST combine the built-in safety prompt, global user
-  instructions, attached environment facts, environment-specific instructions, conversation
-  history, the current prompt, and an optional terminal snapshot in a deterministic order.
+  instructions, attached environment facts, environment-specific instructions, conversation history,
+  the current prompt, and an optional terminal snapshot in a deterministic order.
 - **AI-008**: Terminal snapshots MUST be clearly delimited as untrusted observations. Snapshot text
   MUST never be interpreted as application instructions.
 - **AI-009**: Before the first request to a normalized endpoint, the UI MUST show what categories of
   data can be sent and require confirmation. Changing endpoint identity MUST invalidate consent.
 - **AI-010**: Provider-specific SSE or JSON MUST be parsed only in the main process adapter. The
-  renderer receives provider-neutral start, delta, reasoning, activity, usage, source, complete,
-  and error events.
-- **AI-011**: Streaming text and reasoning MUST render incrementally. The user MUST be able to stop a
-  request. Cancellation MUST abort network work and ignore late events.
+  renderer receives provider-neutral start, delta, reasoning, activity, usage, source, complete, and
+  error events.
+- **AI-011**: Streaming text and reasoning MUST render incrementally. The user MUST be able to stop
+  a request. Cancellation MUST abort network work and ignore late events.
 - **AI-012**: While the user is near the bottom, new output SHOULD remain pinned. Reading older
   content MUST not be interrupted by forced scrolling.
 - **AI-013**: The UI MUST distinguish connecting, queued, working, web search, source reading,
@@ -430,12 +430,12 @@ When terminal focus is active, the following behavior is required:
 - **AI-020**: Each conversation MUST be persisted to a human-readable Markdown history file after
   meaningful changes. It MUST include role, displayed content, snapshot metadata/text, reasoning,
   model, usage, and continuation metadata needed to continue the conversation.
-- **AI-021**: The history window MUST list, refresh, load/continue, delete with confirmation, and open
-  the history directory. Loading while a request is active MUST be rejected.
+- **AI-021**: The history window MUST list, refresh, load/continue, delete with confirmation, and
+  open the history directory. Loading while a request is active MUST be rejected.
 - **AI-022**: Starting a new chat MUST cancel in-flight work, clear current messages and attachment,
   and bind subsequent messages to a new history file.
-- **AI-023**: Prompt text, responses, reasoning, snapshots, and command text MUST not appear in normal
-  logs or analytics.
+- **AI-023**: Prompt text, responses, reasoning, snapshots, and command text MUST not appear in
+  normal logs or analytics.
 
 ## 17. Shell command parsing and actions
 
@@ -458,8 +458,8 @@ When terminal focus is active, the following behavior is required:
   MUST not be injected unless they are semantically required and visibly included in the payload.
 - **CMD-008**: Prompt prefixes MAY be stripped only when every non-blank line consistently matches a
   recognized shell-session prompt pattern.
-- **CMD-009**: If parsing might change semantics, the parser MUST return one whole-block candidate or
-  a non-runnable result. It MUST NOT guess a plausible but incomplete command.
+- **CMD-009**: If parsing might change semantics, the parser MUST return one whole-block candidate
+  or a non-runnable result. It MUST NOT guess a plausible but incomplete command.
 - **CMD-010**: Parser input size and work time MUST be bounded. Oversized or pathological input MUST
   degrade without blocking the renderer.
 
@@ -480,8 +480,9 @@ When terminal focus is active, the following behavior is required:
 - **CMD-016**: Run sends the exact payload and one appropriate submission sequence only after an
   explicit click on trusted application UI.
 - **CMD-017**: Insert MUST be the primary action. Run MUST not have greater visual emphasis.
-- **CMD-018**: The target session MUST be visible. At action time, the main process MUST validate the
-  session identity and state; it MUST NOT substitute a newly active session after a switch or close.
+- **CMD-018**: The target session MUST be visible. At action time, the main process MUST validate
+  the session identity and state; it MUST NOT substitute a newly active session after a switch or
+  close.
 - **CMD-019**: Repeated Run clicks MUST be debounced or require a renewed explicit action while the
   first submission is pending.
 - **CMD-020**: Clearly destructive commands MUST receive stronger confirmation or be limited to
@@ -507,17 +508,17 @@ When terminal focus is active, the following behavior is required:
   reported without blocking startup.
 - **SET-007**: English and Simplified Chinese UI catalogs MUST be supported, plus a Follow System
   preference. Repository-facing source and documentation remain English.
-- **SET-008**: A language change MUST refresh windows, menus, dialogs, and errors without requiring a
-  process restart where technically practical.
+- **SET-008**: A language change MUST refresh windows, menus, dialogs, and errors without requiring
+  a process restart where technically practical.
 
 ## 19. Persistence
 
 ### 19.1 General persistence rules
 
-- **DATA-001**: Settings, UI state, the structured database, vault metadata, host keys, environments,
-  and history MUST each have a versioned schema or format identifier.
-- **DATA-002**: Writes MUST be atomic or transactional. On failure, the last valid version MUST remain
-  recoverable.
+- **DATA-001**: Settings, UI state, the structured database, vault metadata, host keys,
+  environments, and history MUST each have a versioned schema or format identifier.
+- **DATA-002**: Writes MUST be atomic or transactional. On failure, the last valid version MUST
+  remain recoverable.
 - **DATA-003**: Corrupt persisted data MUST be quarantined or preserved for diagnosis before safe
   defaults are written.
 - **DATA-004**: xterm instances, PTY/SSH handles, raw WebContents objects, and unlimited scrollback
@@ -533,9 +534,9 @@ When terminal focus is active, the following behavior is required:
 - **DATA-007**: The database MUST enable write-ahead logging and foreign-key enforcement. Any
   mutation touching multiple rows or tables (profile saves with credentials, secret-reference
   cleanup, master-password rotation, bulk record operations) MUST execute as one transaction.
-- **DATA-008**: Schema changes MUST be forward-only migrations recorded in code, each executed in one
-  transaction with a pre-migration backup. An unreadable database or an unknown newer schema version
-  MUST be quarantined with its contents preserved and replaced by a fresh database with a
+- **DATA-008**: Schema changes MUST be forward-only migrations recorded in code, each executed in
+  one transaction with a pre-migration backup. An unreadable database or an unknown newer schema
+  version MUST be quarantined with its contents preserved and replaced by a fresh database with a
   user-visible notice. It MUST NOT be silently deleted or downgraded.
 - **DATA-009**: Secret material MUST exist in the database only as vault-encrypted rows carrying
   purpose, algorithm, and version metadata. Plaintext secret columns and secret values in logs are
@@ -543,9 +544,9 @@ When terminal focus is active, the following behavior is required:
 - **DATA-010**: Database rows MUST map one-to-one onto the validated protocol records
   (`SessionProfileRecord`, `EncryptedSecret`, `AiConnectionRecord`, `EnvironmentRecord`). Runtime
   schema validation remains at every IPC boundary independent of storage validation.
-- **DATA-011**: Settings, UI state, known hosts, AI history Markdown, user themes, and logs remain in
-  their documented versioned file stores. Moving one of these artifacts into the database requires a
-  recorded architecture decision.
+- **DATA-011**: Settings, UI state, known hosts, AI history Markdown, user themes, and logs remain
+  in their documented versioned file stores. Moving one of these artifacts into the database
+  requires a recorded architecture decision.
 
 ## 20. Electron security boundary
 
@@ -556,8 +557,8 @@ When terminal focus is active, the following behavior is required:
   execution.
 - **SEC-003**: Every IPC request, response, event, and MessagePort message MUST be runtime-validated
   at the trust boundary in addition to TypeScript checking.
-- **SEC-004**: The renderer MUST never access PTY handles, SSH sockets, SFTP handles, filesystem APIs,
-  the SQLite database, network credentials, or decrypted secrets.
+- **SEC-004**: The renderer MUST never access PTY handles, SSH sockets, SFTP handles, filesystem
+  APIs, the SQLite database, network credentials, or decrypted secrets.
 - **SEC-005**: Navigation, new windows, downloads, permissions, and external URLs MUST be denied by
   default and handled through allowlisted schemes and explicit application actions.
 - **SEC-006**: External URLs MUST be limited to `https:` unless a specific local-development flow
@@ -595,8 +596,8 @@ When terminal focus is active, the following behavior is required:
 - **REL-004**: Closing a window or quitting MUST dispose sessions, transfers, network requests,
   subscriptions, timers, workers, native handles, and the database connection without hanging the
   process.
-- **REL-005**: Suspend/resume, network loss, display-scale change, and WebGL context loss MUST reach a
-  recoverable or clearly terminal state.
+- **REL-005**: Suspend/resume, network loss, display-scale change, and WebGL context loss MUST reach
+  a recoverable or clearly terminal state.
 - **REL-006**: Packaged applications MUST load every rebuilt native module (`node-pty`,
   `better-sqlite3`) on every supported platform. A development-only success is insufficient.
 - **REL-007**: Large terminal output, long scrollback, rapid resize, CJK/emoji, alternate-screen
@@ -604,10 +605,11 @@ When terminal focus is active, the following behavior is required:
 
 ## 23. Accessibility
 
-- **A11Y-001**: All application controls, tabs, dialogs, command actions, settings, and status changes
-  MUST be keyboard reachable and have meaningful accessible names.
+- **A11Y-001**: All application controls, tabs, dialogs, command actions, settings, and status
+  changes MUST be keyboard reachable and have meaningful accessible names.
 - **A11Y-002**: Focus order MUST remain stable during streaming and list refreshes.
-- **A11Y-003**: Disabled actions MUST expose a reason; state MUST not be communicated by color alone.
+- **A11Y-003**: Disabled actions MUST expose a reason; state MUST not be communicated by color
+  alone.
 - **A11Y-004**: Font scaling and high-DPI display MUST not hide terminal, dialog, or command-action
   controls.
 - **A11Y-005**: Terminal accessibility support SHOULD use xterm.js accessibility facilities without
@@ -661,7 +663,8 @@ Geared Term's initial release is complete only when:
 
 1. every MUST requirement is implemented or explicitly waived in a recorded product decision;
 2. every requirement group has closed requirements-matrix rows with owners and evidence;
-3. local, WSL, SSH, SFTP, vault, environment, AI, history, and command-action acceptance suites pass;
+3. local, WSL, SSH, SFTP, vault, environment, AI, history, and command-action acceptance suites
+   pass;
 4. Insert never submits and Run cannot operate on an incomplete or stale candidate;
 5. stored credentials remain outside the renderer and outside plaintext storage;
 6. unknown and changed SSH host keys fail closed without explicit approval;

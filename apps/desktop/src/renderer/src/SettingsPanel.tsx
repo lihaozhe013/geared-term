@@ -146,6 +146,17 @@ export function SettingsPanel({
             />
             <span>{t('splitCommands')}</span>
           </label>
+          <label className="settings-wide">
+            {t('remoteCommands')}
+            <textarea
+              rows={4}
+              value={draft.remoteFileCommands}
+              onChange={(event) => update('remoteFileCommands', event.target.value.slice(0, 4096))}
+              placeholder="cat&#10;less"
+              spellCheck={false}
+            />
+            <small>{t('remoteCommandsHint')}</small>
+          </label>
         </div>
         <div className="settings-actions">
           <button type="button" className="toolbar-button" onClick={onClose}>

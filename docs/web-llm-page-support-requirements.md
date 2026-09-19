@@ -7,9 +7,11 @@
 
 ## 1. 背景
 
-产品当前通过 AI API 的 HTTP streaming 展示回答，并能把 Shell 代码块拆成独立命令，为每条命令提供 Copy、Insert 和 Run。
+产品当前通过 AI API 的 HTTP
+streaming 展示回答，并能把 Shell 代码块拆成独立命令，为每条命令提供 Copy、Insert 和 Run。
 
-新能力希望直接使用主流 LLM 的真实 Web 页面，复用用户已有登录态、订阅、模型选择、Web search、附件和会话历史；同时把页面回答中的简单 Shell 代码块转换成与现有产品一致的终端操作体验。
+新能力希望直接使用主流 LLM 的真实 Web 页面，复用用户已有登录态、订阅、模型选择、Web
+search、附件和会话历史；同时把页面回答中的简单 Shell 代码块转换成与现有产品一致的终端操作体验。
 
 该能力定位为“终端旁的 Web 问答与人工确认式命令桥”，不是让网页或 AI 自治控制终端。
 
@@ -74,7 +76,8 @@
 - **暂不支持**：仅作为普通网页使用，不提供命令增强；
 - **失效**：原先支持，但当前版本检测到适配异常。
 
-首期具体网站名单由实现开始时确定，但至少应覆盖用户实际使用的主流 LLM Web 服务中的一到两个，之后逐站增加。
+首期具体网站名单由实现开始时确定，但至少应覆盖用户实际使用的主流 LLM
+Web 服务中的一到两个，之后逐站增加。
 
 ### 5.2 代码块语言
 
@@ -83,7 +86,8 @@
 - Bash-family：`bash`、`sh`、`shell`、`zsh`；
 - PowerShell：`powershell`、`pwsh`。
 
-`fish`、Windows CMD 或其他 shell 是否开放，由现有 parser 的可靠程度决定。未明确识别的语言不得默认显示 Run。
+`fish`、Windows
+CMD 或其他 shell 是否开放，由现有 parser 的可靠程度决定。未明确识别的语言不得默认显示 Run。
 
 ## 6. Web 页面基础体验需求
 
@@ -219,7 +223,8 @@ Run 只有在用户明确点击后，才把命令写入当前 terminal session �
 
 ### ACT-005 目标可见
 
-执行 Insert 或 Run 前，用户能够确认目标 terminal session。若当前没有有效目标，操作必须禁用并说明原因。
+执行 Insert 或 Run 前，用户能够确认目标 terminal
+session。若当前没有有效目标，操作必须禁用并说明原因。
 
 ### ACT-006 防止错发
 
@@ -265,7 +270,8 @@ Insert 或 Run 涉及多行命令时，必须遵循现有终端的多行粘贴�
 
 ### CTX-005 alternate screen
 
-vim、less、top、tmux 等 alternate-screen 场景必须以用户当前看到的屏幕为主要语义，不得误把历史 normal buffer 当作当前状态。
+vim、less、top、tmux 等 alternate-screen 场景必须以用户当前看到的屏幕为主要语义，不得误把历史 normal
+buffer 当作当前状态。
 
 ### CTX-006 敏感信息
 

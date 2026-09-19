@@ -20,6 +20,9 @@ const messages = {
     defaultTerm: 'Default terminal type',
     splitCommands: 'Show safe command blocks separately',
     contextLines: 'Terminal context lines for commands',
+    remoteCommands: 'Remote file commands (one per line)',
+    remoteCommandsHint:
+      'Used by the SFTP file context menu; names are quoted and control characters rejected.',
     save: 'Save settings',
     cancel: 'Cancel',
     sessions: 'Sessions',
@@ -45,6 +48,8 @@ const messages = {
     defaultTerm: '默认终端类型',
     splitCommands: '将安全命令块分开展示',
     contextLines: '命令上下文行数',
+    remoteCommands: '远程文件命令（每行一条）',
+    remoteCommandsHint: '用于 SFTP 文件右键菜单；文件名会被安全引用，控制字符将被拒绝。',
     save: '保存设置',
     cancel: '取消',
     sessions: '会话',

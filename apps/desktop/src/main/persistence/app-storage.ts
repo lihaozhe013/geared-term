@@ -52,11 +52,7 @@ export class AppStorage {
   /** Set when the user locks the vault; blocks auto-unlock for this process (VLT-006). */
   private autoUnlockSuppressed = false;
 
-  public constructor(
-    rootDirectory: string,
-    logger: Logger,
-    safeStorage?: SafeStorageAdapter
-  ) {
+  public constructor(rootDirectory: string, logger: Logger, safeStorage?: SafeStorageAdapter) {
     this.rootDirectory = rootDirectory;
     this.logger = logger;
     this.autoUnlock = new AutoUnlockStore(rootDirectory, safeStorage);
@@ -157,8 +153,7 @@ export class AppStorage {
       profile.aiConnections.length > 0 ||
       profile.environments.length > 0 ||
       Object.keys(profile.secrets).length > 0;
-    const markMigrated = async () =>
-      rename(path, `${path}.migrated`).catch(() => undefined);
+    const markMigrated = async () => rename(path, `${path}.migrated`).catch(() => undefined);
     if (!hasRows) {
       await markMigrated();
       return;

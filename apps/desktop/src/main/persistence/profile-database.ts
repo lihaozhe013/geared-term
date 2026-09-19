@@ -2,7 +2,11 @@ import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
-import type { AiConnectionRecord, EnvironmentRecord, SessionProfileRecord } from '@geared-term/protocol';
+import type {
+  AiConnectionRecord,
+  EnvironmentRecord,
+  SessionProfileRecord
+} from '@geared-term/protocol';
 import type { Logger } from '../logging';
 import { EncryptedSecretSchema, type EncryptedSecret } from './schema';
 

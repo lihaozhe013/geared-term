@@ -26,27 +26,56 @@ import {
   SessionProfileSaveRequestSchema,
   SettingsRecordSchema,
   SftpListRequestSchema,
+  SftpListResultSchema,
+  SftpMkdirRequestSchema,
+  SftpRenameRequestSchema,
+  SftpDeleteRequestSchema,
+  SftpUploadPathsRequestSchema,
+  SftpDownloadPathsRequestSchema,
+  SftpTransferIdRequestSchema,
+  SftpTransferSchema,
+  SftpTransferEventSchema,
+  SftpRemoteCommandRequestSchema,
+  SftpCdEventSchema,
+  LocalListRequestSchema,
+  LocalEntrySchema,
+  LocalMkdirRequestSchema,
+  LocalRenameRequestSchema,
+  LocalDeleteRequestSchema,
+  LocalOpenRequestSchema,
   SftpDownloadRequestSchema,
   SftpOperationResultSchema,
-  SftpRemoteEntrySchema,
   SftpUploadRequestSchema,
   SshProfileTerminalRequestSchema,
   TerminalCommandActionSchema,
   UiStateRecordSchema,
   VaultPasswordRequestSchema,
   VaultRotateRequestSchema,
-  WslDistributionSchema
+  WslDistributionSchema,
+  parseRemoteFileCommands
 } from '@geared-term/protocol';
 import { createLogger, type Logger } from './logging';
-import { buildChatCompletionsPayload, buildResponsesPayload, normalizeEndpoint } from './ai/endpoint';
+import {
+  buildChatCompletionsPayload,
+  buildResponsesPayload,
+  normalizeEndpoint
+} from './ai/endpoint';
 import { streamAiRequest } from './ai/provider';
 import { discoverModels } from './ai/discovery';
 import { AiHistoryStore } from './ai/history';
 import { LocalTerminalManager } from './local-terminal';
 import { commandRevision, parseCommandBlock } from '@geared-term/command-parser';
 import { AppStorage } from './persistence/app-storage';
+import {
+  listLocalDirectory,
+  makeLocalDirectory,
+  removeLocalPaths,
+  renameLocalPath
+} from './files/local-files';
 import { KnownHostsStore } from './ssh/known-hosts';
 import { SshSessionManager } from './ssh/ssh-session';
+import { buildRemoteFileCommand } from './sftp/remote-commands';
+import { TransferManager } from './sftp/transfers';
 import { discoverWsl } from './wsl/discovery';
 import { probeEnvironment } from './environment/probe';
 
@@ -56,8 +85,13 @@ let mainWindow: BrowserWindow | undefined;
 let localTerminals: LocalTerminalManager;
 let storage: AppStorage;
 let sshSessions: SshSessionManager;
+let transferManager: TransferManager;
 const aiControllers = new Map<string, AbortController>();
 const aiHistory = new AiHistoryStore(isDevelopment ? process.cwd() : app.getPath('userData'));
+
+function sendToRenderer(channel: string, payload: unknown): void {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, payload);
+}
 
 function isAllowedExternalUrl(value: string): boolean {
   try {
@@ -255,23 +289,62 @@ function registerIpc(): void {
   });
   ipcMain.handle('sftp:list', async (_event, input: unknown) => {
     const request = SftpListRequestSchema.parse(input);
-    return SftpRemoteEntrySchema.array().parse(
+    return SftpListResultSchema.parse(
       await sshSessions.listSftp(request.sessionId, request.directory)
     );
+  });
+  ipcMain.handle('sftp:mkdir', async (_event, input: unknown) => {
+    const request = SftpMkdirRequestSchema.parse(input);
+    await sshSessions.runSftp(request.sessionId, (service) => service.ensureDir(request.path));
+    return SftpOperationResultSchema.parse({ accepted: true });
+  });
+  ipcMain.handle('sftp:rename', async (_event, input: unknown) => {
+    const request = SftpRenameRequestSchema.parse(input);
+    await sshSessions.runSftp(request.sessionId, (service) =>
+      service.rename(request.source, request.destination)
+    );
+    return SftpOperationResultSchema.parse({ accepted: true });
+  });
+  ipcMain.handle('sftp:delete', async (_event, input: unknown) => {
+    const request = SftpDeleteRequestSchema.parse(input);
+    await sshSessions.runSftp(request.sessionId, async (service) => {
+      for (const path of request.paths) await service.remove(path);
+    });
+    return SftpOperationResultSchema.parse({ accepted: true });
+  });
+  ipcMain.handle('sftp:upload-paths', async (_event, input: unknown) => {
+    const request = SftpUploadPathsRequestSchema.parse(input);
+    return SftpTransferSchema.array().parse(await transferManager.uploadPaths(request));
+  });
+  ipcMain.handle('sftp:download-paths', async (_event, input: unknown) => {
+    const request = SftpDownloadPathsRequestSchema.parse(input);
+    await fsMkdir(request.localDirectory, { recursive: true });
+    return SftpTransferSchema.array().parse(await transferManager.downloadPaths(request));
+  });
+  ipcMain.handle('sftp:transfers', (_event, input: { sessionId?: string } | undefined) =>
+    SftpTransferSchema.array().parse(transferManager.transfers(input?.sessionId))
+  );
+  ipcMain.handle('sftp:cancel-transfer', (_event, input: unknown) => {
+    const request = SftpTransferIdRequestSchema.parse(input);
+    return SftpOperationResultSchema.parse({
+      accepted: transferManager.cancel(request.transferId)
+    });
   });
   ipcMain.handle('sftp:upload', async (_event, input: unknown) => {
     const request = SftpUploadRequestSchema.parse(input);
     if (!mainWindow) throw new Error('Application window is not available');
     const selection = await dialog.showOpenDialog(mainWindow, {
-      properties: ['openFile'],
-      title: 'Select a file to upload'
+      properties: ['openFile', 'openDirectory', 'multiSelections'],
+      title: 'Select files or folders to upload'
     });
-    if (selection.canceled || !selection.filePaths[0]) {
+    if (selection.canceled || selection.filePaths.length === 0) {
       return SftpOperationResultSchema.parse({ accepted: false });
     }
-    const localPath = selection.filePaths[0];
-    const remotePath = posix.join(request.remoteDirectory || '.', basename(localPath));
-    await sshSessions.uploadSftp(request.sessionId, localPath, remotePath);
+    await transferManager.uploadPaths({
+      sessionId: request.sessionId,
+      localPaths: selection.filePaths,
+      remoteDirectory: request.remoteDirectory
+    });
     return SftpOperationResultSchema.parse({ accepted: true });
   });
   ipcMain.handle('sftp:download', async (_event, input: unknown) => {
@@ -284,7 +357,51 @@ function registerIpc(): void {
     if (selection.canceled || !selection.filePath) {
       return SftpOperationResultSchema.parse({ accepted: false });
     }
-    await sshSessions.downloadSftp(request.sessionId, request.remotePath, selection.filePath);
+    await transferManager.downloadPaths({
+      sessionId: request.sessionId,
+      remotePaths: [request.remotePath],
+      localDirectory: selection.filePath
+    });
+    return SftpOperationResultSchema.parse({ accepted: true });
+  });
+  ipcMain.handle('sftp:remote-command', async (_event, input: unknown) => {
+    const request = SftpRemoteCommandRequestSchema.parse(input);
+    const configured = parseRemoteFileCommands(storage.settingsSnapshot().remoteFileCommands);
+    if (!configured.includes(request.command)) {
+      throw new Error('That command is not in the configured remote-file commands');
+    }
+    const line = buildRemoteFileCommand(request.command, request.remotePath);
+    sshSessions.sendInput(request.sessionId, `${line}\r`);
+    return SftpOperationResultSchema.parse({ accepted: true });
+  });
+  ipcMain.handle('local:list', async (_event, input: unknown) => {
+    const request = LocalListRequestSchema.parse(input);
+    return LocalEntrySchema.array().parse(await listLocalDirectory(request.directory));
+  });
+  ipcMain.handle('local:mkdir', async (_event, input: unknown) => {
+    const request = LocalMkdirRequestSchema.parse(input);
+    await makeLocalDirectory(request.parent, request.name);
+    return SftpOperationResultSchema.parse({ accepted: true });
+  });
+  ipcMain.handle('local:rename', async (_event, input: unknown) => {
+    const request = LocalRenameRequestSchema.parse(input);
+    await renameLocalPath(request.source, request.destination);
+    return SftpOperationResultSchema.parse({ accepted: true });
+  });
+  ipcMain.handle('local:delete', async (_event, input: unknown) => {
+    const request = LocalDeleteRequestSchema.parse(input);
+    await removeLocalPaths(request.paths);
+    return SftpOperationResultSchema.parse({ accepted: true });
+  });
+  ipcMain.handle('local:open', async (_event, input: unknown) => {
+    const request = LocalOpenRequestSchema.parse(input);
+    const result = await shell.openPath(request.path);
+    if (result) throw new Error(result);
+    return SftpOperationResultSchema.parse({ accepted: true });
+  });
+  ipcMain.handle('local:reveal', async (_event, input: unknown) => {
+    const request = LocalOpenRequestSchema.parse(input);
+    shell.showItemInFolder(request.path);
     return SftpOperationResultSchema.parse({ accepted: true });
   });
   ipcMain.handle('environment:list', () =>
@@ -550,7 +667,15 @@ void app.whenReady().then(async () => {
   });
   await storage.load();
   const knownHosts = new KnownHostsStore(join(app.getPath('userData'), 'known-hosts.json'), logger);
-  sshSessions = new SshSessionManager(logger, knownHosts);
+  transferManager = new TransferManager(
+    (sessionId) => sshSessions.sftpService(sessionId),
+    (event) => sendToRenderer('sftp:transfer-event', SftpTransferEventSchema.parse(event))
+  );
+  sshSessions = new SshSessionManager(logger, knownHosts, {
+    onSftpCd: (sessionId, directory) =>
+      sendToRenderer('sftp:cd', SftpCdEventSchema.parse({ sessionId, directory })),
+    onClosed: (sessionId) => transferManager.cancelForSession(sessionId)
+  });
   process.on('uncaughtException', (error) =>
     logger.error('system', 'Uncaught exception', { error: error.message })
   );

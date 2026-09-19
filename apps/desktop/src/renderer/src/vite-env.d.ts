@@ -11,9 +11,21 @@ import type {
   SettingsRecord,
   SftpDownloadRequest,
   SftpListRequest,
+  SftpListResult,
+  SftpMkdirRequest,
+  SftpRenameRequest,
+  SftpDeleteRequest,
+  SftpUploadPathsRequest,
+  SftpDownloadPathsRequest,
+  SftpTransfer,
+  SftpTransferEvent,
+  SftpRemoteCommandRequest,
+  SftpCdEvent,
   SftpOperationResult,
-  SftpRemoteEntry,
   SftpUploadRequest,
+  LocalEntry,
+  LocalMkdirRequest,
+  LocalRenameRequest,
   TerminalCommandAction,
   SshProfileTerminalRequest,
   SshTerminalRequest,
@@ -105,7 +117,23 @@ declare global {
       saveUiState: (input: UiStateRecord) => Promise<UiStateRecord>;
       getSettings: () => Promise<SettingsRecord>;
       saveSettings: (input: SettingsRecord) => Promise<SettingsRecord>;
-      listSftp: (input: SftpListRequest) => Promise<SftpRemoteEntry[]>;
+      listSftp: (input: SftpListRequest) => Promise<SftpListResult>;
+      sftpMkdir: (input: SftpMkdirRequest) => Promise<SftpOperationResult>;
+      sftpRename: (input: SftpRenameRequest) => Promise<SftpOperationResult>;
+      sftpDelete: (input: SftpDeleteRequest) => Promise<SftpOperationResult>;
+      uploadPathsSftp: (input: SftpUploadPathsRequest) => Promise<SftpTransfer[]>;
+      downloadPathsSftp: (input: SftpDownloadPathsRequest) => Promise<SftpTransfer[]>;
+      listSftpTransfers: (sessionId?: string) => Promise<SftpTransfer[]>;
+      cancelSftpTransfer: (transferId: string) => Promise<SftpOperationResult>;
+      runRemoteFileCommand: (input: SftpRemoteCommandRequest) => Promise<SftpOperationResult>;
+      listLocalFiles: (directory: string | null) => Promise<LocalEntry[]>;
+      makeLocalDirectory: (input: LocalMkdirRequest) => Promise<SftpOperationResult>;
+      renameLocalPath: (input: LocalRenameRequest) => Promise<SftpOperationResult>;
+      deleteLocalPaths: (paths: string[]) => Promise<SftpOperationResult>;
+      openLocalPath: (path: string) => Promise<SftpOperationResult>;
+      revealLocalPath: (path: string) => Promise<SftpOperationResult>;
+      onSftpTransferEvent: (listener: (event: SftpTransferEvent) => void) => () => void;
+      onSftpCd: (listener: (event: SftpCdEvent) => void) => () => void;
       uploadSftp: (input: SftpUploadRequest) => Promise<SftpOperationResult>;
       downloadSftp: (input: SftpDownloadRequest) => Promise<SftpOperationResult>;
       executeCommandAction: (input: TerminalCommandAction) => Promise<{ accepted: true }>;

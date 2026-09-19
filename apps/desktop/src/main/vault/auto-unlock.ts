@@ -84,11 +84,10 @@ export class AutoUnlockStore {
     const wrapped = this.wrap(vaultKey, kek);
     try {
       writeFileSync(this.keyPath, storage.encryptString(kek.toString('base64')), { mode: 0o600 });
-      writeFileSync(
-        this.wrappedPath,
-        `${JSON.stringify(wrapped, null, 2)}\n`,
-        { encoding: 'utf8', mode: 0o600 }
-      );
+      writeFileSync(this.wrappedPath, `${JSON.stringify(wrapped, null, 2)}\n`, {
+        encoding: 'utf8',
+        mode: 0o600
+      });
     } catch (error) {
       this.removeFiles();
       throw error;
@@ -137,7 +136,10 @@ export class AutoUnlockStore {
     const decipher = createDecipheriv('aes-256-gcm', kek, Buffer.from(parsed.nonce, 'base64'));
     decipher.setAAD(associatedData);
     decipher.setAuthTag(Buffer.from(parsed.tag, 'base64'));
-    return Buffer.concat([decipher.update(Buffer.from(parsed.ciphertext, 'base64')), decipher.final()]);
+    return Buffer.concat([
+      decipher.update(Buffer.from(parsed.ciphertext, 'base64')),
+      decipher.final()
+    ]);
   }
 
   private removeFiles(): void {

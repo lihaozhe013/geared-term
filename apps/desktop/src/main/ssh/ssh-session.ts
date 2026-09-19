@@ -4,10 +4,17 @@ import type { Client as ClientType } from 'ssh2';
 import {
   SshTerminalRequestSchema,
   TerminalClientMessageSchema,
+  type SftpListResult,
   type SshTerminalRequest
 } from '@geared-term/protocol';
 import type { Logger } from '../logging';
-import { SftpService, type RemoteEntry } from '../sftp/sftp-service';
+import {
+  applyCdSubmission,
+  noteListed,
+  observeInput,
+  type CdFollowState
+} from '../sftp/cd-tracking';
+import { SftpService } from '../sftp/sftp-service';
 import { KnownHostsStore } from './known-hosts';
 
 const { Client, utils } = ssh2;
@@ -31,6 +38,13 @@ type SshSession = {
   sequence: number;
   closed: boolean;
   pendingHostKey?: PendingHostKey;
+  input: { buffer: string; invalid: boolean };
+  follow: CdFollowState | null;
+};
+
+export type SshSessionHooks = {
+  onSftpCd?: (sessionId: string, directory: string | null) => void;
+  onClosed?: (sessionId: string) => void;
 };
 
 export class SshSessionManager {
@@ -38,7 +52,8 @@ export class SshSessionManager {
 
   public constructor(
     private readonly logger: Logger,
-    private readonly knownHosts: KnownHostsStore
+    private readonly knownHosts: KnownHostsStore,
+    private readonly hooks: SshSessionHooks = {}
   ) {}
 
   public create(rawRequest: unknown, port: MessagePortMain): void {
@@ -68,7 +83,9 @@ export class SshSessionManager {
       sftpReady,
       rejectSftp,
       sequence: 0,
-      closed: false
+      closed: false,
+      input: { buffer: '', invalid: false },
+      follow: null
     };
     this.sessions.set(session.id, session);
     port.start();
@@ -131,32 +148,37 @@ export class SshSessionManager {
     for (const session of [...this.sessions.values()]) this.close(session, 'application-shutdown');
   }
 
-  public async listSftp(sessionId: string, directory: string): Promise<RemoteEntry[]> {
+  public async listSftp(sessionId: string, directory: string): Promise<SftpListResult> {
     const session = this.sessions.get(sessionId);
     if (!session || session.closed) throw new Error('SSH session is not available for SFTP');
     const service = await session.sftpReady;
     if (session.closed) throw new Error('SSH session is no longer available for SFTP');
-    return service.list(directory);
+    const canonical = await service.canonicalize(directory);
+    const entries = await service.list(canonical);
+    session.follow = noteListed(
+      session.follow ?? { home: null, directory: '.', previous: null },
+      canonical
+    );
+    return { directory: canonical, entries };
   }
 
-  public async uploadSftp(sessionId: string, localPath: string, remotePath: string): Promise<void> {
-    const session = this.sessions.get(sessionId);
-    if (!session || session.closed) throw new Error('SSH session is not available for SFTP');
-    const service = await session.sftpReady;
-    if (session.closed) throw new Error('SSH session is no longer available for SFTP');
-    await service.upload(localPath, remotePath);
-  }
-
-  public async downloadSftp(
+  public async runSftp<T>(
     sessionId: string,
-    remotePath: string,
-    localPath: string
-  ): Promise<void> {
+    operation: (service: SftpService) => Promise<T>
+  ): Promise<T> {
     const session = this.sessions.get(sessionId);
     if (!session || session.closed) throw new Error('SSH session is not available for SFTP');
     const service = await session.sftpReady;
     if (session.closed) throw new Error('SSH session is no longer available for SFTP');
-    await service.download(remotePath, localPath);
+    return operation(service);
+  }
+
+  public async sftpService(sessionId: string): Promise<SftpService> {
+    const session = this.sessions.get(sessionId);
+    if (!session || session.closed) throw new Error('SSH session is not available for SFTP');
+    const service = await session.sftpReady;
+    if (session.closed) throw new Error('SSH session is no longer available for SFTP');
+    return service;
   }
 
   public sendInput(sessionId: string, data: string): void {
@@ -222,8 +244,19 @@ export class SshSessionManager {
       return;
     }
     const message = result.data;
-    if (message.kind === 'input') session.channel?.write(message.data);
-    else if (message.kind === 'resize')
+    if (message.kind === 'input') {
+      session.channel?.write(message.data);
+      const observed = observeInput(session.input.buffer, session.input.invalid, message.data);
+      session.input = { buffer: observed.buffer, invalid: observed.invalid };
+      for (const line of observed.lines) {
+        if (!session.follow) continue;
+        const result = applyCdSubmission(session.follow, line);
+        session.follow = result.state;
+        if (result.effect.kind === 'move')
+          this.hooks.onSftpCd?.(session.id, result.effect.directory);
+        else if (result.effect.kind === 'unsynced') this.hooks.onSftpCd?.(session.id, null);
+      }
+    } else if (message.kind === 'resize')
       session.channel?.setWindow(message.rows, message.cols, 0, 0);
     else if (message.kind === 'host-key-decision')
       void this.resolveHostKey(session, message.decision === 'approve');
@@ -320,6 +353,7 @@ export class SshSessionManager {
     session.channel?.destroy();
     session.client.end();
     this.sessions.delete(session.id);
+    this.hooks.onClosed?.(session.id);
     session.sequence += 1;
     session.port.postMessage({
       kind: 'state',

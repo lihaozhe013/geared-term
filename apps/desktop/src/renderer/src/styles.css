@@ -124,14 +124,19 @@ textarea {
 }
 
 .sftp-panel {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   min-width: 0;
-  grid-template-rows: auto auto auto auto minmax(0, 1fr) auto;
   gap: 10px;
   padding: 16px;
   overflow: hidden;
   border-left: 1px solid #2a3140;
   background: #12151c;
+}
+
+.sftp-panel .sftp-pane {
+  flex: 1 1 0;
+  min-height: 0;
 }
 
 .environment-panel {
@@ -1136,4 +1141,162 @@ button:disabled {
   50% {
     opacity: 0;
   }
+}
+
+.sftp-sync {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.sftp-sync-state {
+  opacity: 0.8;
+}
+
+.sftp-transfers {
+  border: 1px solid #202a39;
+  border-radius: 8px;
+  padding: 6px 8px;
+  display: grid;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.sftp-transfer {
+  display: grid;
+  gap: 3px;
+  padding: 4px 0;
+}
+
+.sftp-transfer-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sftp-transfer-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sftp-transfer-bar {
+  height: 5px;
+  border-radius: 3px;
+  background: #202a39;
+  overflow: hidden;
+}
+
+.sftp-transfer-bar span {
+  display: block;
+  height: 100%;
+  background: #5c8ea5;
+}
+
+.sftp-transfer-error {
+  color: #f4a5a5;
+  overflow-wrap: anywhere;
+}
+
+.sftp-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+}
+
+.sftp-pane .sftp-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.sftp-pane-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sftp-path-display {
+  margin: 0;
+  font-size: 11px;
+  opacity: 0.75;
+  overflow-wrap: anywhere;
+}
+
+.sftp-edit {
+  display: flex;
+  gap: 6px;
+}
+
+.sftp-edit input {
+  min-width: 0;
+  flex: 1;
+  padding: 6px 7px;
+  border: 1px solid #344157;
+  border-radius: 5px;
+  outline: none;
+  color: #e4eaf3;
+  background: #0f141c;
+  font-size: 11px;
+}
+
+.sftp-context-menu {
+  position: fixed;
+  z-index: 60;
+  display: grid;
+  min-width: 180px;
+  padding: 4px;
+  border: 1px solid #344157;
+  border-radius: 8px;
+  background: #10161f;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+}
+
+.sftp-context-menu button {
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 5px;
+  color: #d8e0ee;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font-size: 11px;
+}
+
+.sftp-context-menu button:hover {
+  background: #202b3c;
+}
+
+.sftp-context-menu button.danger {
+  color: #f4a5a5;
+}
+
+.settings-wide {
+  grid-column: 1 / -1;
+}
+
+.settings-wide textarea {
+  width: 100%;
+  margin-top: 4px;
+  padding: 6px 7px;
+  border: 1px solid #344157;
+  border-radius: 5px;
+  outline: none;
+  color: #e4eaf3;
+  background: #0f141c;
+  font-family: inherit;
+  font-size: 12px;
+  resize: vertical;
+}
+
+.settings-wide small {
+  margin-top: 4px;
+  display: block;
+  opacity: 0.7;
 }

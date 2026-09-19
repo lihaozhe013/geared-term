@@ -12,10 +12,7 @@ import type {
   EnvironmentRecord
 } from '@geared-term/protocol';
 import { MarkdownView } from './assistant/MarkdownView';
-import {
-  formatSnapshotForPrompt,
-  type TerminalSnapshot
-} from './terminal/snapshot';
+import { formatSnapshotForPrompt, type TerminalSnapshot } from './terminal/snapshot';
 
 type Message = {
   role: 'user' | 'assistant';
@@ -357,9 +354,7 @@ export function AssistantPanel({
 
   const snapshotSummary = (snapshot: TerminalSnapshot): string => {
     const bounds =
-      snapshot.lineStart === null
-        ? 'selection'
-        : `lines ${snapshot.lineStart}-${snapshot.lineEnd}`;
+      snapshot.lineStart === null ? 'selection' : `lines ${snapshot.lineStart}-${snapshot.lineEnd}`;
     return `${snapshot.source} · ${bounds} · ${snapshot.charCount} chars${
       snapshot.truncated ? ' · truncated' : ''
     }${snapshot.alternateScreen ? ' · alternate screen' : ''}`;

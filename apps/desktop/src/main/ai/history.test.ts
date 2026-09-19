@@ -65,7 +65,9 @@ describe('ai history store', () => {
     const store = createStore();
     expect(await store.load('../secrets')).toBeUndefined();
     await store.remove('../../vault.json');
-    await expect(store.save({ id: 'a/b', title: 'x', messages: [{ role: 'user', content: 'c' }] })).resolves.toMatchObject({
+    await expect(
+      store.save({ id: 'a/b', title: 'x', messages: [{ role: 'user', content: 'c' }] })
+    ).resolves.toMatchObject({
       title: 'x'
     });
   });

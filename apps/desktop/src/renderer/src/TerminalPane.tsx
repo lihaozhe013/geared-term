@@ -29,6 +29,7 @@ type TerminalPaneProps = {
     client: TerminalClient
   ) => void;
   registerSnapshot?: (extractor: SnapshotExtractor | null) => void;
+  onAlternateScreen?: (active: boolean) => void;
 };
 
 function isSshRequest(request: TerminalRequest): request is SshTerminalRequest {
@@ -55,7 +56,8 @@ export function TerminalPane({
   active,
   onState,
   onHostKeyPrompt,
-  registerSnapshot
+  registerSnapshot,
+  onAlternateScreen
 }: TerminalPaneProps): React.JSX.Element {
   const hostRef = useRef<HTMLDivElement>(null);
   const fitRef = useRef<FitAddon | null>(null);
@@ -66,11 +68,13 @@ export function TerminalPane({
   const onHostKeyPromptRef = useRef(onHostKeyPrompt);
   const registerSnapshotRef = useRef(registerSnapshot);
   const precedingLinesRef = useRef(settings.terminalContextPrecedingLines);
+  const onAlternateScreenRef = useRef(onAlternateScreen);
   activeRef.current = active;
   onStateRef.current = onState;
   onHostKeyPromptRef.current = onHostKeyPrompt;
   registerSnapshotRef.current = registerSnapshot;
   precedingLinesRef.current = settings.terminalContextPrecedingLines;
+  onAlternateScreenRef.current = onAlternateScreen;
 
   useEffect(() => {
     const host = hostRef.current;
@@ -154,6 +158,28 @@ export function TerminalPane({
       );
     }
 
+    const alternateScreenModes = new Set([47, 1047, 1049]);
+    const isAlternateScreenMode = (params: unknown): boolean => {
+      const first = params as (number | number[])[];
+      const mode = Array.isArray(first[0]) ? (first[0] as number[])[0] : first[0];
+      return alternateScreenModes.has(Number(mode));
+    };
+    const setAlternate = (value: boolean): void => onAlternateScreenRef.current?.(value);
+    const handlerEnter = terminal.parser.registerCsiHandler(
+      { prefix: '?', final: 'h' },
+      (params) => {
+        if (isAlternateScreenMode(params)) setAlternate(true);
+        return false;
+      }
+    );
+    const handlerLeave = terminal.parser.registerCsiHandler(
+      { prefix: '?', final: 'l' },
+      (params) => {
+        if (isAlternateScreenMode(params)) setAlternate(false);
+        return false;
+      }
+    );
+
     const resizeObserver = new ResizeObserver(() => {
       if (activeRef.current) {
         fit.fit();
@@ -167,6 +193,9 @@ export function TerminalPane({
       resizeObserver.disconnect();
       inputSubscription?.dispose();
       resizeSubscription?.dispose();
+      handlerEnter.dispose();
+      handlerLeave.dispose();
+      setAlternate(false);
       registerSnapshotRef.current?.(null);
       client?.close();
       terminal.dispose();

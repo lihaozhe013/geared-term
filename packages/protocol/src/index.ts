@@ -126,7 +126,8 @@ export const SettingsRecordSchema = z
     terminalCursor: z.enum(['block', 'underline', 'bar']),
     defaultTerm: z.enum(['xterm-256color', 'xterm', 'vt520', 'linux', 'screen']),
     splitCommandPresentation: z.boolean(),
-    terminalContextPrecedingLines: z.number().int().min(0).max(2000)
+    terminalContextPrecedingLines: z.number().int().min(0).max(2000),
+    remoteFileCommands: z.string().max(4096).default('cat\nless\nvim')
   })
   .strict();
 
@@ -176,7 +177,10 @@ export const AiDiscoveredModelsSchema = z.object({
   models: z.array(z.string().min(1).max(256)).max(256)
 });
 
-export const AiHistoryIdSchema = z.string().regex(/^[A-Za-z0-9._-]+$/).max(128);
+export const AiHistoryIdSchema = z
+  .string()
+  .regex(/^[A-Za-z0-9._-]+$/)
+  .max(128);
 
 export const AiHistorySummarySchema = z
   .object({
@@ -396,6 +400,142 @@ export const SftpRemoteEntrySchema = z
   })
   .strict();
 
+export const SftpListResultSchema = z
+  .object({
+    directory: z.string().max(8192),
+    entries: z.array(SftpRemoteEntrySchema).max(20000)
+  })
+  .strict();
+
+export const SftpMkdirRequestSchema = z
+  .object({
+    sessionId: IdSchema,
+    path: z.string().min(1).max(8192)
+  })
+  .strict();
+
+export const SftpRenameRequestSchema = z
+  .object({
+    sessionId: IdSchema,
+    source: z.string().min(1).max(8192),
+    destination: z.string().min(1).max(8192)
+  })
+  .strict();
+
+export const SftpDeleteRequestSchema = z
+  .object({
+    sessionId: IdSchema,
+    paths: z.array(z.string().min(1).max(8192)).min(1).max(5000)
+  })
+  .strict();
+
+export const SftpUploadPathsRequestSchema = z
+  .object({
+    sessionId: IdSchema,
+    localPaths: z.array(z.string().min(1).max(4096)).min(1).max(5000),
+    remoteDirectory: z.string().min(1).max(8192)
+  })
+  .strict();
+
+export const SftpDownloadPathsRequestSchema = z
+  .object({
+    sessionId: IdSchema,
+    remotePaths: z.array(z.string().min(1).max(8192)).min(1).max(5000),
+    localDirectory: z.string().min(1).max(4096)
+  })
+  .strict();
+
+export const SftpTransferIdRequestSchema = z.object({ transferId: IdSchema }).strict();
+
+export const SftpTransferStatusSchema = z.enum([
+  'queued',
+  'active',
+  'completed',
+  'failed',
+  'cancelled'
+]);
+
+export const SftpTransferSchema = z
+  .object({
+    id: IdSchema,
+    sessionId: IdSchema,
+    direction: z.enum(['upload', 'download']),
+    name: z.string().min(1).max(4096),
+    remotePath: z.string().min(1).max(8192),
+    localPath: z.string().min(1).max(4096),
+    totalBytes: z.number().int().nonnegative().nullable(),
+    transferredBytes: z.number().int().nonnegative(),
+    status: SftpTransferStatusSchema,
+    error: z.string().max(512).optional()
+  })
+  .strict();
+
+export const SftpTransferEventSchema = z
+  .object({
+    kind: z.enum(['progress', 'state']),
+    transfer: SftpTransferSchema
+  })
+  .strict();
+
+export const SftpRemoteCommandRequestSchema = z
+  .object({
+    sessionId: IdSchema,
+    command: z.string().min(1).max(256),
+    remotePath: z.string().min(1).max(8192)
+  })
+  .strict();
+
+export const SftpCdEventSchema = z
+  .object({
+    sessionId: IdSchema,
+    directory: z.string().max(8192).nullable()
+  })
+  .strict();
+
+export const LocalListRequestSchema = z
+  .object({
+    directory: z.string().max(4096).nullable().default(null)
+  })
+  .strict();
+
+export const LocalEntrySchema = z
+  .object({
+    name: z.string().min(1).max(4096),
+    path: z.string().min(1).max(4096),
+    kind: z.enum(['file', 'directory', 'drive', 'symlink', 'other']),
+    size: z.number().int().nonnegative(),
+    modifiedAt: z.number().int().nonnegative().nullable(),
+    permissions: z.string().max(16),
+    guarded: z.boolean()
+  })
+  .strict();
+
+export const LocalMkdirRequestSchema = z
+  .object({
+    parent: z.string().min(1).max(4096),
+    name: z.string().min(1).max(255)
+  })
+  .strict();
+
+export const LocalRenameRequestSchema = z
+  .object({
+    source: z.string().min(1).max(4096),
+    destination: z.string().min(1).max(4096)
+  })
+  .strict();
+
+export const LocalDeleteRequestSchema = z
+  .object({
+    paths: z.array(z.string().min(1).max(4096)).min(1).max(5000)
+  })
+  .strict();
+
+export const LocalOpenRequestSchema = z
+  .object({
+    path: z.string().min(1).max(4096)
+  })
+  .strict();
+
 export const TerminalCommandActionSchema = z
   .object({
     sessionId: IdSchema,
@@ -464,6 +604,38 @@ export type SftpUploadRequest = z.infer<typeof SftpUploadRequestSchema>;
 export type SftpDownloadRequest = z.infer<typeof SftpDownloadRequestSchema>;
 export type SftpOperationResult = z.infer<typeof SftpOperationResultSchema>;
 export type SftpRemoteEntry = z.infer<typeof SftpRemoteEntrySchema>;
+export type SftpListResult = z.infer<typeof SftpListResultSchema>;
+export type SftpMkdirRequest = z.infer<typeof SftpMkdirRequestSchema>;
+export type SftpRenameRequest = z.infer<typeof SftpRenameRequestSchema>;
+export type SftpDeleteRequest = z.infer<typeof SftpDeleteRequestSchema>;
+export type SftpUploadPathsRequest = z.infer<typeof SftpUploadPathsRequestSchema>;
+export type SftpDownloadPathsRequest = z.infer<typeof SftpDownloadPathsRequestSchema>;
+export type SftpTransferIdRequest = z.infer<typeof SftpTransferIdRequestSchema>;
+export type SftpTransferStatus = z.infer<typeof SftpTransferStatusSchema>;
+export type SftpTransfer = z.infer<typeof SftpTransferSchema>;
+export type SftpTransferEvent = z.infer<typeof SftpTransferEventSchema>;
+export type SftpRemoteCommandRequest = z.infer<typeof SftpRemoteCommandRequestSchema>;
+export type SftpCdEvent = z.infer<typeof SftpCdEventSchema>;
+export type LocalListRequest = z.infer<typeof LocalListRequestSchema>;
+export type LocalEntry = z.infer<typeof LocalEntrySchema>;
+export type LocalMkdirRequest = z.infer<typeof LocalMkdirRequestSchema>;
+export type LocalRenameRequest = z.infer<typeof LocalRenameRequestSchema>;
+export type LocalDeleteRequest = z.infer<typeof LocalDeleteRequestSchema>;
+export type LocalOpenRequest = z.infer<typeof LocalOpenRequestSchema>;
+
+const REMOTE_COMMAND_CONTROL_CHARACTERS = /[\u0000-\u0008\u000a-\u001f\u007f]/u;
+
+/** Parses the one-per-line remote-file commands setting, deduplicating in order. */
+export function parseRemoteFileCommands(text: string): string[] {
+  const seen = new Set<string>();
+  for (const rawLine of text.split('\n')) {
+    const line = rawLine.trim();
+    if (!line || REMOTE_COMMAND_CONTROL_CHARACTERS.test(line)) continue;
+    seen.add(line);
+    if (seen.size >= 32) break;
+  }
+  return [...seen];
+}
 export type TerminalCommandAction = z.infer<typeof TerminalCommandActionSchema>;
 export type EnvironmentFacts = z.infer<typeof EnvironmentFactsSchema>;
 export type EnvironmentRecord = z.infer<typeof EnvironmentRecordSchema>;
