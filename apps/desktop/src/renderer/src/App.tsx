@@ -10,8 +10,10 @@ import type {
   TerminalPortMessage,
   UiStateRecord,
   UserTheme,
+  VaultStatus,
   WslDistribution
 } from '@geared-term/protocol';
+import { Bot, FolderSync, Lock, PanelRightClose, SquareTerminal } from 'lucide-react';
 import { applyPalette, resolvePalette } from './themes';
 import { AssistantPanel } from './AssistantPanel';
 import { EnvironmentPanel } from './EnvironmentPanel';
@@ -162,6 +164,7 @@ export function App(): React.JSX.Element {
   const [editingProfile, setEditingProfile] = useState<SessionProfileRecord | undefined>();
   const [showQuickSsh, setShowQuickSsh] = useState(false);
   const [pendingHistoryId, setPendingHistoryId] = useState<string | null>(null);
+  const [vaultStatus, setVaultStatus] = useState<VaultStatus | null>(null);
   const snapshotExtractors = useRef(new Map<string, SnapshotExtractor>());
 
   useEffect(() => {
@@ -180,6 +183,13 @@ export function App(): React.JSX.Element {
       .catch((reason: unknown) =>
         setError(reason instanceof Error ? reason.message : 'Unable to read application state')
       );
+  }, []);
+
+  useEffect(() => {
+    void window.geared
+      .getVaultStatus()
+      .then(setVaultStatus)
+      .catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -497,20 +507,15 @@ export function App(): React.JSX.Element {
   return (
     <main className="app-shell">
       <header className="titlebar">
-        <div className="brand-mark" aria-hidden="true">
-          GT
-        </div>
-        <div>
-          <p className="eyebrow">SECURE DESKTOP FOUNDATION</p>
-          <h1>Geared Term</h1>
-        </div>
+        <span className="titlebar-app">Geared Term</span>
+        <span className="titlebar-session">{activeTab?.name ?? ''}</span>
         <span className="status-pill">{activeTab ? statusLabel(activeTab.status) : 'Ready'}</span>
       </header>
 
       <section
-        className={`workspace ${uiState.rightPanel === 'assistant' ? 'with-assistant' : ''} ${
-          uiState.rightPanel === 'sftp' ? 'with-sftp' : ''
-        } ${uiState.rightPanel === 'environment' ? 'with-environment' : ''}`}
+        className={`workspace ${uiState.sidebarCollapsed ? 'sidebar-collapsed' : ''} ${
+          uiState.rightPanel ? 'with-panel' : ''
+        }`}
         aria-label="Workspace"
       >
         {!uiState.sidebarCollapsed ? (
@@ -707,37 +712,10 @@ export function App(): React.JSX.Element {
             <button
               type="button"
               className="toolbar-button"
-              onClick={toggleAssistant}
-              aria-pressed={uiState.rightPanel === 'assistant'}
-            >
-              {uiState.rightPanel === 'assistant' ? 'Hide assistant' : 'Assistant'}
-            </button>
-            <button
-              type="button"
-              className="toolbar-button"
-              onClick={toggleSftp}
-              aria-pressed={uiState.rightPanel === 'sftp'}
-              disabled={!supportsSftp(activeTab?.request)}
-            >
-              {uiState.rightPanel === 'sftp' ? 'Hide SFTP' : 'SFTP'}
-            </button>
-            <button
-              type="button"
-              className="toolbar-button"
-              onClick={toggleEnvironment}
-              aria-pressed={uiState.rightPanel === 'environment'}
-              disabled={!environmentTarget(activeTab?.request)}
-            >
-              {uiState.rightPanel === 'environment' ? 'Hide environment' : 'Environment'}
-            </button>
-            <button
-              type="button"
-              className="toolbar-button"
               onClick={() => void window.geared.openSettings()}
             >
               Settings
             </button>
-            <span className="toolbar-chip">Renderer isolated</span>
           </div>
           <div className="terminal-surface">
             {tabs.map((tab) => (
@@ -773,45 +751,100 @@ export function App(): React.JSX.Element {
             ) : null}
           </div>
         </section>
-        {uiState.rightPanel === 'assistant' ? (
-          <AssistantPanel
-            targetSessionId={activeTab?.id}
-            sessionLabel={activeTab?.name}
-            language={settings.language}
-            environmentTargetKey={environmentTarget(activeTab?.request)?.targetKey}
-            splitCommandPresentation={settings.splitCommandPresentation}
-            onToggleSplitCommand={() => {
-              void saveSettings({
-                ...settings,
-                splitCommandPresentation: !settings.splitCommandPresentation
-              }).catch(() => undefined);
-            }}
-            globalInstructions={settings.globalAiInstructions}
-            pendingHistoryId={pendingHistoryId}
-            onPendingHistoryConsumed={() => setPendingHistoryId(null)}
-            getSnapshot={() => {
-              const extractor = activeTab ? snapshotExtractors.current.get(activeTab.id) : null;
-              return extractor ? extractor() : null;
-            }}
-          />
-        ) : null}
-        {uiState.rightPanel === 'sftp' && activeTab && supportsSftp(activeTab.request) ? (
-          <SftpPanel
-            sessionId={activeTab.id}
-            remoteFileCommands={parseRemoteFileCommands(settings.remoteFileCommands)}
-            alternateScreen={Boolean(alternateScreens[activeTab.id])}
-            onClose={toggleSftp}
-          />
-        ) : null}
-        {uiState.rightPanel === 'environment' && activeTab ? (
-          <>
-            {environmentTarget(activeTab.request) ? (
+        {uiState.rightPanel ? (
+          <div className="right-panel">
+            <div className="right-panel-switcher" role="tablist" aria-label="Right panel">
+              <button
+                type="button"
+                className="right-panel-pill"
+                role="tab"
+                aria-selected={uiState.rightPanel === 'sftp'}
+                disabled={!supportsSftp(activeTab?.request)}
+                title={
+                  supportsSftp(activeTab?.request) ? 'SFTP files' : 'SFTP requires an SSH session'
+                }
+                onClick={toggleSftp}
+              >
+                <FolderSync size={13} aria-hidden="true" /> SFTP
+              </button>
+              <button
+                type="button"
+                className="right-panel-pill"
+                role="tab"
+                aria-selected={uiState.rightPanel === 'assistant'}
+                onClick={toggleAssistant}
+              >
+                <Bot size={13} aria-hidden="true" /> AI Assistant
+              </button>
+              <button
+                type="button"
+                className="right-panel-pill"
+                role="tab"
+                aria-selected={uiState.rightPanel === 'environment'}
+                disabled={!environmentTarget(activeTab?.request)}
+                title={
+                  environmentTarget(activeTab?.request)
+                    ? 'Environment context'
+                    : 'Environment detection requires a local or WSL session'
+                }
+                onClick={toggleEnvironment}
+              >
+                <SquareTerminal size={13} aria-hidden="true" /> Environment
+              </button>
+              <span className="right-panel-spacer" />
+              <button
+                type="button"
+                className="icon-button"
+                aria-label="Collapse panel"
+                title="Collapse panel"
+                onClick={() => {
+                  const next: UiStateRecord = { ...uiState, rightPanel: null };
+                  setUiState(next);
+                  void window.geared.saveUiState(next).catch(() => undefined);
+                }}
+              >
+                <PanelRightClose size={14} aria-hidden="true" />
+              </button>
+            </div>
+            {uiState.rightPanel === 'assistant' ? (
+              <AssistantPanel
+                targetSessionId={activeTab?.id}
+                sessionLabel={activeTab?.name}
+                language={settings.language}
+                environmentTargetKey={environmentTarget(activeTab?.request)?.targetKey}
+                splitCommandPresentation={settings.splitCommandPresentation}
+                onToggleSplitCommand={() => {
+                  void saveSettings({
+                    ...settings,
+                    splitCommandPresentation: !settings.splitCommandPresentation
+                  }).catch(() => undefined);
+                }}
+                globalInstructions={settings.globalAiInstructions}
+                pendingHistoryId={pendingHistoryId}
+                onPendingHistoryConsumed={() => setPendingHistoryId(null)}
+                getSnapshot={() => {
+                  const extractor = activeTab ? snapshotExtractors.current.get(activeTab.id) : null;
+                  return extractor ? extractor() : null;
+                }}
+              />
+            ) : null}
+            {uiState.rightPanel === 'sftp' && activeTab && supportsSftp(activeTab.request) ? (
+              <SftpPanel
+                sessionId={activeTab.id}
+                remoteFileCommands={parseRemoteFileCommands(settings.remoteFileCommands)}
+                alternateScreen={Boolean(alternateScreens[activeTab.id])}
+                onClose={toggleSftp}
+              />
+            ) : null}
+            {uiState.rightPanel === 'environment' &&
+            activeTab &&
+            environmentTarget(activeTab.request) ? (
               <EnvironmentPanel
                 target={environmentTarget(activeTab.request)!}
                 onClose={toggleEnvironment}
               />
             ) : null}
-          </>
+          </div>
         ) : null}
       </section>
 
@@ -835,9 +868,17 @@ export function App(): React.JSX.Element {
       ) : null}
 
       <footer className="statusbar">
-        <span>Secure context bridge</span>
-        <span>Node integration disabled</span>
-        <span>Schema validation enabled</span>
+        <span className="statusbar-left">
+          {vaultStatus && !vaultStatus.unlocked ? <Lock size={11} aria-hidden="true" /> : null}
+          {vaultStatus
+            ? vaultStatus.unlocked
+              ? 'Geared Term · Vault unlocked'
+              : 'Geared Term · Vault locked'
+            : 'Geared Term'}
+        </span>
+        <span className={`statusbar-state state-${activeTab?.status ?? 'closed'}`}>
+          {activeTab ? statusLabel(activeTab.status) : 'Not connected'}
+        </span>
       </footer>
     </main>
   );

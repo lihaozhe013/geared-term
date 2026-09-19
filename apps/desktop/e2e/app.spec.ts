@@ -14,7 +14,7 @@ test.afterEach(async () => {
 test('opens the main window and connects the secure bridge', async () => {
   const { page } = session;
   await expect(page).toHaveTitle('Geared Term');
-  await expect(page.locator('h1')).toHaveText('Geared Term');
+  await expect(page.locator('.titlebar-app')).toHaveText('Geared Term');
   await expect(page.locator('.terminal-line.success')).toContainText('bridge: Geared Term');
   await expect(page.locator('.terminal-line.success')).toContainText('(win32)');
 });

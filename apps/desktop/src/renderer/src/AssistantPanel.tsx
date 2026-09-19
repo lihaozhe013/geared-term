@@ -300,6 +300,7 @@ export function AssistantPanel({
   messagesRef.current = messages;
   const reasoningBoxRef = useRef<HTMLDivElement | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
+  const messagesBoxRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     void window.geared
@@ -378,6 +379,15 @@ export function AssistantPanel({
     const timer = window.setInterval(() => setTick((value) => value + 1), 1000);
     return () => window.clearInterval(timer);
   }, [streaming]);
+
+  // Pin output to the bottom only while the user is already near it; reading
+  // older content must not be interrupted by forced scrolling.
+  useEffect(() => {
+    const box = messagesBoxRef.current;
+    if (!box) return;
+    const distance = box.scrollHeight - box.scrollTop - box.clientHeight;
+    if (distance < 48) box.scrollTop = box.scrollHeight;
+  }, [messages, reasoning, activities]);
 
   const selectedConnection = connections.find((connection) => connection.id === selectedId);
   const modelOptions = selectedConnection?.models ?? [];
@@ -716,7 +726,7 @@ export function AssistantPanel({
         ) : null}
       </div>
 
-      <div className="assistant-messages" aria-live="polite">
+      <div className="assistant-messages" aria-live="polite" ref={messagesBoxRef}>
         {attachedEnvironment ? (
           <div className="assistant-context-chip">
             Environment context attached · {attachedEnvironment.facts.os ?? 'unknown OS'} ·{' '}
