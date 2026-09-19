@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SessionProfileRecordSchema, UiStateRecordSchema } from '@geared-term/protocol';
 
 export const settingsSchemaVersion = 1;
 export const profileSchemaVersion = 1;
@@ -16,22 +17,7 @@ export const SettingsSchema = z.object({
   terminalContextPrecedingLines: z.number().int().min(0).max(2000)
 });
 
-export const UiStateSchema = z.object({
-  schemaVersion: z.literal(uiStateSchemaVersion),
-  bounds: z
-    .object({
-      x: z.number(),
-      y: z.number(),
-      width: z.number().positive(),
-      height: z.number().positive()
-    })
-    .optional(),
-  maximized: z.boolean(),
-  sidebarCollapsed: z.boolean(),
-  rightPanel: z.enum(['sftp', 'assistant']).nullable(),
-  rightPanelCollapsed: z.boolean(),
-  splitRatio: z.number().min(0.15).max(0.85)
-});
+export const UiStateSchema = UiStateRecordSchema;
 
 export const EncryptedSecretSchema = z.object({
   version: z.literal(1),
@@ -55,27 +41,7 @@ export const VaultStateSchema = z.object({
   verifier: EncryptedSecretSchema.nullable()
 });
 
-export const SessionProfileSchema = z.object({
-  id: z.string().min(1).max(128),
-  kind: z.enum(['local', 'wsl', 'ssh']),
-  name: z.string().min(1).max(160),
-  group: z.string().max(160).optional(),
-  term: z.enum(['xterm-256color', 'xterm', 'vt520', 'linux', 'screen']),
-  host: z.string().max(512).optional(),
-  port: z.number().int().min(1).max(65535).optional(),
-  user: z.string().max(256).optional(),
-  shell: z.string().max(512).optional(),
-  args: z.array(z.string().max(4096)).max(32).optional(),
-  cwd: z.string().max(4096).optional(),
-  distribution: z.string().max(256).optional(),
-  secretRefs: z
-    .object({
-      password: z.string().max(128).optional(),
-      privateKey: z.string().max(128).optional(),
-      passphrase: z.string().max(128).optional()
-    })
-    .optional()
-});
+export const SessionProfileSchema = SessionProfileRecordSchema;
 
 export const ProfileSchema = z.object({
   schemaVersion: z.literal(profileSchemaVersion),
@@ -98,6 +64,7 @@ export type Settings = z.infer<typeof SettingsSchema>;
 export type UiState = z.infer<typeof UiStateSchema>;
 export type EncryptedSecret = z.infer<typeof EncryptedSecretSchema>;
 export type VaultState = z.infer<typeof VaultStateSchema>;
+export type SessionProfile = z.infer<typeof SessionProfileSchema>;
 export type Profile = z.infer<typeof ProfileSchema>;
 
 export const defaultSettings: Settings = {

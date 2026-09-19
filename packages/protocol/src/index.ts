@@ -40,6 +40,51 @@ export const VaultStatusSchema = z.object({ initialized: z.boolean(), unlocked: 
 
 export const IpcChannelSchema = z.enum(['app:get-info']);
 
+export const SessionProfileRecordSchema = z
+  .object({
+    id: IdSchema,
+    kind: z.enum(['local', 'wsl', 'ssh']),
+    name: z.string().min(1).max(160),
+    group: z.string().max(160).optional(),
+    term: z.enum(['xterm-256color', 'xterm', 'vt520', 'linux', 'screen']),
+    host: z.string().max(512).optional(),
+    port: z.number().int().min(1).max(65535).optional(),
+    user: z.string().max(256).optional(),
+    shell: z.string().max(512).optional(),
+    args: z.array(z.string().max(4096)).max(32).optional(),
+    cwd: z.string().max(4096).optional(),
+    distribution: z.string().max(256).optional(),
+    secretRefs: z
+      .object({
+        password: IdSchema.optional(),
+        privateKey: IdSchema.optional(),
+        passphrase: IdSchema.optional()
+      })
+      .optional()
+  })
+  .strict();
+
+export const ProfileIdRequestSchema = z.object({ id: IdSchema }).strict();
+
+export const UiStateRecordSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    bounds: z
+      .object({
+        x: z.number(),
+        y: z.number(),
+        width: z.number().positive(),
+        height: z.number().positive()
+      })
+      .optional(),
+    maximized: z.boolean(),
+    sidebarCollapsed: z.boolean(),
+    rightPanel: z.enum(['sftp', 'assistant']).nullable(),
+    rightPanelCollapsed: z.boolean(),
+    splitRatio: z.number().min(0.15).max(0.85)
+  })
+  .strict();
+
 export const TerminalPortMessageSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('output'),
@@ -145,3 +190,5 @@ export type TerminalClientMessage = z.infer<typeof TerminalClientMessageSchema>;
 export type SshTerminalRequest = z.infer<typeof SshTerminalRequestSchema>;
 export type VaultPasswordRequest = z.infer<typeof VaultPasswordRequestSchema>;
 export type VaultStatus = z.infer<typeof VaultStatusSchema>;
+export type SessionProfileRecord = z.infer<typeof SessionProfileRecordSchema>;
+export type UiStateRecord = z.infer<typeof UiStateRecordSchema>;

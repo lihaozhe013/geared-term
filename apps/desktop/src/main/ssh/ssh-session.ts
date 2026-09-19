@@ -1,5 +1,6 @@
 import type { MessagePortMain } from 'electron';
-import { Client, utils, type ClientChannel, type ConnectConfig, type VerifyCallback } from 'ssh2';
+import ssh2, { type ClientChannel, type ConnectConfig, type VerifyCallback } from 'ssh2';
+import type { Client as ClientType } from 'ssh2';
 import {
   SshTerminalRequestSchema,
   TerminalClientMessageSchema,
@@ -7,6 +8,8 @@ import {
 } from '@geared-term/protocol';
 import type { Logger } from '../logging';
 import { KnownHostsStore } from './known-hosts';
+
+const { Client, utils } = ssh2;
 
 type PendingHostKey = {
   key: Buffer;
@@ -19,7 +22,7 @@ type PendingHostKey = {
 type SshSession = {
   id: string;
   request: SshTerminalRequest;
-  client: Client;
+  client: ClientType;
   channel?: ClientChannel;
   port: MessagePortMain;
   sequence: number;

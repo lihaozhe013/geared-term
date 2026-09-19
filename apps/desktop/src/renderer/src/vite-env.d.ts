@@ -4,7 +4,9 @@ declare module '*.css';
 
 import type {
   LocalTerminalRequest,
+  SessionProfileRecord,
   SshTerminalRequest,
+  UiStateRecord,
   VaultPasswordRequest,
   VaultStatus
 } from '@geared-term/protocol';
@@ -41,6 +43,11 @@ declare global {
       initializeVault: (input: VaultPasswordRequest) => Promise<VaultStatus>;
       unlockVault: (input: VaultPasswordRequest) => Promise<VaultStatus>;
       lockVault: () => Promise<VaultStatus>;
+      listProfiles: () => Promise<SessionProfileRecord[]>;
+      saveProfile: (input: SessionProfileRecord) => Promise<SessionProfileRecord[]>;
+      deleteProfile: (id: string) => Promise<SessionProfileRecord[]>;
+      getUiState: () => Promise<UiStateRecord>;
+      saveUiState: (input: UiStateRecord) => Promise<UiStateRecord>;
     };
   }
 }

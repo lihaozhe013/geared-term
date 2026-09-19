@@ -2,13 +2,18 @@ import { contextBridge, ipcRenderer } from 'electron';
 import {
   AppInfoSchema,
   LocalTerminalRequestSchema,
+  ProfileIdRequestSchema,
+  SessionProfileRecordSchema,
   SshTerminalRequestSchema,
   VaultPasswordRequestSchema,
   VaultStatusSchema,
   TerminalClientMessageSchema,
   TerminalPortMessageSchema,
+  UiStateRecordSchema,
   type LocalTerminalRequest,
+  type SessionProfileRecord,
   type SshTerminalRequest,
+  type UiStateRecord,
   type VaultPasswordRequest
 } from '@geared-term/protocol';
 
@@ -77,7 +82,26 @@ const api = Object.freeze({
     const request = VaultPasswordRequestSchema.parse(input);
     return VaultStatusSchema.parse(await ipcRenderer.invoke('vault:unlock', request));
   },
-  lockVault: async () => VaultStatusSchema.parse(await ipcRenderer.invoke('vault:lock'))
+  lockVault: async () => VaultStatusSchema.parse(await ipcRenderer.invoke('vault:lock')),
+  listProfiles: async () =>
+    SessionProfileRecordSchema.array().parse(await ipcRenderer.invoke('profile:list')),
+  saveProfile: async (input: SessionProfileRecord) => {
+    const profile = SessionProfileRecordSchema.parse(input);
+    return SessionProfileRecordSchema.array().parse(
+      await ipcRenderer.invoke('profile:save', profile)
+    );
+  },
+  deleteProfile: async (id: string) => {
+    const request = ProfileIdRequestSchema.parse({ id });
+    return SessionProfileRecordSchema.array().parse(
+      await ipcRenderer.invoke('profile:delete', request)
+    );
+  },
+  getUiState: async () => UiStateRecordSchema.parse(await ipcRenderer.invoke('ui:get-state')),
+  saveUiState: async (input: UiStateRecord) => {
+    const state = UiStateRecordSchema.parse(input);
+    return UiStateRecordSchema.parse(await ipcRenderer.invoke('ui:save-state', state));
+  }
 });
 
 contextBridge.exposeInMainWorld('geared', api);

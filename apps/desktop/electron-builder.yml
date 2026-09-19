@@ -4,8 +4,11 @@ directories:
   output: out/releases
   buildResources: resources
 files:
-  - out/**
+  - out/main/**
+  - out/preload/**
+  - out/renderer/**
   - package.json
+  - '!out/releases{,/**/*}'
 asar: true
 asarUnpack:
   - '**/*.node'

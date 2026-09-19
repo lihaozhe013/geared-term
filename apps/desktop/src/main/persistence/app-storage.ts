@@ -7,10 +7,12 @@ import {
   defaultSettings,
   defaultUiState,
   ProfileSchema,
+  SessionProfileSchema,
   SettingsSchema,
   UiStateSchema,
   VaultStateSchema,
   type Profile,
+  type SessionProfile,
   type Settings,
   type UiState,
   type VaultState
@@ -23,6 +25,8 @@ export class AppStorage {
   public readonly vaultState: VersionedJsonStore<VaultState>;
   public vault: Vault;
   private vaultStateSnapshot: VaultState;
+  private profileValue: Profile = defaultProfile;
+  private uiStateValue: UiState = defaultUiState;
 
   public constructor(
     private readonly rootDirectory: string,
@@ -65,6 +69,8 @@ export class AppStorage {
       this.vaultState.load()
     ]);
     this.vaultStateSnapshot = vaultState.value;
+    this.profileValue = profile.value;
+    this.uiStateValue = uiState.value;
     this.vault = new Vault(vaultState.value.metadata as VaultMetadata);
     await Promise.all([
       settings.source === 'default' ? this.settings.save(settings.value) : Promise.resolve(),
@@ -108,5 +114,44 @@ export class AppStorage {
       initialized: this.vaultStateSnapshot.verifier !== null,
       unlocked: this.vault.isUnlocked
     };
+  }
+
+  public profileSnapshot(): SessionProfile[] {
+    return this.profileValue.sessions.map((profile) => ({
+      ...profile,
+      args: profile.args ? [...profile.args] : undefined,
+      secretRefs: profile.secretRefs ? { ...profile.secretRefs } : undefined
+    }));
+  }
+
+  public async saveProfile(profile: SessionProfile): Promise<SessionProfile[]> {
+    const nextProfile = SessionProfileSchema.parse(profile);
+    const sessions = this.profileValue.sessions.filter((item) => item.id !== nextProfile.id);
+    sessions.push(nextProfile);
+    this.profileValue = ProfileSchema.parse({ ...this.profileValue, sessions });
+    await this.profile.save(this.profileValue);
+    return this.profileSnapshot();
+  }
+
+  public async deleteProfile(id: string): Promise<SessionProfile[]> {
+    const sessions = this.profileValue.sessions.filter((item) => item.id !== id);
+    if (sessions.length !== this.profileValue.sessions.length) {
+      this.profileValue = ProfileSchema.parse({ ...this.profileValue, sessions });
+      await this.profile.save(this.profileValue);
+    }
+    return this.profileSnapshot();
+  }
+
+  public uiStateSnapshot(): UiState {
+    return {
+      ...this.uiStateValue,
+      bounds: this.uiStateValue.bounds ? { ...this.uiStateValue.bounds } : undefined
+    };
+  }
+
+  public async saveUiState(value: UiState): Promise<UiState> {
+    this.uiStateValue = UiStateSchema.parse(value);
+    await this.uiState.save(this.uiStateValue);
+    return this.uiStateSnapshot();
   }
 }

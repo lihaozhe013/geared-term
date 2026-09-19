@@ -1,8 +1,11 @@
-import { app, BrowserWindow, ipcMain, session, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, screen, session, shell } from 'electron';
 import { join } from 'node:path';
 import {
   AppInfoSchema,
   EmptyRequestSchema,
+  ProfileIdRequestSchema,
+  SessionProfileRecordSchema,
+  UiStateRecordSchema,
   VaultPasswordRequestSchema
 } from '@geared-term/protocol';
 import { createLogger, type Logger } from './logging';
@@ -33,10 +36,36 @@ function installSecurityHandlers(): void {
   });
 }
 
+function restoredBounds(): { x: number; y: number; width: number; height: number } | undefined {
+  const saved = storage.uiStateSnapshot().bounds;
+  if (!saved) return undefined;
+  const displays = screen.getAllDisplays();
+  const display =
+    displays.find(
+      ({ workArea }) =>
+        saved.x < workArea.x + workArea.width &&
+        saved.x + saved.width > workArea.x &&
+        saved.y < workArea.y + workArea.height &&
+        saved.y + saved.height > workArea.y
+    ) ?? displays[0];
+  if (!display) return undefined;
+  const { x, y, width, height } = display.workArea;
+  const restoredWidth = Math.min(Math.max(Math.round(saved.width), 900), width);
+  const restoredHeight = Math.min(Math.max(Math.round(saved.height), 600), height);
+  return {
+    width: restoredWidth,
+    height: restoredHeight,
+    x: Math.max(x, Math.min(Math.round(saved.x), x + width - restoredWidth)),
+    y: Math.max(y, Math.min(Math.round(saved.y), y + height - restoredHeight))
+  };
+}
+
 function createWindow(): BrowserWindow {
+  const bounds = restoredBounds();
   const window = new BrowserWindow({
-    width: 1280,
-    height: 800,
+    width: bounds?.width ?? 1280,
+    height: bounds?.height ?? 800,
+    ...(bounds ? { x: bounds.x, y: bounds.y } : {}),
     minWidth: 900,
     minHeight: 600,
     show: false,
@@ -50,7 +79,18 @@ function createWindow(): BrowserWindow {
     }
   });
 
-  window.once('ready-to-show', () => window.show());
+  window.once('ready-to-show', () => {
+    if (storage.uiStateSnapshot().maximized) window.maximize();
+    window.show();
+  });
+  window.on('close', () => {
+    const nextBounds = window.isMaximized() ? window.getNormalBounds() : window.getBounds();
+    void storage.saveUiState({
+      ...storage.uiStateSnapshot(),
+      bounds: nextBounds,
+      maximized: window.isMaximized()
+    });
+  });
   window.webContents.setWindowOpenHandler(({ url }) => {
     if (isAllowedExternalUrl(url)) {
       void shell.openExternal(url);
@@ -116,6 +156,23 @@ function registerIpc(): void {
   ipcMain.handle('vault:lock', () => {
     storage.lockVault();
     return storage.vaultStatus();
+  });
+
+  ipcMain.handle('profile:list', () =>
+    SessionProfileRecordSchema.array().parse(storage.profileSnapshot())
+  );
+  ipcMain.handle('profile:save', async (_event, input: unknown) => {
+    const profile = SessionProfileRecordSchema.parse(input);
+    return SessionProfileRecordSchema.array().parse(await storage.saveProfile(profile));
+  });
+  ipcMain.handle('profile:delete', async (_event, input: unknown) => {
+    const request = ProfileIdRequestSchema.parse(input);
+    return SessionProfileRecordSchema.array().parse(await storage.deleteProfile(request.id));
+  });
+  ipcMain.handle('ui:get-state', () => UiStateRecordSchema.parse(storage.uiStateSnapshot()));
+  ipcMain.handle('ui:save-state', async (_event, input: unknown) => {
+    const nextState = UiStateRecordSchema.parse(input);
+    return UiStateRecordSchema.parse(await storage.saveUiState(nextState));
   });
 
   ipcMain.on('terminal:create-local', (event, input: unknown) => {
