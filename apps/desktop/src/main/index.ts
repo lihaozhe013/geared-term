@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, screen, session, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, safeStorage, screen, session, shell } from 'electron';
 import { basename, join, posix } from 'node:path';
 import {
   AppInfoSchema,
@@ -12,6 +12,7 @@ import {
   EnvironmentProbeRequestSchema,
   EnvironmentRecordSchema,
   EmptyRequestSchema,
+  AutoUnlockStatusSchema,
   ProfileIdRequestSchema,
   SessionProfileRecordSchema,
   SessionProfileSaveRequestSchema,
@@ -25,6 +26,7 @@ import {
   TerminalCommandActionSchema,
   UiStateRecordSchema,
   VaultPasswordRequestSchema,
+  VaultRotateRequestSchema,
   WslDistributionSchema
 } from '@geared-term/protocol';
 import { createLogger, type Logger } from './logging';
@@ -192,6 +194,22 @@ function registerIpc(): void {
   ipcMain.handle('vault:lock', () => {
     storage.lockVault();
     return storage.vaultStatus();
+  });
+  ipcMain.handle('vault:rotate', async (_event, input: unknown) => {
+    const request = VaultRotateRequestSchema.parse(input);
+    await storage.rotateVault(request.oldPassword, request.newPassword);
+    return storage.vaultStatus();
+  });
+  ipcMain.handle('vault:auto-unlock-status', () =>
+    AutoUnlockStatusSchema.parse(storage.autoUnlockStatus())
+  );
+  ipcMain.handle('vault:enable-auto-unlock', () => {
+    storage.enableAutoUnlock();
+    return AutoUnlockStatusSchema.parse(storage.autoUnlockStatus());
+  });
+  ipcMain.handle('vault:disable-auto-unlock', () => {
+    storage.disableAutoUnlock();
+    return AutoUnlockStatusSchema.parse(storage.autoUnlockStatus());
   });
 
   ipcMain.handle('profile:list', () =>
@@ -446,7 +464,13 @@ void app.whenReady().then(async () => {
     : join(app.getPath('userData'), 'logs');
   logger = createLogger(logDirectory);
   localTerminals = new LocalTerminalManager(logger);
-  storage = new AppStorage(app.getPath('userData'), logger);
+  storage = new AppStorage(app.getPath('userData'), logger, {
+    isEncryptionAvailable: () => safeStorage.isEncryptionAvailable(),
+    encryptString: (plaintext) => safeStorage.encryptString(plaintext),
+    decryptString: (encrypted) => safeStorage.decryptString(encrypted),
+    selectedStorageBackend: () =>
+      process.platform === 'linux' ? safeStorage.getSelectedStorageBackend() : undefined
+  });
   await storage.load();
   const knownHosts = new KnownHostsStore(join(app.getPath('userData'), 'known-hosts.json'), logger);
   sshSessions = new SshSessionManager(logger, knownHosts);

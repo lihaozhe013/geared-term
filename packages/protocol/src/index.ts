@@ -36,7 +36,15 @@ export const EmptyRequestSchema = z.object({}).strict();
 export const VaultPasswordRequestSchema = z
   .object({ password: z.string().min(1).max(1024) })
   .strict();
+export const VaultRotateRequestSchema = z
+  .object({ oldPassword: z.string().min(1).max(1024), newPassword: z.string().min(1).max(1024) })
+  .strict();
 export const VaultStatusSchema = z.object({ initialized: z.boolean(), unlocked: z.boolean() });
+export const AutoUnlockStatusSchema = z.object({
+  supported: z.boolean(),
+  reason: z.string().max(512).optional(),
+  enabled: z.boolean()
+});
 
 export const IpcChannelSchema = z.enum(['app:get-info']);
 
@@ -402,6 +410,8 @@ export type EnvironmentFacts = z.infer<typeof EnvironmentFactsSchema>;
 export type EnvironmentRecord = z.infer<typeof EnvironmentRecordSchema>;
 export type EnvironmentProbeRequest = z.infer<typeof EnvironmentProbeRequestSchema>;
 export type VaultPasswordRequest = z.infer<typeof VaultPasswordRequestSchema>;
+export type VaultRotateRequest = z.infer<typeof VaultRotateRequestSchema>;
+export type AutoUnlockStatus = z.infer<typeof AutoUnlockStatusSchema>;
 export type VaultStatus = z.infer<typeof VaultStatusSchema>;
 export type SessionProfileRecord = z.infer<typeof SessionProfileRecordSchema>;
 export type ProfileCredentials = z.infer<typeof ProfileCredentialsSchema>;

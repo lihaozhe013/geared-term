@@ -15,6 +15,7 @@ import {
 } from '@geared-term/protocol';
 import type { Logger } from '../logging';
 import { createVaultMetadata, Vault, type VaultMetadata } from '../vault/vault';
+import { AutoUnlockStore, type SafeStorageAdapter } from '../vault/auto-unlock';
 import { normalizeEndpoint } from '../ai/endpoint';
 import { ProfileDatabase, newSecretId } from './profile-database';
 import { VersionedJsonStore } from './json-store';
@@ -47,10 +48,18 @@ export class AppStorage {
   private settingsValue: Settings = defaultSettings;
   private uiStateValue: UiState = defaultUiState;
   private profileDatabase: ProfileDatabase | undefined;
+  private readonly autoUnlock: AutoUnlockStore;
+  /** Set when the user locks the vault; blocks auto-unlock for this process (VLT-006). */
+  private autoUnlockSuppressed = false;
 
-  public constructor(rootDirectory: string, logger: Logger) {
+  public constructor(
+    rootDirectory: string,
+    logger: Logger,
+    safeStorage?: SafeStorageAdapter
+  ) {
     this.rootDirectory = rootDirectory;
     this.logger = logger;
+    this.autoUnlock = new AutoUnlockStore(rootDirectory, safeStorage);
     this.settings = new VersionedJsonStore(
       join(rootDirectory, 'config.json'),
       SettingsSchema,
@@ -99,6 +108,21 @@ export class AppStorage {
     }
     this.openProfileDatabase();
     await this.adoptLegacyProfileFile();
+    await this.tryAutoUnlock();
+  }
+
+  private async tryAutoUnlock(): Promise<void> {
+    if (this.autoUnlockSuppressed || this.vault.isUnlocked || !this.autoUnlock.isEnabled()) return;
+    const key = this.autoUnlock.loadVaultKey();
+    if (!key) {
+      this.logger.warn('system', 'Auto-unlock material was unreadable; password required', {});
+      return;
+    }
+    try {
+      this.vault.applyKey(key);
+    } catch (error) {
+      this.logger.warn('system', 'Auto-unlock failed', { error: String(error) });
+    }
   }
 
   private openProfileDatabase(): void {
@@ -201,6 +225,86 @@ export class AppStorage {
 
   public lockVault(): void {
     this.vault.lock();
+    this.autoUnlockSuppressed = true;
+  }
+
+  public autoUnlockStatus(): { supported: boolean; reason?: string; enabled: boolean } {
+    const state = this.autoUnlock.status();
+    return {
+      supported: state.supported,
+      reason: state.reason,
+      enabled: state.enabled && !this.autoUnlockSuppressed
+    };
+  }
+
+  public enableAutoUnlock(): void {
+    if (!this.vault.isUnlocked) throw new Error('Vault is locked');
+    this.autoUnlock.enable(this.vault.exportKey());
+    this.autoUnlockSuppressed = false;
+  }
+
+  public disableAutoUnlock(): void {
+    this.autoUnlock.disable();
+  }
+
+  /**
+   * Re-encrypts every stored secret for a new master password in one
+   * recoverable sequence: verify, stage, commit database rows, then persist
+   * the new vault metadata. If the metadata write fails the database changes
+   * are rolled back so the previous password keeps working (VLT-007).
+   */
+  public async rotateVault(oldPassword: string, newPassword: string): Promise<void> {
+    if (!this.vaultStateSnapshot.verifier) {
+      throw new Error('Vault has not been initialized');
+    }
+    if (!this.vault.isUnlocked) throw new Error('Vault is locked');
+    const oldMetadata = this.vaultStateSnapshot.metadata as VaultMetadata;
+    const probe = new Vault(oldMetadata);
+    probe.unlock(oldPassword, this.vaultStateSnapshot.verifier);
+    probe.lock();
+
+    const nextMetadata = createVaultMetadata();
+    const nextVault = new Vault(nextMetadata);
+    nextVault.initialize(newPassword);
+    const database = this.requireDatabase();
+    const currentRows = [...database.listSecrets().entries()];
+    const reencrypted: Array<[string, EncryptedSecret]> = currentRows.map(([id, secret]) => [
+      id,
+      nextVault.encrypt(secret.purpose, this.vault.decrypt(secret))
+    ]);
+    const nextState: VaultState = {
+      schemaVersion: 1,
+      metadata: nextMetadata,
+      verifier: nextVault.createVerifier()
+    };
+
+    database.transaction(() => {
+      for (const [id, secret] of reencrypted) {
+        database.putSecret(id, secret);
+      }
+    });
+    try {
+      await this.vaultState.save(nextState);
+    } catch (error) {
+      database.transaction(() => {
+        for (const [id, secret] of currentRows) {
+          database.putSecret(id, secret);
+        }
+      });
+      throw error;
+    }
+    this.vaultStateSnapshot = nextState;
+    this.vault = nextVault;
+    if (this.autoUnlock.isEnabled()) {
+      try {
+        this.autoUnlock.enable(this.vault.exportKey());
+      } catch (error) {
+        this.autoUnlock.disable();
+        this.logger.warn('system', 'Auto-unlock was disabled during password rotation', {
+          error: String(error)
+        });
+      }
+    }
   }
 
   public vaultStatus(): { initialized: boolean; unlocked: boolean } {
@@ -352,6 +456,13 @@ export class AppStorage {
       database.deleteSecret(id);
       database.sweepUnreferencedSecrets();
     });
+  }
+
+  /** Decrypts a stored secret in the main process; the renderer has no path here. */
+  public readSecret(id: string): string {
+    const secret = this.requireDatabase().getSecret(id);
+    if (!secret) throw new Error('Secret was not found');
+    return this.vault.decrypt(secret);
   }
 
   public resolveSshProfile(

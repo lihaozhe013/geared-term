@@ -24,7 +24,9 @@ import type {
   UiStateRecord,
   WslDistribution,
   VaultPasswordRequest,
-  VaultStatus
+  VaultRotateRequest,
+  VaultStatus,
+  AutoUnlockStatus
 } from '@geared-term/protocol';
 
 declare global {
@@ -69,6 +71,10 @@ declare global {
       initializeVault: (input: VaultPasswordRequest) => Promise<VaultStatus>;
       unlockVault: (input: VaultPasswordRequest) => Promise<VaultStatus>;
       lockVault: () => Promise<VaultStatus>;
+      rotateVault: (input: VaultRotateRequest) => Promise<VaultStatus>;
+      getAutoUnlockStatus: () => Promise<AutoUnlockStatus>;
+      enableAutoUnlock: () => Promise<AutoUnlockStatus>;
+      disableAutoUnlock: () => Promise<AutoUnlockStatus>;
       listAiConnections: () => Promise<AiConnectionRecord[]>;
       saveAiConnection: (input: AiConnectionInput) => Promise<AiConnectionRecord[]>;
       deleteAiConnection: (id: string) => Promise<AiConnectionRecord[]>;

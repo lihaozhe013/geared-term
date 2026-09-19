@@ -24,7 +24,9 @@ import {
   SshTerminalRequestSchema,
   TerminalCommandActionSchema,
   VaultPasswordRequestSchema,
+  VaultRotateRequestSchema,
   VaultStatusSchema,
+  AutoUnlockStatusSchema,
   TerminalClientMessageSchema,
   TerminalPortMessageSchema,
   UiStateRecordSchema,
@@ -36,6 +38,7 @@ import {
   type EnvironmentRecord,
   type SessionProfileRecord,
   type SessionProfileSaveRequest,
+  type VaultRotateRequest,
   type SettingsRecord,
   type SftpListRequest,
   type SftpDownloadRequest,
@@ -145,6 +148,16 @@ const api = Object.freeze({
     return VaultStatusSchema.parse(await ipcRenderer.invoke('vault:unlock', request));
   },
   lockVault: async () => VaultStatusSchema.parse(await ipcRenderer.invoke('vault:lock')),
+  rotateVault: async (input: VaultRotateRequest) => {
+    const request = VaultRotateRequestSchema.parse(input);
+    return VaultStatusSchema.parse(await ipcRenderer.invoke('vault:rotate', request));
+  },
+  getAutoUnlockStatus: async () =>
+    AutoUnlockStatusSchema.parse(await ipcRenderer.invoke('vault:auto-unlock-status')),
+  enableAutoUnlock: async () =>
+    AutoUnlockStatusSchema.parse(await ipcRenderer.invoke('vault:enable-auto-unlock')),
+  disableAutoUnlock: async () =>
+    AutoUnlockStatusSchema.parse(await ipcRenderer.invoke('vault:disable-auto-unlock')),
   listAiConnections: async () =>
     AiConnectionRecordSchema.array().parse(await ipcRenderer.invoke('ai:list')),
   saveAiConnection: async (input: AiConnectionInput) => {

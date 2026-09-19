@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { SessionProfileRecord, VaultStatus } from '@geared-term/protocol';
+import type { SessionProfileRecord, VaultStatus, AutoUnlockStatus } from '@geared-term/protocol';
 
 type ProfileEditorProps = {
   profile?: SessionProfileRecord;
@@ -67,6 +67,9 @@ export function ProfileEditor({
   const [vaultStatus, setVaultStatus] = useState<VaultStatus | null>(null);
   const [vaultPassword, setVaultPassword] = useState('');
   const [vaultBusy, setVaultBusy] = useState(false);
+  const [rotateOld, setRotateOld] = useState('');
+  const [rotateNew, setRotateNew] = useState('');
+  const [autoUnlock, setAutoUnlock] = useState<AutoUnlockStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -83,6 +86,10 @@ export function ProfileEditor({
       .getVaultStatus()
       .then(setVaultStatus)
       .catch((reason: unknown) => setError(asError(reason, 'Unable to read vault status')));
+    void window.geared
+      .getAutoUnlockStatus()
+      .then(setAutoUnlock)
+      .catch(() => setAutoUnlock(null));
   }, []);
 
   const update = <K extends keyof ProfileDraft>(key: K, value: ProfileDraft[K]): void => {
@@ -105,6 +112,36 @@ export function ProfileEditor({
       setError(asError(reason, 'Unable to update vault state'));
     } finally {
       setVaultBusy(false);
+    }
+  };
+
+  const rotatePassword = async (): Promise<void> => {
+    setVaultBusy(true);
+    setError(null);
+    try {
+      const next = await window.geared.rotateVault({
+        oldPassword: rotateOld,
+        newPassword: rotateNew
+      });
+      setVaultStatus(next);
+      setRotateOld('');
+      setRotateNew('');
+    } catch (reason) {
+      setError(asError(reason, 'Unable to change the master password'));
+    } finally {
+      setVaultBusy(false);
+    }
+  };
+
+  const toggleAutoUnlock = async (): Promise<void> => {
+    setError(null);
+    try {
+      const next = autoUnlock?.enabled
+        ? await window.geared.disableAutoUnlock()
+        : await window.geared.enableAutoUnlock();
+      setAutoUnlock(next);
+    } catch (reason) {
+      setError(asError(reason, 'Unable to update password-free unlock'));
     }
   };
 
@@ -369,7 +406,53 @@ export function ProfileEditor({
                       {vaultStatus?.initialized ? 'Unlock' : 'Initialize'}
                     </button>
                   </div>
-                ) : null}
+                ) : (
+                  <>
+                    <div className="vault-actions">
+                      <input
+                        type="password"
+                        value={rotateOld}
+                        onChange={(event) => setRotateOld(event.target.value)}
+                        placeholder="Current password"
+                        minLength={1}
+                      />
+                      <input
+                        type="password"
+                        value={rotateNew}
+                        onChange={(event) => setRotateNew(event.target.value)}
+                        placeholder="New password"
+                        minLength={1}
+                      />
+                      <button
+                        type="button"
+                        className="toolbar-button"
+                        onClick={() => void rotatePassword()}
+                        disabled={vaultBusy || !rotateOld || !rotateNew}
+                      >
+                        Change password
+                      </button>
+                    </div>
+                    <label className="settings-checkbox profile-editor-wide">
+                      <input
+                        type="checkbox"
+                        checked={autoUnlock?.enabled ?? false}
+                        onChange={() => void toggleAutoUnlock()}
+                        disabled={autoUnlock !== null && !autoUnlock.supported}
+                      />
+                      <span>
+                        Unlock without a password on this device
+                        <span className="muted">
+                          {' '}
+                          — the vault key is protected by this OS account only; anyone with access
+                          to this user profile can read saved secrets.
+                        </span>
+                        {autoUnlock && !autoUnlock.supported && autoUnlock.reason
+                          ? ` (${autoUnlock.reason})`
+                          : ''}
+                      </span>
+                    </label>
+                  </>
+                )}
                 <div className="settings-grid">
                   <label>
                     Password (optional)

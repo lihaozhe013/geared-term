@@ -79,6 +79,26 @@ export class Vault {
     this.key = undefined;
   }
 
+  /**
+   * Copies the derived vault key out for device-local auto-unlock wrapping.
+   * The copy is handed to the auto-unlock store, never persisted unencrypted.
+   */
+  public exportKey(): Buffer {
+    const key = this.requireKey();
+    return Buffer.from(key);
+  }
+
+  /** Installs an unwrapped vault key; the input buffer is zeroed. */
+  public applyKey(key: Buffer): void {
+    if (key.length !== keyLength) {
+      key.fill(0);
+      throw new Error('Auto-unlock key has an unexpected length');
+    }
+    this.key?.fill(0);
+    this.key = Buffer.from(key);
+    key.fill(0);
+  }
+
   public encrypt(purpose: string, plaintext: string): EncryptedSecret {
     const key = this.requireKey();
     const nonce = randomBytes(nonceLength);
