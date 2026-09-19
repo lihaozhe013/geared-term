@@ -47,7 +47,8 @@ and named/ungrouped profile sidebar sections.
 4. Make terminal, SSH/SFTP, AI, parser, and persistence failures independently recoverable.
 5. Keep direct LLM web-page support in a separate workstream and milestone.
 6. Use Conventional Commits in English and keep UX changes separate from functional commits.
-7. Pin the exact dependency graph that passes CI; do not use unbounded ranges for beta tooling.
+7. Pin the exact dependency graph that passes verification; do not use unbounded ranges for beta
+   tooling.
 
 ## 3. Repository layout
 
@@ -488,7 +489,7 @@ No workstream may invent its own identifier, error, cancellation, or persistence
 ### Work
 
 - Build a controlled SSH/SFTP test server with deterministic authentication, host keys, PTY, resize,
-  shell, exit, disconnect, and exec behavior; wire it into CI.
+  shell, exit, disconnect, and exec behavior.
 - Add Playwright E2E for window, preload boundary, terminal workflows, dialogs, tabs, Insert/Run
   targeting, and vault lifecycle.
 - Execute sustained output, long scrollback, rapid resize, concurrent sessions, SFTP transfer, AI
@@ -512,7 +513,7 @@ No workstream may invent its own identifier, error, cancellation, or persistence
 | Main integration   | Vitest in Node/Electron harness   | Vault, SQLite store, PTY, SSH/SFTP, AI adapters                    |
 | Renderer component | Vitest plus DOM testing utilities | Focus, command cards, settings, panel state                        |
 | Electron E2E       | Playwright                        | Window, preload boundary, terminal workflows, dialogs, tabs        |
-| Package smoke      | Platform CI scripts               | Installed/packaged launch and native module execution              |
+| Package smoke      | Packaging scripts                 | Installed/packaged launch and native module execution              |
 | Manual             | Versioned checklists              | IME, DPI, fonts, multiple displays, platform chrome, accessibility |
 
 ### 16.2 Determinism
@@ -523,7 +524,7 @@ No workstream may invent its own identifier, error, cancellation, or persistence
 - Terminal tests compare byte streams and normalized buffer snapshots, not screenshots alone.
 - Secrets in fixtures are synthetic and visibly marked as non-production.
 
-### 16.3 Required CI order
+### 16.3 Required verification order
 
 1. formatting and repository checks;
 2. TypeScript `noEmit` typecheck;
@@ -534,7 +535,7 @@ No workstream may invent its own identifier, error, cancellation, or persistence
 7. Electron build;
 8. package creation and native module rebuild;
 9. packaged-app smoke tests;
-10. artifact upload only after every prior gate succeeds.
+10. artifacts are produced only after every prior gate succeeds.
 
 ## 17. Commit and review strategy
 

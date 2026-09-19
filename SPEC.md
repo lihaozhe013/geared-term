@@ -648,7 +648,7 @@ At minimum, automated tests MUST cover:
 
 The suite MUST exercise:
 
-- a real local PTY on each CI operating system;
+- a real local PTY on each supported operating system;
 - a controlled SSH/SFTP server for password, key, host verification, resize, data, exit, disconnect,
   environment detection, and file operations;
 - main/preload/renderer request and stream boundaries;
