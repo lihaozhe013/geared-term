@@ -40,6 +40,8 @@ const messages = {
     protocolChat: 'OpenAI-compatible Chat',
     protocolResponses: 'OpenAI Responses',
     baseUrl: 'API endpoint (base URL)',
+    baseUrlHint:
+      'Paste an API root such as https://api.openai.com/v1. Bare hosts gain /v1 automatically; full /chat/completions or /responses links are converted.',
     apiKey: 'API key',
     defaultModel: 'Default model',
     discoverModels: 'Discover models',
@@ -162,6 +164,8 @@ const messages = {
     protocolChat: 'OpenAI 兼容 Chat',
     protocolResponses: 'OpenAI Responses',
     baseUrl: 'API 端点（Base URL）',
+    baseUrlHint:
+      '粘贴 API 根地址（如 https://api.openai.com/v1）。裸域名自动补 /v1；完整的 /chat/completions 或 /responses 链接会自动转换。',
     apiKey: 'API 密钥',
     defaultModel: '默认模型',
     discoverModels: '发现模型',

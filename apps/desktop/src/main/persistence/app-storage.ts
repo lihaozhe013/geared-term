@@ -516,7 +516,7 @@ export class AppStorage {
       name: input.name,
       protocol: input.protocol,
       baseUrl: endpoint.baseUrl,
-      models: [input.model],
+      models: Array.from(new Set([...(current?.models ?? []), input.model])),
       defaultModel: input.model,
       apiKeyRef
     });

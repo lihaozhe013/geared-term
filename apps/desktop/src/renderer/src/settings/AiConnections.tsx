@@ -27,8 +27,8 @@ function draftFrom(record: AiConnectionRecord): Draft {
 
 const EMPTY_DRAFT: Draft = {
   name: 'New connection',
-  protocol: 'chat-completions',
-  baseUrl: 'http://127.0.0.1:11434/v1',
+  protocol: 'responses',
+  baseUrl: 'https://api.openai.com/v1',
   model: '',
   apiKey: ''
 };
@@ -194,16 +194,16 @@ export function AiConnectionsSection({ t }: { t: Translate }): React.JSX.Element
                 value={draft.protocol}
                 onChange={(event) => patch({ protocol: event.target.value as Draft['protocol'] })}
               >
-                <option value="chat-completions">{t('protocolChat')}</option>
                 <option value="responses">{t('protocolResponses')}</option>
+                <option value="chat-completions">{t('protocolChat')}</option>
               </select>
             </Row>
-            <Row label={t('baseUrl')}>
+            <Row label={t('baseUrl')} hint={t('baseUrlHint')}>
               <input
                 className="settings-input"
                 value={draft.baseUrl}
                 onChange={(event) => patch({ baseUrl: event.target.value.slice(0, 2048) })}
-                placeholder="https://api.example.com/v1"
+                placeholder="https://api.openai.com/v1"
                 spellCheck={false}
               />
             </Row>

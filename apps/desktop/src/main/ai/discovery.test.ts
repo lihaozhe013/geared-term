@@ -26,8 +26,27 @@ describe('model discovery', () => {
     expect(fetchImpl.mock.calls[0]?.[0]).toBe('http://127.0.0.1:11434/v1/models');
   });
 
-  it('sends the disclosed storage-free responses test request', async () => {
-    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(200, { id: 'resp_1' }));
+  it('prefers the /models listing for responses endpoints', async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(
+        jsonResponse(200, { data: [{ id: 'gpt fixture' }, { id: 'o-series fixture' }] })
+      );
+    const result = await discoverModels({
+      protocol: 'responses',
+      baseUrl: 'https://api.example.test/v1',
+      fetchImpl: fetchImpl as unknown as typeof fetch
+    });
+    expect(result.models).toEqual(['gpt fixture', 'o-series fixture']);
+    expect(fetchImpl.mock.calls[0]?.[0]).toBe('https://api.example.test/v1/models');
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to the disclosed storage-free responses test request', async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(404, 'no listing'))
+      .mockResolvedValueOnce(jsonResponse(200, { id: 'resp_1' }));
     const result = await discoverModels({
       protocol: 'responses',
       baseUrl: 'https://api.example.test/v1',
@@ -36,10 +55,10 @@ describe('model discovery', () => {
       fetchImpl: fetchImpl as unknown as typeof fetch
     });
     expect(result.models).toEqual(['fixture-large']);
-    const [, init] = fetchImpl.mock.calls[0] as [string, RequestInit];
+    const [, init] = fetchImpl.mock.calls[1] as [string, RequestInit];
     expect(JSON.parse(String(init.body))).toEqual({
       model: 'fixture-large',
-      input: [],
+      input: [{ role: 'user', content: 'Reply with OK.' }],
       stream: false,
       store: false
     });
