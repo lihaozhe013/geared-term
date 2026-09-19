@@ -3,6 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "files": [
+    "out/main",
+    "out/preload",
+    "out/renderer",
+    "package.json"
+  ],
   "description": "A secure Electron terminal replacement for Augur Term.",
   "author": "Geared Term contributors",
   "main": "./out/main/index.js",
@@ -11,7 +17,7 @@
     "build": "electron-vite build",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run --passWithNoTests",
-    "package": "electron-builder --config electron-builder.yml"
+    "package": "pnpm run build && electron-builder --config electron-builder.yml"
   },
   "dependencies": {
     "@geared-term/domain": "workspace:*",
