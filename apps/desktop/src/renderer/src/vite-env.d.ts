@@ -8,6 +8,8 @@ import type {
   LocalTerminalRequest,
   SessionProfileRecord,
   SettingsRecord,
+  SftpListRequest,
+  SftpRemoteEntry,
   SshProfileTerminalRequest,
   SshTerminalRequest,
   AiStreamRequest,
@@ -73,6 +75,7 @@ declare global {
       saveUiState: (input: UiStateRecord) => Promise<UiStateRecord>;
       getSettings: () => Promise<SettingsRecord>;
       saveSettings: (input: SettingsRecord) => Promise<SettingsRecord>;
+      listSftp: (input: SftpListRequest) => Promise<SftpRemoteEntry[]>;
       discoverWsl: () => Promise<WslDistribution[]>;
     };
   }

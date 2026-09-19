@@ -271,6 +271,24 @@ export const SshProfileTerminalRequestSchema = z
   })
   .strict();
 
+export const SftpListRequestSchema = z
+  .object({
+    sessionId: IdSchema,
+    directory: z.string().min(1).max(4096).default('.')
+  })
+  .strict();
+
+export const SftpRemoteEntrySchema = z
+  .object({
+    name: z.string().min(1).max(4096),
+    path: z.string().min(1).max(8192),
+    longName: z.string().max(8192),
+    kind: z.enum(['file', 'directory', 'symlink', 'other']),
+    size: z.number().int().nonnegative(),
+    modifiedAt: z.number().int().nonnegative().nullable()
+  })
+  .strict();
+
 export type AppInfo = z.infer<typeof AppInfoSchema>;
 export type ErrorCode = z.infer<typeof ErrorCodeSchema>;
 export type StructuredError = z.infer<typeof StructuredErrorSchema>;
@@ -279,6 +297,8 @@ export type LocalTerminalRequest = z.infer<typeof LocalTerminalRequestSchema>;
 export type TerminalClientMessage = z.infer<typeof TerminalClientMessageSchema>;
 export type SshTerminalRequest = z.infer<typeof SshTerminalRequestSchema>;
 export type SshProfileTerminalRequest = z.infer<typeof SshProfileTerminalRequestSchema>;
+export type SftpListRequest = z.infer<typeof SftpListRequestSchema>;
+export type SftpRemoteEntry = z.infer<typeof SftpRemoteEntrySchema>;
 export type VaultPasswordRequest = z.infer<typeof VaultPasswordRequestSchema>;
 export type VaultStatus = z.infer<typeof VaultStatusSchema>;
 export type SessionProfileRecord = z.infer<typeof SessionProfileRecordSchema>;

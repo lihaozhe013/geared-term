@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { AppInfoSchema, TerminalPortMessageSchema } from './index';
+import {
+  AppInfoSchema,
+  SftpListRequestSchema,
+  SftpRemoteEntrySchema,
+  TerminalPortMessageSchema
+} from './index';
 
 describe('protocol schemas', () => {
   it('accepts app information', () => {
@@ -20,5 +25,22 @@ describe('protocol schemas', () => {
       chunk: 42
     });
     expect(result.success).toBe(false);
+  });
+
+  it('bounds SFTP requests and validates remote entries', () => {
+    expect(SftpListRequestSchema.parse({ sessionId: 'ssh-1' })).toEqual({
+      sessionId: 'ssh-1',
+      directory: '.'
+    });
+    expect(
+      SftpRemoteEntrySchema.safeParse({
+        name: 'notes.txt',
+        path: '/home/user/notes.txt',
+        longName: '-rw-r--r-- 1 user user 3 notes.txt',
+        kind: 'file',
+        size: 3,
+        modifiedAt: null
+      }).success
+    ).toBe(true);
   });
 });

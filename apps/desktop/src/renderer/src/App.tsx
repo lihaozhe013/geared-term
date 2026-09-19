@@ -11,6 +11,7 @@ import type {
 } from '@geared-term/protocol';
 import { AssistantPanel } from './AssistantPanel';
 import { SettingsPanel } from './SettingsPanel';
+import { SftpPanel } from './SftpPanel';
 import { TerminalPane } from './TerminalPane';
 
 type AppInfo = Awaited<ReturnType<Window['geared']['getAppInfo']>>;
@@ -115,6 +116,10 @@ function statusLabel(status: TabStatus): string {
     default:
       return 'Starting';
   }
+}
+
+function supportsSftp(request: TerminalRequest | undefined): boolean {
+  return Boolean(request && ('host' in request || 'profileId' in request));
 }
 
 export function App(): React.JSX.Element {
@@ -247,6 +252,23 @@ export function App(): React.JSX.Element {
     });
   }, [uiState]);
 
+  const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? tabs[0];
+
+  const toggleSftp = useCallback((): void => {
+    if (!supportsSftp(activeTab?.request)) {
+      setError('SFTP is available only for an active SSH session.');
+      return;
+    }
+    const next: UiStateRecord = {
+      ...uiState,
+      rightPanel: uiState.rightPanel === 'sftp' ? null : 'sftp'
+    };
+    setUiState(next);
+    void window.geared.saveUiState(next).catch((reason: unknown) => {
+      setError(reason instanceof Error ? reason.message : 'Unable to save UI state');
+    });
+  }, [activeTab?.request, uiState]);
+
   const saveSettings = useCallback(async (nextSettings: SettingsRecord): Promise<void> => {
     try {
       setSettings(await window.geared.saveSettings(nextSettings));
@@ -287,8 +309,6 @@ export function App(): React.JSX.Element {
     []
   );
 
-  const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? tabs[0];
-
   return (
     <main className="app-shell">
       <header className="titlebar">
@@ -303,7 +323,9 @@ export function App(): React.JSX.Element {
       </header>
 
       <section
-        className={`workspace ${uiState.rightPanel === 'assistant' ? 'with-assistant' : ''}`}
+        className={`workspace ${uiState.rightPanel === 'assistant' ? 'with-assistant' : ''} ${
+          uiState.rightPanel === 'sftp' ? 'with-sftp' : ''
+        }`}
         aria-label="Workspace"
       >
         {!uiState.sidebarCollapsed ? (
@@ -476,6 +498,15 @@ export function App(): React.JSX.Element {
             <button
               type="button"
               className="toolbar-button"
+              onClick={toggleSftp}
+              aria-pressed={uiState.rightPanel === 'sftp'}
+              disabled={!supportsSftp(activeTab?.request)}
+            >
+              {uiState.rightPanel === 'sftp' ? 'Hide SFTP' : 'SFTP'}
+            </button>
+            <button
+              type="button"
+              className="toolbar-button"
               onClick={() => setShowSettings(true)}
               aria-haspopup="dialog"
             >
@@ -503,6 +534,9 @@ export function App(): React.JSX.Element {
           </div>
         </section>
         {uiState.rightPanel === 'assistant' ? <AssistantPanel /> : null}
+        {uiState.rightPanel === 'sftp' && activeTab && supportsSftp(activeTab.request) ? (
+          <SftpPanel sessionId={activeTab.id} onClose={toggleSftp} />
+        ) : null}
       </section>
 
       {showSettings ? (

@@ -11,6 +11,8 @@ import {
   ProfileIdRequestSchema,
   SessionProfileRecordSchema,
   SettingsRecordSchema,
+  SftpListRequestSchema,
+  SftpRemoteEntrySchema,
   SshProfileTerminalRequestSchema,
   SshTerminalRequestSchema,
   VaultPasswordRequestSchema,
@@ -24,6 +26,7 @@ import {
   type AiStreamRequest,
   type SessionProfileRecord,
   type SettingsRecord,
+  type SftpListRequest,
   type SshProfileTerminalRequest,
   type SshTerminalRequest,
   type UiStateRecord,
@@ -177,6 +180,10 @@ const api = Object.freeze({
   saveSettings: async (input: SettingsRecord) => {
     const settings = SettingsRecordSchema.parse(input);
     return SettingsRecordSchema.parse(await ipcRenderer.invoke('settings:save', settings));
+  },
+  listSftp: async (input: SftpListRequest) => {
+    const request = SftpListRequestSchema.parse(input);
+    return SftpRemoteEntrySchema.array().parse(await ipcRenderer.invoke('sftp:list', request));
   },
   discoverWsl: async (): Promise<WslDistribution[]> =>
     WslDistributionSchema.array().parse(await ipcRenderer.invoke('wsl:list'))

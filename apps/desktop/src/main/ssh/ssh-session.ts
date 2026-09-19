@@ -7,6 +7,7 @@ import {
   type SshTerminalRequest
 } from '@geared-term/protocol';
 import type { Logger } from '../logging';
+import { SftpService, type RemoteEntry } from '../sftp/sftp-service';
 import { KnownHostsStore } from './known-hosts';
 
 const { Client, utils } = ssh2;
@@ -25,6 +26,8 @@ type SshSession = {
   client: ClientType;
   channel?: ClientChannel;
   port: MessagePortMain;
+  sftpReady: Promise<SftpService>;
+  rejectSftp: (error: Error) => void;
   sequence: number;
   closed: boolean;
   pendingHostKey?: PendingHostKey;
@@ -43,11 +46,27 @@ export class SshSessionManager {
     if (this.sessions.has(request.sessionId))
       throw new Error(`Session already exists: ${request.sessionId}`);
     const client = new Client();
+    let rejectSftp!: (error: Error) => void;
+    const sftpReady = new Promise<SftpService>((resolve, reject) => {
+      rejectSftp = reject;
+      client.once('ready', () => {
+        client.sftp((error, sftp) => {
+          if (error) {
+            reject(error);
+          } else {
+            resolve(new SftpService(sftp));
+          }
+        });
+      });
+    });
+    void sftpReady.catch(() => undefined);
     const session: SshSession = {
       id: request.sessionId,
       request,
       client,
       port,
+      sftpReady,
+      rejectSftp,
       sequence: 0,
       closed: false
     };
@@ -110,6 +129,14 @@ export class SshSessionManager {
 
   public closeAll(): void {
     for (const session of [...this.sessions.values()]) this.close(session, 'application-shutdown');
+  }
+
+  public async listSftp(sessionId: string, directory: string): Promise<RemoteEntry[]> {
+    const session = this.sessions.get(sessionId);
+    if (!session || session.closed) throw new Error('SSH session is not available for SFTP');
+    const service = await session.sftpReady;
+    if (session.closed) throw new Error('SSH session is no longer available for SFTP');
+    return service.list(directory);
   }
 
   private async verifyHost(
@@ -256,6 +283,7 @@ export class SshSessionManager {
     if (session.closed) return;
     this.sendState(session, 'closing', reason);
     session.closed = true;
+    session.rejectSftp(new Error(`SFTP session closed: ${reason}`));
     if (session.pendingHostKey) {
       clearTimeout(session.pendingHostKey.timer);
       session.pendingHostKey.verify(false);

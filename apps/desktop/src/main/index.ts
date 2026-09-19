@@ -12,6 +12,8 @@ import {
   ProfileIdRequestSchema,
   SessionProfileRecordSchema,
   SettingsRecordSchema,
+  SftpListRequestSchema,
+  SftpRemoteEntrySchema,
   SshProfileTerminalRequestSchema,
   UiStateRecordSchema,
   VaultPasswordRequestSchema,
@@ -202,6 +204,12 @@ function registerIpc(): void {
   ipcMain.handle('settings:save', async (_event, input: unknown) => {
     const settings = SettingsRecordSchema.parse(input);
     return SettingsRecordSchema.parse(await storage.saveSettings(settings));
+  });
+  ipcMain.handle('sftp:list', async (_event, input: unknown) => {
+    const request = SftpListRequestSchema.parse(input);
+    return SftpRemoteEntrySchema.array().parse(
+      await sshSessions.listSftp(request.sessionId, request.directory)
+    );
   });
   ipcMain.handle('wsl:list', async () => WslDistributionSchema.array().parse(await discoverWsl()));
   ipcMain.handle('ai:list', () =>
