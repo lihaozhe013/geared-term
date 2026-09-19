@@ -626,6 +626,7 @@ export function App(): React.JSX.Element {
           <AssistantPanel
             targetSessionId={activeTab?.id}
             environmentTargetKey={environmentTarget(activeTab?.request)?.targetKey}
+            splitCommandPresentation={settings.splitCommandPresentation}
           />
         ) : null}
         {uiState.rightPanel === 'sftp' && activeTab && supportsSftp(activeTab.request) ? (

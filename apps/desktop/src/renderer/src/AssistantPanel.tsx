@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { parseCommandBlock, type CommandCandidate } from '@geared-term/command-parser';
+import {
+  parseCommandBlock,
+  splitCommandBlock,
+  type CommandCandidate,
+  type SupportedShell
+} from '@geared-term/command-parser';
 import type { AiConnectionRecord, AiStreamEvent, EnvironmentRecord } from '@geared-term/protocol';
 
 type Message = {
@@ -10,14 +15,28 @@ type Message = {
 type AssistantPanelProps = {
   targetSessionId?: string;
   environmentTargetKey?: string;
+  splitCommandPresentation?: boolean;
 };
 
-function commandCandidates(content: string): CommandCandidate[] {
+function commandCandidates(content: string, splitPresentation: boolean): CommandCandidate[] {
   const result: CommandCandidate[] = [];
   const fencePattern = /```[^\n]*\n[\s\S]*?```/g;
   for (const match of content.matchAll(fencePattern)) {
     const block = match[0];
-    if (block) result.push(parseCommandBlock(block));
+    if (!block) continue;
+    const candidate = parseCommandBlock(block);
+    if (splitPresentation && candidate.stability === 'stable' && candidate.shell !== 'unknown') {
+      const split = splitCommandBlock(candidate.exactText, candidate.shell as SupportedShell);
+      if (split.splitAllowed && split.parts.length > 1) {
+        result.push(
+          ...split.parts.map((part) =>
+            parseCommandBlock(`\`\`\`${candidate.shell}\n${part}\n\`\`\``)
+          )
+        );
+        continue;
+      }
+    }
+    result.push(candidate);
   }
   return result;
 }
@@ -117,7 +136,8 @@ function CommandCard({
 
 export function AssistantPanel({
   targetSessionId,
-  environmentTargetKey
+  environmentTargetKey,
+  splitCommandPresentation = false
 }: AssistantPanelProps): React.JSX.Element {
   const [connections, setConnections] = useState<AiConnectionRecord[]>([]);
   const [selectedId, setSelectedId] = useState('');
@@ -360,15 +380,17 @@ export function AssistantPanel({
             <small>{message.role === 'user' ? 'You' : 'Assistant'}</small>
             <p>{message.content || (streaming && message.role === 'assistant' ? '…' : '')}</p>
             {message.role === 'assistant'
-              ? commandCandidates(message.content).map((candidate, candidateIndex) => (
-                  <CommandCard
-                    key={`${candidate.revision}-${candidateIndex}`}
-                    candidate={candidate}
-                    targetSessionId={targetSessionId}
-                    disabled={streaming}
-                    onError={handleCommandError}
-                  />
-                ))
+              ? commandCandidates(message.content, splitCommandPresentation).map(
+                  (candidate, candidateIndex) => (
+                    <CommandCard
+                      key={`${candidate.revision}-${candidateIndex}`}
+                      candidate={candidate}
+                      targetSessionId={targetSessionId}
+                      disabled={streaming}
+                      onError={handleCommandError}
+                    />
+                  )
+                )
               : null}
           </div>
         ))}

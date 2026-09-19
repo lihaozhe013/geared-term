@@ -42,7 +42,9 @@ replacement and cleanup. The twelfth checkpoint adds a non-persistent SSH connec
 keeps one-shot credentials in the active tab only and reuses the same host-key and SFTP capability
 paths as saved SSH sessions. The thirteenth checkpoint adds main-owned local file dialogs for SFTP
 upload/download, selected remote-file state, and validated transfer IPC without exposing arbitrary
-filesystem APIs to the renderer.
+filesystem APIs to the renderer. The fourteenth checkpoint wires the persisted split-command
+presentation setting into assistant command-card rendering while retaining whole-block safety
+validation and revision checks in the main process.
 
 ## 2. Delivery rules
 
