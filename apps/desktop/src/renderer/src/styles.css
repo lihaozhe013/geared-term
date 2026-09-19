@@ -740,6 +740,56 @@ textarea {
   flex: 1;
 }
 
+.assistant-markdown {
+  user-select: text;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  display: grid;
+  gap: 8px;
+}
+
+.assistant-markdown p,
+.assistant-markdown ul,
+.assistant-markdown ol,
+.assistant-markdown pre,
+.assistant-markdown blockquote {
+  margin: 0;
+}
+
+.assistant-markdown pre {
+  background: rgba(127, 127, 127, 0.14);
+  border-radius: 8px;
+  padding: 10px;
+  overflow-x: auto;
+  font-size: 11px;
+}
+
+.assistant-markdown code {
+  font-family: inherit;
+  font-size: 0.95em;
+}
+
+.assistant-markdown a {
+  color: inherit;
+}
+
+.assistant-markdown blockquote {
+  border-left: 3px solid var(--border);
+  padding-left: 10px;
+  opacity: 0.85;
+}
+
+.assistant-markdown table {
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.assistant-markdown th,
+.assistant-markdown td {
+  border: 1px solid var(--border);
+  padding: 4px 8px;
+}
+
 .sidebar {
   padding: 20px 16px;
 }

@@ -11,6 +11,7 @@ import type {
   AiStreamEvent,
   EnvironmentRecord
 } from '@geared-term/protocol';
+import { MarkdownView } from './assistant/MarkdownView';
 import {
   formatSnapshotForPrompt,
   type TerminalSnapshot
@@ -578,7 +579,11 @@ export function AssistantPanel({
         {messages.map((message, index) => (
           <div className={`assistant-message ${message.role}`} key={`${message.role}-${index}`}>
             <small>{message.role === 'user' ? 'You' : 'Assistant'}</small>
-            <p>{message.content || (streaming && message.role === 'assistant' ? '…' : '')}</p>
+            {message.role === 'assistant' ? (
+              <MarkdownView source={message.content || (streaming ? '…' : '')} />
+            ) : (
+              <p>{message.content}</p>
+            )}
             {message.role === 'assistant'
               ? commandCandidates(message.content, splitCommandPresentation).map(
                   (candidate, candidateIndex) => (
