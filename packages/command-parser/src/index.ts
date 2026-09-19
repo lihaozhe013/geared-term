@@ -1,0 +1,132 @@
+export type SupportedShell = 'bash' | 'zsh' | 'fish' | 'powershell' | 'cmd' | 'unknown';
+
+export type CommandCandidate = {
+  shell: SupportedShell;
+  exactText: string;
+  confidence: 'high' | 'medium' | 'low';
+  complete: boolean;
+  runAllowed: boolean;
+  fallbackReason?: 'data-fence' | 'ambiguous' | 'incomplete' | 'oversized';
+};
+
+const maxInputBytes = 256 * 1024;
+const shellLabels = new Map<string, SupportedShell>([
+  ['sh', 'bash'],
+  ['shell', 'bash'],
+  ['bash', 'bash'],
+  ['zsh', 'zsh'],
+  ['fish', 'fish'],
+  ['powershell', 'powershell'],
+  ['pwsh', 'powershell'],
+  ['cmd', 'cmd'],
+  ['bat', 'cmd'],
+  ['dos', 'cmd']
+]);
+const dataLabels = new Set(['json', 'yaml', 'yml', 'toml', 'diff', 'text', 'txt', 'python', 'py']);
+
+function byteLength(value: string): number {
+  return new TextEncoder().encode(value).byteLength;
+}
+
+function shellForLabel(label: string | undefined): SupportedShell | undefined {
+  return label ? shellLabels.get(label.toLowerCase()) : undefined;
+}
+
+function removeFence(input: string): { body: string; label?: string; fenced: boolean } {
+  const match = input.match(/^\s*```([^\s`]*)\s*\n([\s\S]*?)\n?\s*```\s*$/);
+  if (!match) {
+    return { body: input, fenced: false };
+  }
+
+  return { body: match[2] ?? '', label: match[1], fenced: true };
+}
+
+function hasUnbalancedSyntax(value: string, shell: SupportedShell): boolean {
+  let quote: 'single' | 'double' | null = null;
+  let escaped = false;
+  let braceDepth = 0;
+  let bracketDepth = 0;
+  let parenDepth = 0;
+
+  for (const character of value) {
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+
+    if (character === '\\' && quote !== 'single') {
+      escaped = true;
+      continue;
+    }
+
+    if (character === "'" && quote !== 'double') {
+      quote = quote === 'single' ? null : 'single';
+      continue;
+    }
+
+    if (character === '"' && quote !== 'single') {
+      quote = quote === 'double' ? null : 'double';
+      continue;
+    }
+
+    if (quote) {
+      continue;
+    }
+
+    if (character === '{') braceDepth += 1;
+    if (character === '}') braceDepth -= 1;
+    if (character === '[') bracketDepth += 1;
+    if (character === ']') bracketDepth -= 1;
+    if (character === '(') parenDepth += 1;
+    if (character === ')') parenDepth -= 1;
+  }
+
+  const hasUnclosedPowerShellString =
+    shell === 'powershell' && /@(['"])|<</.test(value) && value.split(/\r?\n/).length > 1;
+  return (
+    Boolean(quote) ||
+    braceDepth !== 0 ||
+    bracketDepth !== 0 ||
+    parenDepth !== 0 ||
+    hasUnclosedPowerShellString
+  );
+}
+
+export function parseCommandBlock(input: string): CommandCandidate {
+  if (byteLength(input) > maxInputBytes) {
+    return {
+      shell: 'unknown',
+      exactText: '',
+      confidence: 'low',
+      complete: false,
+      runAllowed: false,
+      fallbackReason: 'oversized'
+    };
+  }
+
+  const { body, label, fenced } = removeFence(input);
+  const normalized = body.trim();
+  const lowerLabel = label?.toLowerCase();
+  if (lowerLabel && dataLabels.has(lowerLabel)) {
+    return {
+      shell: 'unknown',
+      exactText: normalized,
+      confidence: 'high',
+      complete: true,
+      runAllowed: false,
+      fallbackReason: 'data-fence'
+    };
+  }
+
+  const shell = shellForLabel(label) ?? (fenced ? 'unknown' : 'unknown');
+  const complete = normalized.length > 0 && !hasUnbalancedSyntax(normalized, shell);
+  const confidence = shell !== 'unknown' ? 'high' : fenced ? 'medium' : 'low';
+  return {
+    shell,
+    exactText: normalized,
+    confidence,
+    complete,
+    runAllowed: complete && confidence === 'high',
+    ...(complete ? {} : { fallbackReason: 'incomplete' as const })
+  };
+}

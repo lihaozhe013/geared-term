@@ -1,0 +1,39 @@
+{
+  "name": "@geared-term/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A secure Electron terminal replacement for Augur Term.",
+  "author": "Geared Term contributors",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run --passWithNoTests",
+    "package": "electron-builder --config electron-builder.yml"
+  },
+  "dependencies": {
+    "@geared-term/domain": "workspace:*",
+    "@geared-term/protocol": "workspace:*",
+    "@xterm/addon-fit": "0.11.0",
+    "@xterm/addon-search": "0.16.0",
+    "@xterm/xterm": "6.0.0",
+    "node-pty": "1.1.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "ssh2": "1.17.0",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "6.1.1",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@types/ssh2": "1.15.6",
+    "electron": "44.4.3",
+    "electron-builder": "26.15.3",
+    "electron-vite": "6.0.0-beta.1",
+    "vite": "8.3.0",
+    "vitest": "5.0.1"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "repository": "E:\\dev\\augur-term",
+  "commit": "136c01b34931d9d496ecbc1e1fab66705e281d59",
+  "tree": "fe9df1f00aeca48b5a2129a6cc220fe944c75593",
+  "committedAt": "2026-09-18T21:31:54+08:00",
+  "baselinePolicy": "The migration baseline is the exact commit above. Working-tree changes are not part of the baseline.",
+  "observations": [
+    "The Windows Git checkout reports a clean tree for the baseline commit.",
+    "A separate WSL Git view reports line-ending and working-tree noise; those changes are excluded.",
+    "The legacy source remains read-only during migration.",
+    "Secrets and unsanitized profile data are not copied into this repository."
+  ],
+  "requiredFixtures": [
+    "sanitized profile database and vault records",
+    "default configuration and UI state",
+    "known-host samples for unknown, matching, and changed keys",
+    "command parser fixtures",
+    "WSL discovery and environment probe outputs",
+    "AI stream and conversation history samples"
+  ],
+  "status": "reference-commit-frozen; sanitized-fixtures-pending"
+}

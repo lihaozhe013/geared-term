@@ -1,6 +1,6 @@
 # Geared Term Migration Implementation Plan
 
-> Status: Proposed; implementation has not started
+> Status: In progress; foundation milestone implemented
 >
 > Last updated: 2026-09-19
 >
@@ -9,11 +9,19 @@
 ## 1. Objective and stop condition
 
 This plan describes how to replace Augur Term with the Electron-based Geared Term while keeping the
-application usable, testable, and auditable at each stage. It deliberately stops at planning. No
-scaffolding, dependency installation, source migration, profile conversion, or product code change
-is authorized by this document.
+application usable, testable, and auditable at each stage. It is the execution record for the
+approved specification and is updated as each vertical slice lands.
 
-Implementation begins only after the specification and this plan are reviewed and approved.
+The migration stops only when the replacement passes the release definition of done in `SPEC.md`,
+including the parity matrix, import verification, packaged smoke tests, and rollback rehearsal.
+
+### 1.1 Current implementation checkpoint
+
+The foundation milestone is complete. It includes the pnpm workspace, validated protocol and domain
+packages, conservative command parsing, secure Electron process boundaries, local PTY transport with
+bounded flow control, SSH host-key verification, SFTP primitives, WSL discovery, encrypted vault
+storage, atomic JSON persistence, provider-neutral AI streaming, diagnostic logging, and a minimal
+React/xterm renderer. The remaining phases below are still required for parity and release.
 
 ## 2. Delivery rules
 
@@ -29,9 +37,9 @@ Implementation begins only after the specification and this plan are reviewed an
 
 ## 3. Baseline to freeze before coding
 
-The current analysis used `E:\dev\augur-term` at HEAD
-`136c01b34931d9d496ecbc1e1fab66705e281d59`, with additional working-tree changes. That is adequate
-for writing the specification but not reproducible enough for acceptance testing.
+The current analysis used `E:\dev\augur-term` at HEAD `136c01b34931d9d496ecbc1e1fab66705e281d59`,
+with additional working-tree changes. That is adequate for writing the specification but not
+reproducible enough for acceptance testing.
 
 Phase 0 must produce a baseline manifest containing:
 
@@ -112,8 +120,8 @@ Rules for the layout:
 - `packages/domain` contains serializable domain types and pure state transitions only.
 - `packages/protocol` owns runtime schemas and generated/inferred TypeScript DTO types.
 - `packages/command-parser` has no React, Electron, provider, terminal, or filesystem dependency.
-- `apps/desktop/src/main` is the only production code allowed to touch Node privileged APIs,
-  native modules, sockets, credentials, or unrestricted files.
+- `apps/desktop/src/main` is the only production code allowed to touch Node privileged APIs, native
+  modules, sockets, credentials, or unrestricted files.
 - `preload` is a small adapter over the validated protocol and transferred ports.
 - renderer stores contain identifiers and serializable view state, never native handles or xterm
   instances.
@@ -141,16 +149,16 @@ flowchart LR
 
 ### 5.1 Process ownership
 
-| Concern | Owner | Notes |
-| --- | --- | --- |
-| Window lifecycle and security | Main | Renderer navigation and new windows are denied by default. |
-| PTY, SSH, SFTP, WSL processes | Main | One explicit lifecycle owner per resource. |
-| Vault and decrypted secrets | Main | Secret DTOs are never part of the preload API. |
-| Provider HTTP and stream decoding | Main | Renderer sees provider-neutral events. |
-| xterm instance and addons | Renderer | Stored outside React state; disposed with its view. |
-| Workspace and transient UI state | Renderer | Persisted through validated main-process services. |
-| Command parsing | Pure package in a worker | Bounded input and conservative fallback. |
-| Runtime schemas | Shared protocol package | Validated on both sides of every trust boundary. |
+| Concern                           | Owner                    | Notes                                                      |
+| --------------------------------- | ------------------------ | ---------------------------------------------------------- |
+| Window lifecycle and security     | Main                     | Renderer navigation and new windows are denied by default. |
+| PTY, SSH, SFTP, WSL processes     | Main                     | One explicit lifecycle owner per resource.                 |
+| Vault and decrypted secrets       | Main                     | Secret DTOs are never part of the preload API.             |
+| Provider HTTP and stream decoding | Main                     | Renderer sees provider-neutral events.                     |
+| xterm instance and addons         | Renderer                 | Stored outside React state; disposed with its view.        |
+| Workspace and transient UI state  | Renderer                 | Persisted through validated main-process services.         |
+| Command parsing                   | Pure package in a worker | Bounded input and conservative fallback.                   |
+| Runtime schemas                   | Shared protocol package  | Validated on both sides of every trust boundary.           |
 
 ### 5.2 Terminal transport
 
@@ -205,15 +213,15 @@ service is called. TypeScript types should be inferred from the schemas rather t
 
 Use main-process-owned, versioned files under the platform-standard Geared Term directories:
 
-| File or directory | Contents |
-| --- | --- |
-| `config.json` | Non-secret application preferences |
-| `profile.json` | Sessions, AI connection metadata, environments, vault-encrypted blobs |
-| `ui-state.json` | Window and panel state |
-| `known-hosts.json` or compatible store | Parsed host keys and metadata |
-| `ai-history/` | Human-readable conversation Markdown |
-| `themes/` | User theme JSON |
-| `logs/` | Rotated diagnostic logs |
+| File or directory                      | Contents                                                              |
+| -------------------------------------- | --------------------------------------------------------------------- |
+| `config.json`                          | Non-secret application preferences                                    |
+| `profile.json`                         | Sessions, AI connection metadata, environments, vault-encrypted blobs |
+| `ui-state.json`                        | Window and panel state                                                |
+| `known-hosts.json` or compatible store | Parsed host keys and metadata                                         |
+| `ai-history/`                          | Human-readable conversation Markdown                                  |
+| `themes/`                              | User theme JSON                                                       |
+| `logs/`                                | Rotated diagnostic logs                                               |
 
 Each mutable JSON file should use write-to-sibling, flush, atomic rename, and a last-known-good
 backup or journal. A profile-wide mutation such as master-password rotation must construct and
@@ -263,17 +271,17 @@ password, partial records, duplicate IDs, and interrupted target commits.
 The phases below define integration gates, but several workstreams can proceed independently after
 their prerequisites are stable.
 
-| Workstream | Depends on | Primary result |
-| --- | --- | --- |
-| Protocol and security boundary | Foundation | Typed IPC, ports, structured errors |
-| Persistence and vault | Protocol | Durable target schemas and secret lifecycle |
-| Terminal transport and xterm | Protocol | Local terminal vertical slice |
-| Workspace UI | Foundation, domain | Sidebar, tabs, panels, settings |
-| SSH and SFTP | Session contract, vault | Remote terminal and file workflow |
-| AI and environment | Protocol, vault, terminal snapshots | Provider-neutral streaming assistant |
-| Command parser | Foundation only | Pure tested parser and risk metadata |
-| Legacy importer | Frozen old schemas, target profile schema | Non-destructive upgrade path |
-| Packaging and release | All vertical slices | Supported signed/unsigned artifacts and smoke tests |
+| Workstream                     | Depends on                                | Primary result                                      |
+| ------------------------------ | ----------------------------------------- | --------------------------------------------------- |
+| Protocol and security boundary | Foundation                                | Typed IPC, ports, structured errors                 |
+| Persistence and vault          | Protocol                                  | Durable target schemas and secret lifecycle         |
+| Terminal transport and xterm   | Protocol                                  | Local terminal vertical slice                       |
+| Workspace UI                   | Foundation, domain                        | Sidebar, tabs, panels, settings                     |
+| SSH and SFTP                   | Session contract, vault                   | Remote terminal and file workflow                   |
+| AI and environment             | Protocol, vault, terminal snapshots       | Provider-neutral streaming assistant                |
+| Command parser                 | Foundation only                           | Pure tested parser and risk metadata                |
+| Legacy importer                | Frozen old schemas, target profile schema | Non-destructive upgrade path                        |
+| Packaging and release          | All vertical slices                       | Supported signed/unsigned artifacts and smoke tests |
 
 No workstream may invent its own identifier, error, cancellation, or persistence conventions.
 
@@ -471,8 +479,8 @@ No workstream may invent its own identifier, error, cancellation, or persistence
 - Both provider protocols pass streaming, non-streaming where supported, cancel, timeout, malformed
   event, size, error, usage, source, and continuation fixtures.
 - Endpoint consent occurs before the first request and is invalidated by endpoint changes.
-- Snapshot, prompt, response, reasoning, and key content are absent from logs and renderer-accessible
-  secret state.
+- Snapshot, prompt, response, reasoning, and key content are absent from logs and
+  renderer-accessible secret state.
 - AI failure under load does not affect PTY, SSH, or SFTP traffic.
 
 ## 16. Phase 8 - Command parser and trusted actions
@@ -498,8 +506,8 @@ No workstream may invent its own identifier, error, cancellation, or persistence
 - Old fixtures pass or have a documented safer fallback; expanded Bash and PowerShell fixtures pass.
 - Insert sends no submission sequence in every shell and platform test.
 - Run sends exactly one submission only for a complete, current, explicitly selected candidate.
-- Tab switches, session closes, response revisions, double-clicks, and delayed IPC cannot redirect or
-  duplicate a command.
+- Tab switches, session closes, response revisions, double-clicks, and delayed IPC cannot redirect
+  or duplicate a command.
 - Parser failure cannot crash or block the renderer.
 
 ## 17. Phase 9 - Legacy import, hardening, packaging, and cutover
@@ -526,21 +534,22 @@ No workstream may invent its own identifier, error, cancellation, or persistence
 - Import succeeds from every sanitized legacy fixture, fails safely on corrupt/wrong-password input,
   and leaves the source untouched.
 - There are no unwaived MUST gaps or blocker defects.
-- Package smoke tests prove `node-pty`, SSH, settings, vault, and renderer security on every artifact.
+- Package smoke tests prove `node-pty`, SSH, settings, vault, and renderer security on every
+  artifact.
 - Cutover and rollback are documented and rehearsed before Geared Term becomes the primary release.
 
 ## 18. Test strategy
 
 ### 18.1 Test layers
 
-| Layer | Tooling | Scope |
-| --- | --- | --- |
-| Pure unit | Vitest | Domain state, parser, schemas, URL building, settings migrations |
-| Main integration | Vitest in Node/Electron harness | Vault, stores, PTY, SSH/SFTP, AI adapters, importer protocol |
-| Renderer component | Vitest plus DOM testing utilities | Focus, command cards, settings, panel state |
-| Electron E2E | Playwright | Window, preload boundary, terminal workflows, dialogs, tabs |
-| Package smoke | Platform CI scripts | Installed/packaged launch and native module execution |
-| Manual | Versioned checklists | IME, DPI, fonts, multiple displays, platform chrome, accessibility |
+| Layer              | Tooling                           | Scope                                                              |
+| ------------------ | --------------------------------- | ------------------------------------------------------------------ |
+| Pure unit          | Vitest                            | Domain state, parser, schemas, URL building, settings migrations   |
+| Main integration   | Vitest in Node/Electron harness   | Vault, stores, PTY, SSH/SFTP, AI adapters, importer protocol       |
+| Renderer component | Vitest plus DOM testing utilities | Focus, command cards, settings, panel state                        |
+| Electron E2E       | Playwright                        | Window, preload boundary, terminal workflows, dialogs, tabs        |
+| Package smoke      | Platform CI scripts               | Installed/packaged launch and native module execution              |
+| Manual             | Versioned checklists              | IME, DPI, fonts, multiple displays, platform chrome, accessibility |
 
 ### 18.2 Determinism
 
@@ -579,22 +588,22 @@ No workstream may invent its own identifier, error, cancellation, or persistence
 
 ## 20. Risk register
 
-| Risk | Detection | Mitigation | Release blocker |
-| --- | --- | --- | --- |
-| electron-vite 6 beta regression | Clean build/package failure or HMR/main mismatch | Pin an exact beta, keep a minimal reproduction, upgrade separately | Package or production build failure |
-| TypeScript 7 tooling gap | Lint/plugin/compiler API errors | Keep TS as typechecker, isolate incompatible non-blocking tooling | Typecheck or source-map correctness failure |
-| `node-pty` ABI/package failure | Packaged PTY smoke fails | Rebuild for Electron ABI on each platform and test artifact | Any supported artifact cannot start a PTY |
-| xterm font/IME regression | Manual matrix or buffer/render mismatch | Font fallback fixtures, IME testing, WebGL fallback | Input loss, unreadable CJK, or incorrect cell geometry |
-| Port backpressure bug | Memory growth, latency, missing sequence | Credit/ack protocol, stress tests, explicit overload state | Lost terminal bytes or unbounded growth |
-| `ssh2` parity gap | Controlled-server scenario fails | Adapter state machine, interoperability fixtures, scoped feature set | Auth, host trust, PTY, or resize failure |
-| SFTP blocks terminal | Latency/stress metrics | Separate channels/tasks and bounded transfer events | Terminal becomes unresponsive during transfer |
-| Changed-host handling weakens | Host-key fixtures fail | Fail closed, serialize store changes, show both fingerprints | Mismatch accepted without explicit approval |
-| Parser changes command meaning | Fixture/fuzz failure | Shell-specific parsers and whole-block fallback | Runnable incorrect candidate |
-| Stale command targets wrong tab | Race E2E failure | Session and revision validation in main | Any demonstrated cross-session send |
-| Legacy Redb import corrupts data | Fixture or interrupted-commit test fails | Read-only source, preview, atomic target commit, receipt | Source mutation, secret loss, or non-idempotence |
-| Secret leakage | Log/IPC/bundle scanning | Main-only secrets, redaction, synthetic canary tests | Any plaintext secret outside approved memory path |
-| Linux auto-unlock is weak | `safeStorage` reports basic backend | Disable or require explicit warned fallback | Silent insecure auto-unlock |
-| Feature creep from Web integration | Dependency or IPC review | Separate milestone and capability boundary | Web content obtains terminal capability |
+| Risk                               | Detection                                        | Mitigation                                                           | Release blocker                                        |
+| ---------------------------------- | ------------------------------------------------ | -------------------------------------------------------------------- | ------------------------------------------------------ |
+| electron-vite 6 beta regression    | Clean build/package failure or HMR/main mismatch | Pin an exact beta, keep a minimal reproduction, upgrade separately   | Package or production build failure                    |
+| TypeScript 7 tooling gap           | Lint/plugin/compiler API errors                  | Keep TS as typechecker, isolate incompatible non-blocking tooling    | Typecheck or source-map correctness failure            |
+| `node-pty` ABI/package failure     | Packaged PTY smoke fails                         | Rebuild for Electron ABI on each platform and test artifact          | Any supported artifact cannot start a PTY              |
+| xterm font/IME regression          | Manual matrix or buffer/render mismatch          | Font fallback fixtures, IME testing, WebGL fallback                  | Input loss, unreadable CJK, or incorrect cell geometry |
+| Port backpressure bug              | Memory growth, latency, missing sequence         | Credit/ack protocol, stress tests, explicit overload state           | Lost terminal bytes or unbounded growth                |
+| `ssh2` parity gap                  | Controlled-server scenario fails                 | Adapter state machine, interoperability fixtures, scoped feature set | Auth, host trust, PTY, or resize failure               |
+| SFTP blocks terminal               | Latency/stress metrics                           | Separate channels/tasks and bounded transfer events                  | Terminal becomes unresponsive during transfer          |
+| Changed-host handling weakens      | Host-key fixtures fail                           | Fail closed, serialize store changes, show both fingerprints         | Mismatch accepted without explicit approval            |
+| Parser changes command meaning     | Fixture/fuzz failure                             | Shell-specific parsers and whole-block fallback                      | Runnable incorrect candidate                           |
+| Stale command targets wrong tab    | Race E2E failure                                 | Session and revision validation in main                              | Any demonstrated cross-session send                    |
+| Legacy Redb import corrupts data   | Fixture or interrupted-commit test fails         | Read-only source, preview, atomic target commit, receipt             | Source mutation, secret loss, or non-idempotence       |
+| Secret leakage                     | Log/IPC/bundle scanning                          | Main-only secrets, redaction, synthetic canary tests                 | Any plaintext secret outside approved memory path      |
+| Linux auto-unlock is weak          | `safeStorage` reports basic backend              | Disable or require explicit warned fallback                          | Silent insecure auto-unlock                            |
+| Feature creep from Web integration | Dependency or IPC review                         | Separate milestone and capability boundary                           | Web content obtains terminal capability                |
 
 ## 21. Progress reporting
 

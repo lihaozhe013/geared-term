@@ -1,0 +1,10 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/protocol" },
+    { "path": "packages/domain" },
+    { "path": "packages/command-parser" },
+    { "path": "packages/test-support" },
+    { "path": "apps/desktop" }
+  ]
+}
