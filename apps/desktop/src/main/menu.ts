@@ -5,6 +5,7 @@ export type MenuLocale = 'en-US' | 'zh-CN';
 export type MenuCommands = {
   onCommand: (command: string) => void;
   onOpenConfigFolder: () => void;
+  onOpenSettings: () => void;
   onAbout: () => void;
 };
 
@@ -22,6 +23,7 @@ const labels = {
     newLocalTerminal: 'New local terminal',
     quickConnection: 'Temporary SSH connection…',
     openConfigFolder: 'Open configuration folder',
+    settings: 'Settings…',
     quit: 'Quit',
     edit: 'Edit',
     undo: 'Undo',
@@ -56,6 +58,7 @@ const labels = {
     newLocalTerminal: '新建本地终端',
     quickConnection: '临时 SSH 连接…',
     openConfigFolder: '打开配置目录',
+    settings: '设置…',
     quit: '退出',
     edit: '编辑',
     undo: '撤销',
@@ -96,6 +99,7 @@ export function buildApplicationMenu(state: MenuState, commands: MenuCommands): 
         { label: t.newLocalTerminal, click: () => commands.onCommand('new-local') },
         { label: t.quickConnection, click: () => commands.onCommand('quick-ssh') },
         { type: 'separator' },
+        { label: t.settings, accelerator: 'CmdOrCtrl+,', click: commands.onOpenSettings },
         { label: t.openConfigFolder, click: commands.onOpenConfigFolder },
         { type: 'separator' },
         { role: 'quit', label: t.quit }

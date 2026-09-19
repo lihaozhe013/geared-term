@@ -21,6 +21,7 @@ import {
   ProfileIdRequestSchema,
   SessionProfileRecordSchema,
   SessionProfileSaveRequestSchema,
+  SettingsOpenRequestSchema,
   SettingsRecordSchema,
   SftpDownloadRequestSchema,
   SftpListRequestSchema,
@@ -273,6 +274,25 @@ const api = Object.freeze({
   saveSettings: async (input: SettingsRecord) => {
     const settings = SettingsRecordSchema.parse(input);
     return SettingsRecordSchema.parse(await ipcRenderer.invoke('settings:save', settings));
+  },
+  openSettings: async (category?: string) => {
+    const request = SettingsOpenRequestSchema.parse({ category });
+    return SftpOperationResultSchema.parse(await ipcRenderer.invoke('app:open-settings', request));
+  },
+  onSettingsChanged: (listener: (settings: SettingsRecord) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, payload: unknown): void => {
+      const result = SettingsRecordSchema.safeParse(payload);
+      if (result.success) listener(result.data);
+    };
+    ipcRenderer.on('settings:changed', handler);
+    return () => ipcRenderer.removeListener('settings:changed', handler);
+  },
+  onSettingsNavigate: (listener: (category: string) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, payload: unknown): void => {
+      if (typeof payload === 'string') listener(payload);
+    };
+    ipcRenderer.on('settings:navigate', handler);
+    return () => ipcRenderer.removeListener('settings:navigate', handler);
   },
   listSftp: async (input: SftpListRequest) => {
     const request = SftpListRequestSchema.parse(input);

@@ -43,6 +43,14 @@ export default defineConfig({
   renderer: {
     root: resolve(__dirname, 'src/renderer'),
     resolve: { alias: aliases },
-    plugins: [react()]
+    plugins: [react()],
+    build: {
+      rollupOptions: {
+        input: {
+          main: resolve(__dirname, 'src/renderer/index.html'),
+          settings: resolve(__dirname, 'src/renderer/settings.html')
+        }
+      }
+    }
   }
 });

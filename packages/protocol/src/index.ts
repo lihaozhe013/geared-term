@@ -48,6 +48,21 @@ export const AutoUnlockStatusSchema = z.object({
 
 export const IpcChannelSchema = z.enum(['app:get-info']);
 
+export const SETTINGS_CATEGORIES = [
+  'general',
+  'appearance',
+  'terminal',
+  'sftp',
+  'ai-connections',
+  'ai-assistant',
+  'security',
+  'about'
+] as const;
+
+export const SettingsOpenRequestSchema = z
+  .object({ category: z.enum(SETTINGS_CATEGORIES).optional() })
+  .strict();
+
 export const SessionProfileRecordSchema = z
   .object({
     id: IdSchema,

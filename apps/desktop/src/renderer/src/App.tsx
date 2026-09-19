@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { parseRemoteFileCommands } from '@geared-term/protocol';
 import type {
   AppInfo,
-  InvalidThemeFile,
   LocalTerminalRequest,
   SessionProfileRecord,
   SshProfileTerminalRequest,
@@ -10,16 +9,14 @@ import type {
   SettingsRecord,
   TerminalPortMessage,
   UiStateRecord,
-  RuntimeInfo,
   UserTheme,
   WslDistribution
 } from '@geared-term/protocol';
-import { applyPalette, builtinThemeNames, resolvePalette } from './themes';
+import { applyPalette, resolvePalette } from './themes';
 import { AssistantPanel } from './AssistantPanel';
 import { EnvironmentPanel } from './EnvironmentPanel';
 import { ProfileEditor } from './ProfileEditor';
 import { QuickSshDialog } from './QuickSshDialog';
-import { SettingsPanel } from './SettingsPanel';
 import { SftpPanel } from './SftpPanel';
 import { TerminalPane, type SnapshotExtractor } from './TerminalPane';
 
@@ -155,15 +152,12 @@ export function App(): React.JSX.Element {
   const [settings, setSettings] = useState<SettingsRecord>(defaultSettings);
   const [alternateScreens, setAlternateScreens] = useState<Record<string, boolean>>({});
   const [userThemes, setUserThemes] = useState<UserTheme[]>([]);
-  const [invalidThemes, setInvalidThemes] = useState<InvalidThemeFile[]>([]);
-  const [runtime, setRuntime] = useState<RuntimeInfo | null>(null);
   const [uiState, setUiState] = useState<UiStateRecord>(defaultUiState);
   const [wslDistributions, setWslDistributions] = useState<WslDistribution[]>([]);
   const [wslLoading, setWslLoading] = useState(false);
   const [tabs, setTabs] = useState<TerminalTab[]>(() => [createLocalTab()]);
   const [activeTabId, setActiveTabId] = useState<string | null>(() => tabs[0]?.id ?? null);
   const [error, setError] = useState<string | null>(null);
-  const [showSettings, setShowSettings] = useState(false);
   const [showProfileEditor, setShowProfileEditor] = useState(false);
   const [editingProfile, setEditingProfile] = useState<SessionProfileRecord | undefined>();
   const [showQuickSsh, setShowQuickSsh] = useState(false);
@@ -174,15 +168,13 @@ export function App(): React.JSX.Element {
       window.geared.getAppInfo(),
       window.geared.listProfiles(),
       window.geared.getUiState(),
-      window.geared.getSettings(),
-      window.geared.getRuntimeInfo()
+      window.geared.getSettings()
     ])
-      .then(([appInfo, savedProfiles, savedUiState, savedSettings, runtimeInfo]) => {
+      .then(([appInfo, savedProfiles, savedUiState, savedSettings]) => {
         setInfo(appInfo);
         setProfiles(savedProfiles);
         setUiState(savedUiState);
         setSettings(savedSettings);
-        setRuntime(runtimeInfo);
       })
       .catch((reason: unknown) =>
         setError(reason instanceof Error ? reason.message : 'Unable to read application state')
@@ -192,12 +184,11 @@ export function App(): React.JSX.Element {
   useEffect(() => {
     void window.geared
       .listUserThemes()
-      .then((result) => {
-        setUserThemes(result.themes);
-        setInvalidThemes(result.invalid);
-      })
+      .then((result) => setUserThemes(result.themes))
       .catch(() => undefined);
   }, []);
+
+  useEffect(() => window.geared.onSettingsChanged(setSettings), []);
 
   const palette = useMemo(
     () => resolvePalette(settings.theme, userThemes),
@@ -728,8 +719,7 @@ export function App(): React.JSX.Element {
             <button
               type="button"
               className="toolbar-button"
-              onClick={() => setShowSettings(true)}
-              aria-haspopup="dialog"
+              onClick={() => void window.geared.openSettings()}
             >
               Settings
             </button>
@@ -800,28 +790,6 @@ export function App(): React.JSX.Element {
           </>
         ) : null}
       </section>
-
-      {showSettings ? (
-        <SettingsPanel
-          settings={settings}
-          themeNames={[
-            ...new Set([...builtinThemeNames, ...userThemes.map((theme) => theme.name)])
-          ]}
-          invalidThemes={invalidThemes}
-          info={info}
-          runtime={runtime}
-          onSave={saveSettings}
-          onOpenAssistant={() =>
-            setUiState((current) => ({
-              ...current,
-              rightPanel: current.rightPanel === 'assistant' ? null : 'assistant',
-              rightPanelCollapsed: false
-            }))
-          }
-          onOpenProfiles={() => setShowProfileEditor(true)}
-          onClose={() => setShowSettings(false)}
-        />
-      ) : null}
 
       {showProfileEditor ? (
         <ProfileEditor

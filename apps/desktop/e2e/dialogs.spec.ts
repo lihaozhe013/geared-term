@@ -11,14 +11,22 @@ test.afterEach(async () => {
   await session.close();
 });
 
-test('opens and cancels the settings dialog', async () => {
-  const { page } = session;
+test('opens the settings window with category navigation', async () => {
+  const { page, app } = session;
   await page.getByRole('button', { name: 'Settings' }).click();
-  const dialog = page.getByRole('dialog', { name: 'Settings' });
-  await expect(dialog).toBeVisible();
-  await expect(dialog.getByRole('heading', { name: 'Appearance' })).toBeVisible();
-  await dialog.getByRole('button', { name: 'Cancel' }).click();
-  await expect(dialog).toHaveCount(0);
+  const settingsWindow = await app.waitForEvent('window');
+  await settingsWindow.waitForLoadState('domcontentloaded');
+  await expect(settingsWindow.locator('.settings-nav')).toBeVisible();
+  await expect(settingsWindow.getByRole('heading', { name: 'General' })).toBeVisible();
+  await settingsWindow.getByRole('button', { name: 'Appearance' }).click();
+  await expect(settingsWindow.getByRole('heading', { name: 'Appearance' })).toBeVisible();
+  await settingsWindow.getByRole('button', { name: 'AI Connections' }).click();
+  await expect(settingsWindow.getByRole('heading', { name: 'New connection' })).toBeVisible();
+  await settingsWindow.getByRole('button', { name: 'Security & Vault' }).click();
+  await expect(settingsWindow.getByRole('heading', { name: 'Security & Vault' })).toBeVisible();
+  await settingsWindow.getByRole('button', { name: 'About' }).click();
+  await expect(settingsWindow.getByRole('heading', { name: 'About' })).toBeVisible();
+  await settingsWindow.close();
 });
 
 test('opens and cancels the temporary SSH dialog', async () => {

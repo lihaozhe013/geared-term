@@ -23,8 +23,10 @@ import {
   EmptyRequestSchema,
   AutoUnlockStatusSchema,
   ProfileIdRequestSchema,
+  SETTINGS_CATEGORIES,
   SessionProfileRecordSchema,
   SessionProfileSaveRequestSchema,
+  SettingsOpenRequestSchema,
   SettingsRecordSchema,
   SftpListRequestSchema,
   SftpListResultSchema,
@@ -81,6 +83,7 @@ import { SshSessionManager } from './ssh/ssh-session';
 import { buildRemoteFileCommand } from './sftp/remote-commands';
 import { TransferManager } from './sftp/transfers';
 import { buildApplicationMenu, type MenuLocale } from './menu';
+import { SettingsWindowManager, type SettingsCategory } from './settings-window';
 import { discoverWsl } from './wsl/discovery';
 import { probeEnvironment } from './environment/probe';
 
@@ -91,6 +94,7 @@ const userDataOverride = process.env.GEARED_USER_DATA?.trim();
 if (userDataOverride) app.setPath('userData', userDataOverride);
 let logger: Logger;
 let mainWindow: BrowserWindow | undefined;
+let settingsWindow: SettingsWindowManager;
 let localTerminals: LocalTerminalManager;
 let storage: AppStorage;
 let sshSessions: SshSessionManager;
@@ -100,7 +104,9 @@ const aiHistory = new AiHistoryStore(isDevelopment ? process.cwd() : app.getPath
 const themesDirectory = join(isDevelopment ? process.cwd() : app.getPath('userData'), 'themes');
 
 function sendToRenderer(channel: string, payload: unknown): void {
-  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, payload);
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed()) window.webContents.send(channel, payload);
+  }
 }
 
 function resolveMenuLocale(language: 'system' | 'en-US' | 'zh-CN'): MenuLocale {
@@ -143,6 +149,7 @@ async function rebuildApplicationMenu(): Promise<void> {
       onOpenConfigFolder: () => {
         void shell.openPath(app.getPath('userData'));
       },
+      onOpenSettings: () => settingsWindow.open(),
       onAbout: () => showAboutDialog(locale)
     }
   );
@@ -160,6 +167,20 @@ function isAllowedExternalUrl(value: string): boolean {
 function installSecurityHandlers(): void {
   session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => {
     callback(false);
+  });
+}
+
+function installContentSecurityPolicy(): void {
+  const contentSecurityPolicy = isDevelopment
+    ? "default-src 'self'; script-src 'self' 'unsafe-inline' http://localhost:*; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' http://localhost:* ws://localhost:*;"
+    : "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self';";
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [contentSecurityPolicy]
+      }
+    });
   });
 }
 
@@ -242,18 +263,6 @@ function createWindow(): BrowserWindow {
     }
     event.preventDefault();
     logger.warn('system', 'Blocked renderer navigation', { url });
-  });
-
-  const contentSecurityPolicy = isDevelopment
-    ? "default-src 'self'; script-src 'self' 'unsafe-inline' http://localhost:*; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' http://localhost:* ws://localhost:*;"
-    : "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self';";
-  window.webContents.session.webRequest.onHeadersReceived((details, callback) => {
-    callback({
-      responseHeaders: {
-        ...details.responseHeaders,
-        'Content-Security-Policy': [contentSecurityPolicy]
-      }
-    });
   });
 
   const rendererUrl = process.env.ELECTRON_RENDERER_URL;
@@ -342,7 +351,13 @@ function registerIpc(): void {
     const settings = SettingsRecordSchema.parse(input);
     const saved = SettingsRecordSchema.parse(await storage.saveSettings(settings));
     await rebuildApplicationMenu();
+    sendToRenderer('settings:changed', saved);
     return saved;
+  });
+  ipcMain.handle('app:open-settings', (_event, input: unknown) => {
+    const parsed = SettingsOpenRequestSchema.parse(input ?? {});
+    settingsWindow.open(parsed.category as SettingsCategory | undefined);
+    return SftpOperationResultSchema.parse({ accepted: true });
   });
   ipcMain.handle('sftp:list', async (_event, input: unknown) => {
     const request = SftpListRequestSchema.parse(input);
@@ -763,7 +778,9 @@ void app.whenReady().then(async () => {
     logger.error('system', 'Unhandled rejection', { reason })
   );
   installSecurityHandlers();
+  installContentSecurityPolicy();
   registerIpc();
+  settingsWindow = new SettingsWindowManager(logger, isDevelopment);
   await rebuildApplicationMenu();
   mainWindow = createWindow();
   logger.info('app', 'Application ready', { packaged: app.isPackaged });
