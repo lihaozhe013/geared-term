@@ -277,9 +277,26 @@ export const AiStreamRequestSchema = z
 
 export const AiStreamClientMessageSchema = z.object({ kind: z.literal('cancel') }).strict();
 
+export const AiActivityLabelSchema = z.enum([
+  'connecting',
+  'working',
+  'writing',
+  'searching-web',
+  'searching-query',
+  'reading-source',
+  'reading-sources',
+  'queued'
+]);
+
 export const AiStreamEventSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('delta'), text: z.string() }),
   z.object({ kind: z.literal('reasoning'), text: z.string() }),
+  z.object({
+    kind: z.literal('activity'),
+    id: z.string().min(1).max(128),
+    label: AiActivityLabelSchema,
+    detail: z.string().max(200).optional()
+  }),
   z.object({
     kind: z.literal('usage'),
     inputTokens: z.number().int().nonnegative().optional(),
@@ -803,3 +820,4 @@ export type AiConnectionInput = z.infer<typeof AiConnectionInputSchema>;
 export type AiChatMessage = z.infer<typeof AiChatMessageSchema>;
 export type AiStreamRequest = z.infer<typeof AiStreamRequestSchema>;
 export type AiStreamEvent = z.infer<typeof AiStreamEventSchema>;
+export type AiActivityLabel = z.infer<typeof AiActivityLabelSchema>;

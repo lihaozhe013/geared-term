@@ -777,6 +777,7 @@ export function App(): React.JSX.Element {
           <AssistantPanel
             targetSessionId={activeTab?.id}
             sessionLabel={activeTab?.name}
+            language={settings.language}
             environmentTargetKey={environmentTarget(activeTab?.request)?.targetKey}
             splitCommandPresentation={settings.splitCommandPresentation}
             onToggleSplitCommand={() => {

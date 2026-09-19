@@ -5,15 +5,25 @@ import {
   type CommandCandidate,
   type SupportedShell
 } from '@geared-term/command-parser';
-import type { AiConnectionRecord, AiStreamEvent, EnvironmentRecord } from '@geared-term/protocol';
+import type {
+  AiActivityLabel,
+  AiConnectionRecord,
+  AiStreamEvent,
+  EnvironmentRecord,
+  SettingsRecord
+} from '@geared-term/protocol';
 import {
   ArrowUp,
   Bot,
   ChevronDown,
   Copy,
+  CircleCheck,
+  CircleX,
   FileText,
+  Globe,
   History,
   List,
+  Loader2,
   Plus,
   Settings2,
   SquareTerminal,
@@ -21,6 +31,7 @@ import {
   X
 } from 'lucide-react';
 import { MarkdownView } from './assistant/MarkdownView';
+import { translate } from './i18n';
 import { formatSnapshotForPrompt, type TerminalSnapshot } from './terminal/snapshot';
 
 type Message = {
@@ -28,13 +39,40 @@ type Message = {
   content: string;
   model?: string;
   usage?: { input?: number; output?: number };
+  durationMs?: number;
 };
 
 type SourceReference = { url: string; title?: string };
 
+type ActivityStep = {
+  id: string;
+  label: AiActivityLabel;
+  detail?: string;
+  state: 'running' | 'done' | 'failed';
+  startedAt: number;
+  endedAt?: number;
+};
+
+function formatElapsed(ms: number): string {
+  const total = Math.max(0, Math.round(ms / 1000));
+  if (total < 60) return `${total}s`;
+  return `${Math.floor(total / 60)}m ${String(total % 60).padStart(2, '0')}s`;
+}
+
+function TypingDots(): React.JSX.Element {
+  return (
+    <span className="typing-dots" aria-hidden="true">
+      <i />
+      <i />
+      <i />
+    </span>
+  );
+}
+
 type AssistantPanelProps = {
   targetSessionId?: string;
   sessionLabel?: string;
+  language?: SettingsRecord['language'];
   environmentTargetKey?: string;
   splitCommandPresentation?: boolean;
   onToggleSplitCommand?: () => void;
@@ -43,6 +81,59 @@ type AssistantPanelProps = {
   onPendingHistoryConsumed?: () => void;
   getSnapshot?: () => TerminalSnapshot | null;
 };
+
+type ActivityLike = {
+  label: AiActivityLabel;
+  state: 'running' | 'done' | 'failed';
+  detail?: string;
+};
+
+function activityStepText(language: SettingsRecord['language'], step: ActivityLike): string {
+  const done = step.state !== 'running';
+  switch (step.label) {
+    case 'connecting':
+      return done ? translate(language, 'actDone') : translate(language, 'actConnecting');
+    case 'working':
+      return done ? translate(language, 'actDone') : translate(language, 'actWorking');
+    case 'writing':
+      return done ? translate(language, 'actDone') : translate(language, 'actWriting');
+    case 'searching-web':
+      return done ? translate(language, 'actSearchedWeb') : translate(language, 'actSearchingWeb');
+    case 'searching-query':
+      return done
+        ? translate(language, 'actSearchedQuery').replace('{query}', step.detail ?? '')
+        : translate(language, 'actSearchingQuery').replace('{query}', step.detail ?? '');
+    case 'reading-source':
+      return done
+        ? translate(language, 'actReadSource').replace('{source}', step.detail ?? '')
+        : translate(language, 'actReadingSource').replace('{source}', step.detail ?? '');
+    case 'reading-sources':
+      return done
+        ? translate(language, 'actReadSources')
+        : translate(language, 'actReadingSources');
+    case 'queued':
+      return translate(language, 'actQueued');
+    default:
+      return translate(language, 'actWorking');
+  }
+}
+
+function activitySummaryText(
+  language: SettingsRecord['language'],
+  summary: { searches: number; reads: number }
+): string {
+  const parts: string[] = [];
+  if (summary.searches > 0) {
+    parts.push(
+      translate(language, 'activitySearches').replace('{count}', String(summary.searches))
+    );
+  }
+  if (summary.reads > 0) {
+    parts.push(translate(language, 'activityPagesRead').replace('{count}', String(summary.reads)));
+  }
+  const base = translate(language, 'activitySummary');
+  return parts.length > 0 ? `${base} · ${parts.join(' · ')}` : base;
+}
 
 function estimateTokens(text: string): number {
   let tokens = 0;
@@ -175,6 +266,7 @@ function MetaChip({ children }: { children: React.ReactNode }): React.JSX.Elemen
 export function AssistantPanel({
   targetSessionId,
   sessionLabel,
+  language = 'en-US',
   environmentTargetKey,
   splitCommandPresentation = false,
   onToggleSplitCommand,
@@ -199,6 +291,10 @@ export function AssistantPanel({
   const [pendingSnapshot, setPendingSnapshot] = useState<TerminalSnapshot | null>(null);
   const [attachedSnapshot, setAttachedSnapshot] = useState<TerminalSnapshot | null>(null);
   const [conversationId, setConversationId] = useState<string>(() => crypto.randomUUID());
+  const [activities, setActivities] = useState<ActivityStep[]>([]);
+  const [streamStartedAt, setStreamStartedAt] = useState<number | null>(null);
+  const [showTimeline, setShowTimeline] = useState(true);
+  const [, setTick] = useState(0);
   const streamRef = useRef<{ cancel: () => void } | null>(null);
   const messagesRef = useRef<Message[]>([]);
   messagesRef.current = messages;
@@ -277,6 +373,12 @@ export function AssistantPanel({
     element.style.height = `${Math.min(element.scrollHeight, 190)}px`;
   }, [composer]);
 
+  useEffect(() => {
+    if (!streaming) return;
+    const timer = window.setInterval(() => setTick((value) => value + 1), 1000);
+    return () => window.clearInterval(timer);
+  }, [streaming]);
+
   const selectedConnection = connections.find((connection) => connection.id === selectedId);
   const modelOptions = selectedConnection?.models ?? [];
 
@@ -285,6 +387,43 @@ export function AssistantPanel({
     const connection = connections.find((item) => item.id === id);
     setModel(connection ? connection.defaultModel : '');
     setModelMenuOpen(false);
+  };
+
+  // Mirrors the reference activity model: exactly one running step at a time;
+  // a new running step auto-closes the previous one.
+  const upsertActivity = (id: string, label: AiActivityLabel, detail?: string): void => {
+    const now = Date.now();
+    setActivities((current) => {
+      const closed = current.map((step) =>
+        step.state === 'running' && step.id !== id
+          ? { ...step, state: 'done' as const, endedAt: now }
+          : step
+      );
+      const index = closed.findIndex((step) => step.id === id);
+      if (index >= 0) {
+        const existing = closed[index] as ActivityStep;
+        return closed.map((step, position) =>
+          position === index
+            ? {
+                ...step,
+                label,
+                detail,
+                state: 'running' as const,
+                startedAt: now,
+                endedAt: undefined
+              }
+            : step
+        );
+      }
+      return [...closed, { id, label, detail, state: 'running' as const, startedAt: now }];
+    });
+  };
+
+  const closeRunningActivities = (state: 'done' | 'failed'): void => {
+    const now = Date.now();
+    setActivities((current) =>
+      current.map((step) => (step.state === 'running' ? { ...step, state, endedAt: now } : step))
+    );
   };
 
   const receiveEvent = (event: AiStreamEvent): void => {
@@ -298,6 +437,8 @@ export function AssistantPanel({
     } else if (event.kind === 'reasoning') {
       setReasoning((current) => current + event.text);
       setReasoningLive(true);
+    } else if (event.kind === 'activity') {
+      upsertActivity(event.id, event.label, event.detail);
     } else if (event.kind === 'usage') {
       setMessages((current) => {
         const last = current.at(-1);
@@ -316,13 +457,23 @@ export function AssistantPanel({
           ? current
           : [...current, { url: event.url, title: event.title }]
       );
+      upsertActivity(`read:${event.url}`, 'reading-source', event.title ?? event.url);
     } else if (event.kind === 'error') {
       setError(event.message);
       setStreaming(false);
       setReasoningLive(false);
+      closeRunningActivities('failed');
     } else if (event.kind === 'complete') {
       setStreaming(false);
       setReasoningLive(false);
+      closeRunningActivities('done');
+      const startedAt = streamStartedAt;
+      setMessages((current) => {
+        const last = current.at(-1);
+        if (!last || last.role !== 'assistant' || startedAt === null) return current;
+        return [...current.slice(0, -1), { ...last, durationMs: Date.now() - startedAt }];
+      });
+      setShowTimeline(false);
       streamRef.current = null;
       const turn = messagesRef.current.filter((message) => message.content.trim().length > 0);
       if (turn.length > 0) {
@@ -348,6 +499,8 @@ export function AssistantPanel({
     setReasoning('');
     setReasoningLive(false);
     setSources([]);
+    setActivities([]);
+    setStreamStartedAt(null);
     setPendingSnapshot(null);
     setAttachedSnapshot(null);
     setStreaming(false);
@@ -421,6 +574,9 @@ export function AssistantPanel({
     setAttachedSnapshot(null);
     setReasoning('');
     setSources([]);
+    setActivities([]);
+    setStreamStartedAt(Date.now());
+    setShowTimeline(true);
     setError(null);
     setStreaming(true);
     const streamId = crypto.randomUUID();
@@ -437,7 +593,30 @@ export function AssistantPanel({
     streamRef.current = null;
     setStreaming(false);
     setReasoningLive(false);
+    closeRunningActivities('done');
+    setShowTimeline(false);
   };
+
+  // After a search closes and before the first answer token, the model is
+  // digesting results; mirror the reference copy by showing "Reading sources…".
+  const runningStep = [...activities].reverse().find((step) => step.state === 'running');
+  const headlineStep =
+    runningStep &&
+    (runningStep.label === 'searching-web' || runningStep.label === 'searching-query') &&
+    sources.length > 0
+      ? { ...runningStep, label: 'reading-sources' as const, detail: undefined }
+      : runningStep;
+  const activitySummary = ((): { searches: number; reads: number } => {
+    const done = activities.filter((step) => step.state !== 'running');
+    return {
+      searches: done.filter(
+        (step) => step.label === 'searching-web' || step.label === 'searching-query'
+      ).length,
+      reads: done.filter(
+        (step) => step.label === 'reading-source' || step.label === 'reading-sources'
+      ).length
+    };
+  })();
 
   return (
     <aside className="assistant-panel" aria-label="AI assistant">
@@ -569,6 +748,58 @@ export function AssistantPanel({
                   <span className="assistant-message-model">{message.model}</span>
                 ) : null}
               </div>
+              {index === messages.length - 1 && activities.length > 0 ? (
+                <div className="assistant-activity">
+                  {streaming && headlineStep ? (
+                    <div className="assistant-activity-head">
+                      <span className="activity-spinner">
+                        <Loader2 size={14} aria-hidden="true" />
+                      </span>
+                      <span className="assistant-activity-label">
+                        {activityStepText(language, headlineStep)}
+                        <TypingDots />
+                      </span>
+                      <span className="assistant-activity-elapsed">
+                        {formatElapsed(streamStartedAt ? Date.now() - streamStartedAt : 0)}
+                      </span>
+                    </div>
+                  ) : null}
+                  {showTimeline ? (
+                    <div className="assistant-activity-timeline">
+                      {activities.map((step) => (
+                        <div className="assistant-activity-row" key={step.id}>
+                          <span className={`activity-step-icon ${step.state}`}>
+                            {step.state === 'running' ? (
+                              <Loader2 size={12} aria-hidden="true" />
+                            ) : step.state === 'failed' ? (
+                              <CircleX size={12} aria-hidden="true" />
+                            ) : (
+                              <CircleCheck size={12} aria-hidden="true" />
+                            )}
+                          </span>
+                          <span className="assistant-activity-label">
+                            {activityStepText(language, step)}
+                            {step.state === 'running' ? <TypingDots /> : null}
+                          </span>
+                          <span className="assistant-activity-elapsed">
+                            {formatElapsed((step.endedAt ?? Date.now()) - step.startedAt)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                  {!streaming ? (
+                    <button
+                      type="button"
+                      className="chip activity-summary-chip"
+                      onClick={() => setShowTimeline((value) => !value)}
+                    >
+                      <Globe size={12} aria-hidden="true" />
+                      {activitySummaryText(language, activitySummary)}
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
               {reasoning ? (
                 reasoningLive && index === messages.length - 1 ? (
                   <div className="assistant-reasoning-live" ref={reasoningBoxRef}>
@@ -581,7 +812,11 @@ export function AssistantPanel({
                   </details>
                 )
               ) : null}
-              <MarkdownView source={message.content || (streaming ? '…' : '')} />
+              {message.content ? (
+                <MarkdownView source={message.content} />
+              ) : streaming ? (
+                <TypingDots />
+              ) : null}
               {message.role === 'assistant'
                 ? commandCandidates(message.content, splitCommandPresentation).map(
                     (candidate, candidateIndex) => (
@@ -622,6 +857,9 @@ export function AssistantPanel({
                   ) : null}
                   {message.usage?.output !== undefined ? (
                     <MetaChip>out {message.usage.output}</MetaChip>
+                  ) : null}
+                  {message.durationMs !== undefined ? (
+                    <MetaChip>{formatElapsed(message.durationMs)}</MetaChip>
                   ) : null}
                   {!message.usage ? (
                     <MetaChip>~{estimateTokens(message.content)} estimated tokens</MetaChip>

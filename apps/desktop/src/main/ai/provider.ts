@@ -1,6 +1,7 @@
 import { normalizeEndpoint, type AiProtocol, type NormalizedEndpoint } from './endpoint';
 import {
   mapChatCompletionEvent,
+  mapResponseEvent,
   parseSseFrame,
   splitSseBuffer,
   type AiStreamEvent
@@ -30,42 +31,6 @@ function mergeSignals(signal: AbortSignal | undefined, controller: AbortControll
   if (typeof AbortSignal.any === 'function') return AbortSignal.any([signal, controller.signal]);
   signal.addEventListener('abort', () => controller.abort(signal.reason), { once: true });
   return controller.signal;
-}
-
-function mapResponseEvent(payload: unknown): AiStreamEvent | undefined {
-  if (!payload || typeof payload !== 'object') return undefined;
-  const value = payload as {
-    type?: unknown;
-    delta?: unknown;
-    response?: { usage?: { input_tokens?: unknown; output_tokens?: unknown } };
-    item?: { url?: unknown; title?: unknown };
-  };
-  if (value.type === 'response.output_text.delta' && typeof value.delta === 'string')
-    return { kind: 'delta', text: value.delta };
-  if (value.type === 'response.reasoning_summary_text.delta' && typeof value.delta === 'string')
-    return { kind: 'reasoning', text: value.delta };
-  if (value.type === 'response.completed') {
-    const usage = value.response?.usage;
-    if (
-      usage &&
-      (typeof usage.input_tokens === 'number' || typeof usage.output_tokens === 'number')
-    ) {
-      return {
-        kind: 'usage',
-        inputTokens: typeof usage.input_tokens === 'number' ? usage.input_tokens : undefined,
-        outputTokens: typeof usage.output_tokens === 'number' ? usage.output_tokens : undefined
-      };
-    }
-    return { kind: 'complete' };
-  }
-  if (value.type === 'response.output_item.added' && typeof value.item?.url === 'string') {
-    return {
-      kind: 'source',
-      url: value.item.url,
-      title: typeof value.item.title === 'string' ? value.item.title : undefined
-    };
-  }
-  return undefined;
 }
 
 async function readStream(
@@ -124,7 +89,18 @@ export async function streamAiRequest(request: AiRequest): Promise<AiResponse> {
     connectTimeoutMs
   );
   const signal = mergeSignals(request.signal, controller);
+  // Lifecycle activity steps. The renderer auto-closes a running step when the
+  // next one starts, so only transitions are emitted here.
+  let writingStarted = false;
+  const emit = (event: AiStreamEvent): void => {
+    if (event.kind === 'delta' && !writingStarted) {
+      writingStarted = true;
+      request.onEvent({ kind: 'activity', id: 'write', label: 'writing' });
+    }
+    request.onEvent(event);
+  };
   try {
+    request.onEvent({ kind: 'activity', id: 'connect', label: 'connecting' });
     const response = await fetch(endpoint.requestUrl, {
       method: 'POST',
       headers: {
@@ -145,7 +121,8 @@ export async function streamAiRequest(request: AiRequest): Promise<AiResponse> {
         `AI provider rejected request (${response.status})${body ? `: ${body}` : ''}`
       );
     }
-    await readStream(response, request.protocol, request.onEvent, signal);
+    request.onEvent({ kind: 'activity', id: 'work', label: 'working' });
+    await readStream(response, request.protocol, emit, signal);
     return { endpoint, status: response.status };
   } finally {
     clearTimeout(timeout);

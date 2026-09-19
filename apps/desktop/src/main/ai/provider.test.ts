@@ -24,7 +24,13 @@ describe('AI provider adapter', () => {
         headers: expect.objectContaining({ authorization: 'Bearer secret-key' })
       })
     );
-    expect(events).toEqual([{ kind: 'delta', text: 'hello' }, { kind: 'complete' }]);
+    expect(events).toEqual([
+      { kind: 'activity', id: 'connect', label: 'connecting' },
+      { kind: 'activity', id: 'work', label: 'working' },
+      { kind: 'activity', id: 'write', label: 'writing' },
+      { kind: 'delta', text: 'hello' },
+      { kind: 'complete' }
+    ]);
     fetchMock.mockRestore();
   });
 });
