@@ -102,6 +102,10 @@ textarea {
   grid-template-columns: 240px minmax(0, 1fr) 340px;
 }
 
+.workspace.with-environment {
+  grid-template-columns: 240px minmax(0, 1fr) 340px;
+}
+
 .sidebar,
 .terminal-card {
   min-width: 0;
@@ -128,6 +132,96 @@ textarea {
   overflow: hidden;
   border-left: 1px solid #2a3140;
   background: #12151c;
+}
+
+.environment-panel {
+  display: grid;
+  min-width: 0;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto auto auto;
+  gap: 10px;
+  padding: 16px;
+  overflow: hidden;
+  border-left: 1px solid #2a3140;
+  background: #12151c;
+}
+
+.environment-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.environment-header h2 {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 16px;
+}
+
+.environment-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.environment-save {
+  width: auto;
+  text-align: center;
+}
+
+.environment-facts {
+  min-height: 0;
+  margin: 0;
+  overflow: auto;
+}
+
+.environment-facts > div {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid #202a39;
+  font-size: 11px;
+}
+
+.environment-facts dt {
+  color: #8e9bb1;
+}
+
+.environment-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: #d8e0ee;
+}
+
+.environment-field {
+  display: grid;
+  gap: 5px;
+  color: #9aa8bd;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.environment-field textarea {
+  width: 100%;
+  resize: vertical;
+  padding: 6px 7px;
+  border: 1px solid #344157;
+  border-radius: 5px;
+  outline: none;
+  color: #e4eaf3;
+  background: #0f141c;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.environment-field textarea:focus {
+  border-color: #5c8ea5;
+}
+
+.environment-attach {
+  margin-top: 2px;
 }
 
 .sftp-header {

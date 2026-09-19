@@ -54,6 +54,7 @@ export const SessionProfileRecordSchema = z
     args: z.array(z.string().max(4096)).max(32).optional(),
     cwd: z.string().max(4096).optional(),
     distribution: z.string().max(256).optional(),
+    environmentId: IdSchema.optional(),
     secretRefs: z
       .object({
         password: IdSchema.optional(),
@@ -79,7 +80,7 @@ export const UiStateRecordSchema = z
       .optional(),
     maximized: z.boolean(),
     sidebarCollapsed: z.boolean(),
-    rightPanel: z.enum(['sftp', 'assistant']).nullable(),
+    rightPanel: z.enum(['sftp', 'assistant', 'environment']).nullable(),
     rightPanelCollapsed: z.boolean(),
     splitRatio: z.number().min(0.15).max(0.85)
   })
@@ -289,6 +290,48 @@ export const SftpRemoteEntrySchema = z
   })
   .strict();
 
+export const EnvironmentFactsSchema = z
+  .object({
+    os: z.string().max(160).optional(),
+    distribution: z.string().max(160).optional(),
+    kernel: z.string().max(256).optional(),
+    architecture: z.string().max(80).optional(),
+    shell: z.string().max(512).optional(),
+    shellVersion: z.string().max(512).optional(),
+    user: z.string().max(256).optional(),
+    hostname: z.string().max(512).optional()
+  })
+  .strict();
+
+export const EnvironmentRecordSchema = z
+  .object({
+    id: IdSchema,
+    targetKey: z.string().min(1).max(512),
+    kind: z.enum(['local', 'wsl', 'ssh']),
+    facts: EnvironmentFactsSchema,
+    notes: z.string().max(8192),
+    instructions: z.string().max(8192),
+    attachToAi: z.boolean(),
+    detectedAt: z.string().max(64).nullable()
+  })
+  .strict();
+
+export const EnvironmentProbeRequestSchema = z
+  .object({
+    kind: z.enum(['local', 'wsl']),
+    distribution: z.string().max(256).optional()
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.kind === 'wsl' && !value.distribution?.trim()) {
+      context.addIssue({
+        code: 'custom',
+        path: ['distribution'],
+        message: 'WSL distribution is required'
+      });
+    }
+  });
+
 export type AppInfo = z.infer<typeof AppInfoSchema>;
 export type ErrorCode = z.infer<typeof ErrorCodeSchema>;
 export type StructuredError = z.infer<typeof StructuredErrorSchema>;
@@ -299,6 +342,9 @@ export type SshTerminalRequest = z.infer<typeof SshTerminalRequestSchema>;
 export type SshProfileTerminalRequest = z.infer<typeof SshProfileTerminalRequestSchema>;
 export type SftpListRequest = z.infer<typeof SftpListRequestSchema>;
 export type SftpRemoteEntry = z.infer<typeof SftpRemoteEntrySchema>;
+export type EnvironmentFacts = z.infer<typeof EnvironmentFactsSchema>;
+export type EnvironmentRecord = z.infer<typeof EnvironmentRecordSchema>;
+export type EnvironmentProbeRequest = z.infer<typeof EnvironmentProbeRequestSchema>;
 export type VaultPasswordRequest = z.infer<typeof VaultPasswordRequestSchema>;
 export type VaultStatus = z.infer<typeof VaultStatusSchema>;
 export type SessionProfileRecord = z.infer<typeof SessionProfileRecordSchema>;

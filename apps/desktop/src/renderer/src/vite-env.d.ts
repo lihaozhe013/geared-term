@@ -13,6 +13,9 @@ import type {
   SshProfileTerminalRequest,
   SshTerminalRequest,
   AiStreamRequest,
+  EnvironmentFacts,
+  EnvironmentProbeRequest,
+  EnvironmentRecord,
   UiStateRecord,
   WslDistribution,
   VaultPasswordRequest,
@@ -76,6 +79,10 @@ declare global {
       getSettings: () => Promise<SettingsRecord>;
       saveSettings: (input: SettingsRecord) => Promise<SettingsRecord>;
       listSftp: (input: SftpListRequest) => Promise<SftpRemoteEntry[]>;
+      listEnvironments: () => Promise<EnvironmentRecord[]>;
+      saveEnvironment: (input: EnvironmentRecord) => Promise<EnvironmentRecord[]>;
+      deleteEnvironment: (id: string) => Promise<EnvironmentRecord[]>;
+      probeEnvironment: (input: EnvironmentProbeRequest) => Promise<EnvironmentFacts>;
       discoverWsl: () => Promise<WslDistribution[]>;
     };
   }

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   AiConnectionRecordSchema,
+  EnvironmentRecordSchema,
   SessionProfileRecordSchema,
   SettingsRecordSchema,
   UiStateRecordSchema
@@ -38,12 +39,14 @@ export const VaultStateSchema = z.object({
 
 export const SessionProfileSchema = SessionProfileRecordSchema;
 export const AiConnectionSchema = AiConnectionRecordSchema;
+export const EnvironmentSchema = EnvironmentRecordSchema;
 
 export const ProfileSchema = z.object({
   schemaVersion: z.literal(profileSchemaVersion),
   sessions: z.array(SessionProfileSchema),
   secrets: z.record(z.string(), EncryptedSecretSchema),
-  aiConnections: z.array(AiConnectionSchema)
+  aiConnections: z.array(AiConnectionSchema),
+  environments: z.array(EnvironmentSchema).default([])
 });
 
 export type Settings = z.infer<typeof SettingsSchema>;
@@ -53,6 +56,7 @@ export type VaultState = z.infer<typeof VaultStateSchema>;
 export type SessionProfile = z.infer<typeof SessionProfileSchema>;
 export type Profile = z.infer<typeof ProfileSchema>;
 export type AiConnection = z.infer<typeof AiConnectionSchema>;
+export type Environment = z.infer<typeof EnvironmentSchema>;
 
 export const defaultSettings: Settings = {
   schemaVersion: settingsSchemaVersion,
@@ -79,5 +83,6 @@ export const defaultProfile: Profile = {
   schemaVersion: profileSchemaVersion,
   sessions: [],
   secrets: {},
-  aiConnections: []
+  aiConnections: [],
+  environments: []
 };

@@ -6,6 +6,7 @@ import {
   SshTerminalRequestSchema,
   type AiConnectionInput,
   type AiConnectionRecord,
+  type EnvironmentRecord,
   type SshTerminalRequest
 } from '@geared-term/protocol';
 import type { Logger } from '../logging';
@@ -16,6 +17,7 @@ import {
   defaultProfile,
   defaultSettings,
   defaultUiState,
+  EnvironmentSchema,
   ProfileSchema,
   SessionProfileSchema,
   SettingsSchema,
@@ -153,6 +155,33 @@ export class AppStorage {
     this.profileValue = ProfileSchema.parse({ ...this.profileValue, sessions });
     await this.profile.save(this.profileValue);
     return this.profileSnapshot();
+  }
+
+  public environmentSnapshot(): EnvironmentRecord[] {
+    return this.profileValue.environments.map((environment) => ({
+      ...environment,
+      facts: { ...environment.facts }
+    }));
+  }
+
+  public async saveEnvironment(environment: EnvironmentRecord): Promise<EnvironmentRecord[]> {
+    const nextEnvironment = EnvironmentSchema.parse(environment);
+    const environments = this.profileValue.environments.filter(
+      (item) => item.id !== nextEnvironment.id
+    );
+    environments.push(nextEnvironment);
+    this.profileValue = ProfileSchema.parse({ ...this.profileValue, environments });
+    await this.profile.save(this.profileValue);
+    return this.environmentSnapshot();
+  }
+
+  public async deleteEnvironment(id: string): Promise<EnvironmentRecord[]> {
+    const environments = this.profileValue.environments.filter((item) => item.id !== id);
+    if (environments.length !== this.profileValue.environments.length) {
+      this.profileValue = ProfileSchema.parse({ ...this.profileValue, environments });
+      await this.profile.save(this.profileValue);
+    }
+    return this.environmentSnapshot();
   }
 
   public async deleteProfile(id: string): Promise<SessionProfile[]> {

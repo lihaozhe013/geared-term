@@ -10,6 +10,7 @@ import type {
   WslDistribution
 } from '@geared-term/protocol';
 import { AssistantPanel } from './AssistantPanel';
+import { EnvironmentPanel } from './EnvironmentPanel';
 import { SettingsPanel } from './SettingsPanel';
 import { SftpPanel } from './SftpPanel';
 import { TerminalPane } from './TerminalPane';
@@ -120,6 +121,19 @@ function statusLabel(status: TabStatus): string {
 
 function supportsSftp(request: TerminalRequest | undefined): boolean {
   return Boolean(request && ('host' in request || 'profileId' in request));
+}
+
+function environmentTarget(
+  request: TerminalRequest | undefined
+): { kind: 'local' | 'wsl'; targetKey: string; distribution?: string } | undefined {
+  if (!request || 'host' in request || 'profileId' in request) return undefined;
+  if (request.shell?.toLowerCase().endsWith('wsl.exe')) {
+    const distribution = request.args.find(
+      (arg, index) => request.args[index - 1] === '--distribution'
+    );
+    if (distribution) return { kind: 'wsl', targetKey: `wsl:${distribution}`, distribution };
+  }
+  return { kind: 'local', targetKey: 'local' };
 }
 
 export function App(): React.JSX.Element {
@@ -269,6 +283,22 @@ export function App(): React.JSX.Element {
     });
   }, [activeTab?.request, uiState]);
 
+  const toggleEnvironment = useCallback((): void => {
+    const target = environmentTarget(activeTab?.request);
+    if (!target) {
+      setError('Environment detection is available for local and WSL sessions.');
+      return;
+    }
+    const next: UiStateRecord = {
+      ...uiState,
+      rightPanel: uiState.rightPanel === 'environment' ? null : 'environment'
+    };
+    setUiState(next);
+    void window.geared.saveUiState(next).catch((reason: unknown) => {
+      setError(reason instanceof Error ? reason.message : 'Unable to save UI state');
+    });
+  }, [activeTab?.request, uiState]);
+
   const saveSettings = useCallback(async (nextSettings: SettingsRecord): Promise<void> => {
     try {
       setSettings(await window.geared.saveSettings(nextSettings));
@@ -325,7 +355,7 @@ export function App(): React.JSX.Element {
       <section
         className={`workspace ${uiState.rightPanel === 'assistant' ? 'with-assistant' : ''} ${
           uiState.rightPanel === 'sftp' ? 'with-sftp' : ''
-        }`}
+        } ${uiState.rightPanel === 'environment' ? 'with-environment' : ''}`}
         aria-label="Workspace"
       >
         {!uiState.sidebarCollapsed ? (
@@ -507,6 +537,15 @@ export function App(): React.JSX.Element {
             <button
               type="button"
               className="toolbar-button"
+              onClick={toggleEnvironment}
+              aria-pressed={uiState.rightPanel === 'environment'}
+              disabled={!environmentTarget(activeTab?.request)}
+            >
+              {uiState.rightPanel === 'environment' ? 'Hide environment' : 'Environment'}
+            </button>
+            <button
+              type="button"
+              className="toolbar-button"
               onClick={() => setShowSettings(true)}
               aria-haspopup="dialog"
             >
@@ -536,6 +575,16 @@ export function App(): React.JSX.Element {
         {uiState.rightPanel === 'assistant' ? <AssistantPanel /> : null}
         {uiState.rightPanel === 'sftp' && activeTab && supportsSftp(activeTab.request) ? (
           <SftpPanel sessionId={activeTab.id} onClose={toggleSftp} />
+        ) : null}
+        {uiState.rightPanel === 'environment' && activeTab ? (
+          <>
+            {environmentTarget(activeTab.request) ? (
+              <EnvironmentPanel
+                target={environmentTarget(activeTab.request)!}
+                onClose={toggleEnvironment}
+              />
+            ) : null}
+          </>
         ) : null}
       </section>
 

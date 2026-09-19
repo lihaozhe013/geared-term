@@ -7,6 +7,9 @@ import {
   AiStreamClientMessageSchema,
   AiStreamEventSchema,
   AiStreamRequestSchema,
+  EnvironmentFactsSchema,
+  EnvironmentProbeRequestSchema,
+  EnvironmentRecordSchema,
   LocalTerminalRequestSchema,
   ProfileIdRequestSchema,
   SessionProfileRecordSchema,
@@ -24,6 +27,8 @@ import {
   type LocalTerminalRequest,
   type AiConnectionInput,
   type AiStreamRequest,
+  type EnvironmentProbeRequest,
+  type EnvironmentRecord,
   type SessionProfileRecord,
   type SettingsRecord,
   type SftpListRequest,
@@ -184,6 +189,20 @@ const api = Object.freeze({
   listSftp: async (input: SftpListRequest) => {
     const request = SftpListRequestSchema.parse(input);
     return SftpRemoteEntrySchema.array().parse(await ipcRenderer.invoke('sftp:list', request));
+  },
+  listEnvironments: async () =>
+    EnvironmentRecordSchema.array().parse(await ipcRenderer.invoke('environment:list')),
+  saveEnvironment: async (input: EnvironmentRecord) => {
+    const environment = EnvironmentRecordSchema.parse(input);
+    return EnvironmentRecordSchema.array().parse(
+      await ipcRenderer.invoke('environment:save', environment)
+    );
+  },
+  deleteEnvironment: async (id: string) =>
+    EnvironmentRecordSchema.array().parse(await ipcRenderer.invoke('environment:delete', { id })),
+  probeEnvironment: async (input: EnvironmentProbeRequest) => {
+    const request = EnvironmentProbeRequestSchema.parse(input);
+    return EnvironmentFactsSchema.parse(await ipcRenderer.invoke('environment:probe', request));
   },
   discoverWsl: async (): Promise<WslDistribution[]> =>
     WslDistributionSchema.array().parse(await ipcRenderer.invoke('wsl:list'))

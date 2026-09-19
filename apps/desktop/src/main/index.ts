@@ -8,6 +8,9 @@ import {
   AiStreamClientMessageSchema,
   AiStreamEventSchema,
   AiStreamRequestSchema,
+  EnvironmentFactsSchema,
+  EnvironmentProbeRequestSchema,
+  EnvironmentRecordSchema,
   EmptyRequestSchema,
   ProfileIdRequestSchema,
   SessionProfileRecordSchema,
@@ -27,6 +30,7 @@ import { AppStorage } from './persistence/app-storage';
 import { KnownHostsStore } from './ssh/known-hosts';
 import { SshSessionManager } from './ssh/ssh-session';
 import { discoverWsl } from './wsl/discovery';
+import { probeEnvironment } from './environment/probe';
 
 const isDevelopment = !app.isPackaged;
 let logger: Logger;
@@ -210,6 +214,21 @@ function registerIpc(): void {
     return SftpRemoteEntrySchema.array().parse(
       await sshSessions.listSftp(request.sessionId, request.directory)
     );
+  });
+  ipcMain.handle('environment:list', () =>
+    EnvironmentRecordSchema.array().parse(storage.environmentSnapshot())
+  );
+  ipcMain.handle('environment:save', async (_event, input: unknown) => {
+    const environment = EnvironmentRecordSchema.parse(input);
+    return EnvironmentRecordSchema.array().parse(await storage.saveEnvironment(environment));
+  });
+  ipcMain.handle('environment:delete', async (_event, input: unknown) => {
+    const request = ProfileIdRequestSchema.parse(input);
+    return EnvironmentRecordSchema.array().parse(await storage.deleteEnvironment(request.id));
+  });
+  ipcMain.handle('environment:probe', async (_event, input: unknown) => {
+    const request = EnvironmentProbeRequestSchema.parse(input);
+    return EnvironmentFactsSchema.parse(await probeEnvironment(request.kind, request.distribution));
   });
   ipcMain.handle('wsl:list', async () => WslDistributionSchema.array().parse(await discoverWsl()));
   ipcMain.handle('ai:list', () =>

@@ -27,7 +27,11 @@ required for parity and release. The third checkpoint adds validated WSL discove
 main-process-only resolution of vault-backed SSH profile credentials. The fourth checkpoint adds
 vault-referenced AI connections, cancellable provider-neutral streaming, and a bounded assistant
 panel. The fifth checkpoint adds conservative top-level command splitting with whole-block fallback
-for incomplete or conditional command text.
+for incomplete or conditional command text. The sixth checkpoint adds persisted terminal settings
+and English/Simplified-Chinese settings labels without exposing privileged state to the renderer. The
+seventh checkpoint attaches an independent SFTP channel to SSH sessions and exposes validated remote
+directory listing in a capability-gated panel. The eighth checkpoint adds bounded local/WSL
+environment probes, versioned environment records, and an editable context panel.
 
 ## 2. Delivery rules
 

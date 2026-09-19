@@ -51,6 +51,22 @@ describe('application storage', () => {
     expect(reloaded.settingsSnapshot().terminalFontSize).toBe(16);
     expect(reloaded.settingsSnapshot().terminalCursor).toBe('bar');
 
+    await reloaded.saveEnvironment({
+      id: 'env-local',
+      targetKey: 'local',
+      kind: 'local',
+      facts: { os: 'Windows', hostname: 'devbox' },
+      notes: 'Development machine',
+      instructions: 'Use the project virtual environment.',
+      attachToAi: true,
+      detectedAt: '2026-09-19T00:00:00.000Z'
+    });
+    expect(reloaded.environmentSnapshot()[0]?.facts.hostname).toBe('devbox');
+
+    const environmentReload = new AppStorage(directory, testLogger());
+    await environmentReload.load();
+    expect(environmentReload.environmentSnapshot()[0]?.notes).toBe('Development machine');
+
     await reloaded.deleteProfile('local-dev');
     expect(reloaded.profileSnapshot()).toEqual([]);
   });
