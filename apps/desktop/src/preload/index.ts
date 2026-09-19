@@ -41,6 +41,8 @@ import {
   LocalRenameRequestSchema,
   LocalDeleteRequestSchema,
   LocalOpenRequestSchema,
+  RuntimeInfoSchema,
+  UserThemeListSchema,
   SftpOperationResultSchema,
   SftpUploadRequestSchema,
   SshProfileTerminalRequestSchema,
@@ -352,6 +354,12 @@ const api = Object.freeze({
     ipcRenderer.on('sftp:cd', handler);
     return () => ipcRenderer.removeListener('sftp:cd', handler);
   },
+  listUserThemes: async () => UserThemeListSchema.parse(await ipcRenderer.invoke('themes:list')),
+  openThemesFolder: async () =>
+    SftpOperationResultSchema.parse(await ipcRenderer.invoke('themes:open-folder')),
+  getRuntimeInfo: async () => RuntimeInfoSchema.parse(await ipcRenderer.invoke('app:runtime-info')),
+  openConfigFolder: async () =>
+    SftpOperationResultSchema.parse(await ipcRenderer.invoke('app:open-config-folder')),
   uploadSftp: async (input: SftpUploadRequest) => {
     const request = SftpUploadRequestSchema.parse(input);
     return SftpOperationResultSchema.parse(await ipcRenderer.invoke('sftp:upload', request));

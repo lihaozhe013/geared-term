@@ -68,7 +68,12 @@ export const defaultSettings: Settings = {
   defaultTerm: 'xterm-256color',
   splitCommandPresentation: false,
   terminalContextPrecedingLines: 100,
-  remoteFileCommands: 'cat\nless\nvim'
+  remoteFileCommands: 'cat\nless\nvim',
+  uiFontFamily: '',
+  uiFontSize: 13,
+  terminalFontFamily: 'Cascadia Code',
+  terminalFontFallbacks: [],
+  globalAiInstructions: ''
 };
 
 export const defaultUiState: UiState = {

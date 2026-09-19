@@ -43,6 +43,8 @@ import {
   LocalRenameRequestSchema,
   LocalDeleteRequestSchema,
   LocalOpenRequestSchema,
+  RuntimeInfoSchema,
+  UserThemeListSchema,
   SftpDownloadRequestSchema,
   SftpOperationResultSchema,
   SftpUploadRequestSchema,
@@ -66,6 +68,7 @@ import { AiHistoryStore } from './ai/history';
 import { LocalTerminalManager } from './local-terminal';
 import { commandRevision, parseCommandBlock } from '@geared-term/command-parser';
 import { AppStorage } from './persistence/app-storage';
+import { loadUserThemes } from './persistence/user-themes';
 import {
   listLocalDirectory,
   makeLocalDirectory,
@@ -88,6 +91,7 @@ let sshSessions: SshSessionManager;
 let transferManager: TransferManager;
 const aiControllers = new Map<string, AbortController>();
 const aiHistory = new AiHistoryStore(isDevelopment ? process.cwd() : app.getPath('userData'));
+const themesDirectory = join(isDevelopment ? process.cwd() : app.getPath('userData'), 'themes');
 
 function sendToRenderer(channel: string, payload: unknown): void {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, payload);
@@ -404,6 +408,29 @@ function registerIpc(): void {
     shell.showItemInFolder(request.path);
     return SftpOperationResultSchema.parse({ accepted: true });
   });
+  ipcMain.handle('themes:list', async () =>
+    UserThemeListSchema.parse(await loadUserThemes(themesDirectory))
+  );
+  ipcMain.handle('themes:open-folder', async () => {
+    await fsMkdir(themesDirectory, { recursive: true });
+    const result = await shell.openPath(themesDirectory);
+    if (result) throw new Error(result);
+    return SftpOperationResultSchema.parse({ accepted: true });
+  });
+  ipcMain.handle('app:open-config-folder', async () => {
+    const result = await shell.openPath(app.getPath('userData'));
+    if (result) throw new Error(result);
+    return SftpOperationResultSchema.parse({ accepted: true });
+  });
+  ipcMain.handle('app:runtime-info', () =>
+    RuntimeInfoSchema.parse({
+      electron: process.versions.electron,
+      chrome: process.versions.chrome,
+      node: process.versions.node,
+      configDirectory: app.getPath('userData'),
+      themeDirectory: themesDirectory
+    })
+  );
   ipcMain.handle('environment:list', () =>
     EnvironmentRecordSchema.array().parse(storage.environmentSnapshot())
   );

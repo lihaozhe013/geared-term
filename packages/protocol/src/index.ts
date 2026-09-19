@@ -127,7 +127,24 @@ export const SettingsRecordSchema = z
     defaultTerm: z.enum(['xterm-256color', 'xterm', 'vt520', 'linux', 'screen']),
     splitCommandPresentation: z.boolean(),
     terminalContextPrecedingLines: z.number().int().min(0).max(2000),
-    remoteFileCommands: z.string().max(4096).default('cat\nless\nvim')
+    remoteFileCommands: z.string().max(4096).default('cat\nless\nvim'),
+    uiFontFamily: z.string().max(256).default(''),
+    uiFontSize: z.number().min(10).max(24).default(13),
+    terminalFontFamily: z.string().min(1).max(256).default('Cascadia Code'),
+    terminalFontFallbacks: z
+      .array(
+        z
+          .object({
+            name: z.string().min(1).max(128),
+            scale: z.number().min(0.5).max(2).default(1),
+            offsetX: z.number().int().min(-10).max(10).default(0),
+            offsetY: z.number().int().min(-10).max(10).default(0)
+          })
+          .strict()
+      )
+      .max(8)
+      .default([]),
+    globalAiInstructions: z.string().max(8192).default('')
   })
   .strict();
 
@@ -536,6 +553,63 @@ export const LocalOpenRequestSchema = z
   })
   .strict();
 
+const ThemeColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/u);
+
+export const ThemeColorsSchema = z
+  .object({
+    background: ThemeColorSchema,
+    foreground: ThemeColorSchema,
+    cursor: ThemeColorSchema,
+    selection: ThemeColorSchema.optional(),
+    accent: ThemeColorSchema.optional(),
+    bright: ThemeColorSchema.optional(),
+    panel: ThemeColorSchema.optional(),
+    panelAlt: ThemeColorSchema.optional(),
+    shell: ThemeColorSchema.optional(),
+    divider: ThemeColorSchema.optional(),
+    text: ThemeColorSchema.optional(),
+    border: ThemeColorSchema.optional(),
+    borderStrong: ThemeColorSchema.optional(),
+    inputBackground: ThemeColorSchema.optional(),
+    hover: ThemeColorSchema.optional(),
+    textDim: ThemeColorSchema.optional(),
+    textMuted: ThemeColorSchema.optional(),
+    danger: ThemeColorSchema.optional(),
+    ansi: z.array(ThemeColorSchema).length(16).optional()
+  })
+  .strict();
+
+export const UserThemeSchema = z
+  .object({
+    name: z.string().min(1).max(160),
+    colors: ThemeColorsSchema
+  })
+  .strict();
+
+export const InvalidThemeFileSchema = z
+  .object({
+    file: z.string().max(4096),
+    error: z.string().max(512)
+  })
+  .strict();
+
+export const UserThemeListSchema = z
+  .object({
+    themes: z.array(UserThemeSchema).max(200),
+    invalid: z.array(InvalidThemeFileSchema).max(200)
+  })
+  .strict();
+
+export const RuntimeInfoSchema = z
+  .object({
+    electron: z.string().max(64),
+    chrome: z.string().max(64),
+    node: z.string().max(64),
+    configDirectory: z.string().max(4096),
+    themeDirectory: z.string().max(4096)
+  })
+  .strict();
+
 export const TerminalCommandActionSchema = z
   .object({
     sessionId: IdSchema,
@@ -622,6 +696,11 @@ export type LocalMkdirRequest = z.infer<typeof LocalMkdirRequestSchema>;
 export type LocalRenameRequest = z.infer<typeof LocalRenameRequestSchema>;
 export type LocalDeleteRequest = z.infer<typeof LocalDeleteRequestSchema>;
 export type LocalOpenRequest = z.infer<typeof LocalOpenRequestSchema>;
+export type ThemeColors = z.infer<typeof ThemeColorsSchema>;
+export type UserTheme = z.infer<typeof UserThemeSchema>;
+export type InvalidThemeFile = z.infer<typeof InvalidThemeFileSchema>;
+export type UserThemeList = z.infer<typeof UserThemeListSchema>;
+export type RuntimeInfo = z.infer<typeof RuntimeInfoSchema>;
 
 const REMOTE_COMMAND_CONTROL_CHARACTERS = /[\u0000-\u0008\u000a-\u001f\u007f]/u;
 
@@ -635,6 +714,37 @@ export function parseRemoteFileCommands(text: string): string[] {
     if (seen.size >= 32) break;
   }
   return [...seen];
+}
+
+export type TerminalFontFallbackEntry = {
+  name: string;
+  scale: number;
+  offsetX: number;
+  offsetY: number;
+};
+
+/**
+ * Normalizes the ordered terminal fallback fonts: blanks and invalid entries
+ * are removed, duplicates collapse to the first occurrence, the primary font
+ * is excluded, and the remaining order is preserved.
+ */
+export function normalizeTerminalFontFallbacks(
+  primary: string,
+  entries: TerminalFontFallbackEntry[]
+): TerminalFontFallbackEntry[] {
+  const normalizedPrimary = primary.trim().toLowerCase();
+  const seen = new Set<string>();
+  const result: TerminalFontFallbackEntry[] = [];
+  for (const entry of entries) {
+    const name = entry.name.trim();
+    if (!name) continue;
+    const key = name.toLowerCase();
+    if (key === normalizedPrimary || seen.has(key)) continue;
+    seen.add(key);
+    result.push({ ...entry, name });
+    if (result.length >= 8) break;
+  }
+  return result;
 }
 export type TerminalCommandAction = z.infer<typeof TerminalCommandActionSchema>;
 export type EnvironmentFacts = z.infer<typeof EnvironmentFactsSchema>;

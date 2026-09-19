@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { parseRemoteFileCommands } from '@geared-term/protocol';
 import type {
+  AppInfo,
+  InvalidThemeFile,
   LocalTerminalRequest,
   SessionProfileRecord,
   SshProfileTerminalRequest,
@@ -8,8 +10,11 @@ import type {
   SettingsRecord,
   TerminalPortMessage,
   UiStateRecord,
+  RuntimeInfo,
+  UserTheme,
   WslDistribution
 } from '@geared-term/protocol';
+import { applyPalette, builtinThemeNames, resolvePalette } from './themes';
 import { AssistantPanel } from './AssistantPanel';
 import { EnvironmentPanel } from './EnvironmentPanel';
 import { ProfileEditor } from './ProfileEditor';
@@ -18,7 +23,6 @@ import { SettingsPanel } from './SettingsPanel';
 import { SftpPanel } from './SftpPanel';
 import { TerminalPane, type SnapshotExtractor } from './TerminalPane';
 
-type AppInfo = Awaited<ReturnType<Window['geared']['getAppInfo']>>;
 type TerminalRequest = LocalTerminalRequest | SshTerminalRequest | SshProfileTerminalRequest;
 type TabStatus = 'starting' | 'awaiting-user' | 'running' | 'exited' | 'failed' | 'closed';
 
@@ -39,7 +43,12 @@ const defaultSettings: SettingsRecord = {
   defaultTerm: 'xterm-256color',
   splitCommandPresentation: false,
   terminalContextPrecedingLines: 100,
-  remoteFileCommands: 'cat\nless\nvim'
+  remoteFileCommands: 'cat\nless\nvim',
+  uiFontFamily: '',
+  uiFontSize: 13,
+  terminalFontFamily: 'Cascadia Code',
+  terminalFontFallbacks: [],
+  globalAiInstructions: ''
 };
 
 const defaultUiState: UiStateRecord = {
@@ -145,6 +154,9 @@ export function App(): React.JSX.Element {
   const [profiles, setProfiles] = useState<SessionProfileRecord[]>([]);
   const [settings, setSettings] = useState<SettingsRecord>(defaultSettings);
   const [alternateScreens, setAlternateScreens] = useState<Record<string, boolean>>({});
+  const [userThemes, setUserThemes] = useState<UserTheme[]>([]);
+  const [invalidThemes, setInvalidThemes] = useState<InvalidThemeFile[]>([]);
+  const [runtime, setRuntime] = useState<RuntimeInfo | null>(null);
   const [uiState, setUiState] = useState<UiStateRecord>(defaultUiState);
   const [wslDistributions, setWslDistributions] = useState<WslDistribution[]>([]);
   const [wslLoading, setWslLoading] = useState(false);
@@ -162,18 +174,46 @@ export function App(): React.JSX.Element {
       window.geared.getAppInfo(),
       window.geared.listProfiles(),
       window.geared.getUiState(),
-      window.geared.getSettings()
+      window.geared.getSettings(),
+      window.geared.getRuntimeInfo()
     ])
-      .then(([appInfo, savedProfiles, savedUiState, savedSettings]) => {
+      .then(([appInfo, savedProfiles, savedUiState, savedSettings, runtimeInfo]) => {
         setInfo(appInfo);
         setProfiles(savedProfiles);
         setUiState(savedUiState);
         setSettings(savedSettings);
+        setRuntime(runtimeInfo);
       })
       .catch((reason: unknown) =>
         setError(reason instanceof Error ? reason.message : 'Unable to read application state')
       );
   }, []);
+
+  useEffect(() => {
+    void window.geared
+      .listUserThemes()
+      .then((result) => {
+        setUserThemes(result.themes);
+        setInvalidThemes(result.invalid);
+      })
+      .catch(() => undefined);
+  }, []);
+
+  const palette = useMemo(
+    () => resolvePalette(settings.theme, userThemes),
+    [settings.theme, userThemes]
+  );
+
+  useEffect(() => {
+    applyPalette(palette);
+    const style = document.documentElement.style;
+    style.setProperty('--gt-ui-font-size', `${settings.uiFontSize}px`);
+    if (settings.uiFontFamily.trim()) {
+      style.setProperty('--gt-ui-font-family', settings.uiFontFamily.trim());
+    } else {
+      style.removeProperty('--gt-ui-font-family');
+    }
+  }, [palette, settings.uiFontFamily, settings.uiFontSize]);
 
   const discoverWsl = useCallback(async (): Promise<void> => {
     setWslLoading(true);
@@ -629,6 +669,7 @@ export function App(): React.JSX.Element {
                 key={tab.id}
                 request={tab.request}
                 settings={settings}
+                palette={palette}
                 active={tab.id === activeTab?.id}
                 onState={(message) => handleState(tab.id, message)}
                 onHostKeyPrompt={handleHostKeyPrompt}
@@ -657,6 +698,7 @@ export function App(): React.JSX.Element {
             targetSessionId={activeTab?.id}
             environmentTargetKey={environmentTarget(activeTab?.request)?.targetKey}
             splitCommandPresentation={settings.splitCommandPresentation}
+            globalInstructions={settings.globalAiInstructions}
             getSnapshot={() => {
               const extractor = activeTab ? snapshotExtractors.current.get(activeTab.id) : null;
               return extractor ? extractor() : null;
@@ -686,7 +728,21 @@ export function App(): React.JSX.Element {
       {showSettings ? (
         <SettingsPanel
           settings={settings}
+          themeNames={[
+            ...new Set([...builtinThemeNames, ...userThemes.map((theme) => theme.name)])
+          ]}
+          invalidThemes={invalidThemes}
+          info={info}
+          runtime={runtime}
           onSave={saveSettings}
+          onOpenAssistant={() =>
+            setUiState((current) => ({
+              ...current,
+              rightPanel: current.rightPanel === 'assistant' ? null : 'assistant',
+              rightPanelCollapsed: false
+            }))
+          }
+          onOpenProfiles={() => setShowProfileEditor(true)}
           onClose={() => setShowSettings(false)}
         />
       ) : null}

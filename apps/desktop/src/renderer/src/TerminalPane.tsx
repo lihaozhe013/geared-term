@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { FitAddon } from '@xterm/addon-fit';
 import { SearchAddon } from '@xterm/addon-search';
 import { Terminal } from '@xterm/xterm';
+import { normalizeTerminalFontFallbacks } from '@geared-term/protocol';
 import {
   TerminalPortMessageSchema,
   type LocalTerminalRequest,
@@ -10,6 +11,7 @@ import {
   type SettingsRecord,
   type TerminalPortMessage
 } from '@geared-term/protocol';
+import { buildXtermTheme, type Palette } from './themes';
 import { extractSnapshot, type SnapshotTerminal, type TerminalSnapshot } from './terminal/snapshot';
 
 type TerminalRequest = LocalTerminalRequest | SshTerminalRequest | SshProfileTerminalRequest;
@@ -22,6 +24,7 @@ export type SnapshotExtractor = () => TerminalSnapshot | null;
 type TerminalPaneProps = {
   request: TerminalRequest;
   settings: SettingsRecord;
+  palette: Palette;
   active: boolean;
   onState: (state: TerminalPortMessage & { kind: 'state' }) => void;
   onHostKeyPrompt: (
@@ -40,19 +43,20 @@ function isSavedSshRequest(request: TerminalRequest): request is SshProfileTermi
   return 'profileId' in request;
 }
 
-function terminalTheme(theme: string): { background: string; foreground: string; cursor: string } {
-  if (theme === 'Light') {
-    return { background: '#f6f8fb', foreground: '#1d2633', cursor: '#245c69' };
-  }
-  if (theme === 'Midnight') {
-    return { background: '#070b12', foreground: '#dce7f7', cursor: '#9fe6d5' };
-  }
-  return { background: '#0d1117', foreground: '#d7deea', cursor: '#9fe6d5' };
+function fontFamilyFor(settings: SettingsRecord): string {
+  const fallbacks = normalizeTerminalFontFallbacks(
+    settings.terminalFontFamily,
+    settings.terminalFontFallbacks
+  ).map((entry) => entry.name);
+  return [`"${settings.terminalFontFamily.replace(/"/gu, '')}"`, ...fallbacks, 'monospace'].join(
+    ', '
+  );
 }
 
 export function TerminalPane({
   request,
   settings,
+  palette,
   active,
   onState,
   onHostKeyPrompt,
@@ -69,12 +73,14 @@ export function TerminalPane({
   const registerSnapshotRef = useRef(registerSnapshot);
   const precedingLinesRef = useRef(settings.terminalContextPrecedingLines);
   const onAlternateScreenRef = useRef(onAlternateScreen);
+  const paletteRef = useRef(palette);
   activeRef.current = active;
   onStateRef.current = onState;
   onHostKeyPromptRef.current = onHostKeyPrompt;
   registerSnapshotRef.current = registerSnapshot;
   precedingLinesRef.current = settings.terminalContextPrecedingLines;
   onAlternateScreenRef.current = onAlternateScreen;
+  paletteRef.current = palette;
 
   useEffect(() => {
     const host = hostRef.current;
@@ -82,12 +88,12 @@ export function TerminalPane({
 
     const terminal = new Terminal({
       cursorBlink: true,
-      fontFamily: '"Cascadia Code", "SFMono-Regular", Consolas, monospace',
+      fontFamily: fontFamilyFor(settings),
       fontSize: settings.terminalFontSize,
       lineHeight: settings.terminalLineHeight,
       cursorStyle: settings.terminalCursor,
       scrollback: 10_000,
-      theme: terminalTheme(settings.theme)
+      theme: buildXtermTheme(paletteRef.current)
     });
     const fit = new FitAddon();
     terminal.loadAddon(fit);
@@ -211,9 +217,10 @@ export function TerminalPane({
     terminal.options.fontSize = settings.terminalFontSize;
     terminal.options.lineHeight = settings.terminalLineHeight;
     terminal.options.cursorStyle = settings.terminalCursor;
-    terminal.options.theme = terminalTheme(settings.theme);
+    terminal.options.fontFamily = fontFamilyFor(settings);
+    terminal.options.theme = buildXtermTheme(palette);
     fitRef.current?.fit();
-  }, [settings]);
+  }, [settings, palette]);
 
   useEffect(() => {
     if (!active) return;

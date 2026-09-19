@@ -23,6 +23,7 @@ type AssistantPanelProps = {
   targetSessionId?: string;
   environmentTargetKey?: string;
   splitCommandPresentation?: boolean;
+  globalInstructions?: string;
   getSnapshot?: () => TerminalSnapshot | null;
 };
 
@@ -146,6 +147,7 @@ export function AssistantPanel({
   targetSessionId,
   environmentTargetKey,
   splitCommandPresentation = false,
+  globalInstructions = '',
   getSnapshot
 }: AssistantPanelProps): React.JSX.Element {
   const [connections, setConnections] = useState<AiConnectionRecord[]>([]);
@@ -366,6 +368,9 @@ export function AssistantPanel({
     const userMessage: Message = { role: 'user', content: text };
     const nextMessages: Message[] = [...messages, userMessage];
     const systemMessages: Array<{ role: 'system'; content: string }> = [];
+    if (globalInstructions.trim()) {
+      systemMessages.push({ role: 'system', content: globalInstructions.trim().slice(0, 8192) });
+    }
     if (attachedEnvironment) {
       systemMessages.push({
         role: 'system',

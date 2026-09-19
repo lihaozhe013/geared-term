@@ -5,6 +5,7 @@ declare module '*.css';
 import type {
   AiConnectionInput,
   AiConnectionRecord,
+  AppInfo,
   LocalTerminalRequest,
   SessionProfileRecord,
   SessionProfileSaveRequest,
@@ -26,6 +27,8 @@ import type {
   LocalEntry,
   LocalMkdirRequest,
   LocalRenameRequest,
+  RuntimeInfo,
+  UserThemeList,
   TerminalCommandAction,
   SshProfileTerminalRequest,
   SshTerminalRequest,
@@ -51,12 +54,7 @@ import type {
 declare global {
   interface Window {
     geared: {
-      getAppInfo: () => Promise<{
-        name: 'Geared Term';
-        version: string;
-        isPackaged: boolean;
-        platform: NodeJS.Platform;
-      }>;
+      getAppInfo: () => Promise<AppInfo>;
       createLocalTerminal: (
         input: LocalTerminalRequest,
         onMessage: (message: unknown) => void
@@ -134,6 +132,10 @@ declare global {
       revealLocalPath: (path: string) => Promise<SftpOperationResult>;
       onSftpTransferEvent: (listener: (event: SftpTransferEvent) => void) => () => void;
       onSftpCd: (listener: (event: SftpCdEvent) => void) => () => void;
+      listUserThemes: () => Promise<UserThemeList>;
+      openThemesFolder: () => Promise<SftpOperationResult>;
+      getRuntimeInfo: () => Promise<RuntimeInfo>;
+      openConfigFolder: () => Promise<SftpOperationResult>;
       uploadSftp: (input: SftpUploadRequest) => Promise<SftpOperationResult>;
       downloadSftp: (input: SftpDownloadRequest) => Promise<SftpOperationResult>;
       executeCommandAction: (input: TerminalCommandAction) => Promise<{ accepted: true }>;
