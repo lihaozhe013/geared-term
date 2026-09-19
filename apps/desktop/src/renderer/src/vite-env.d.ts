@@ -7,6 +7,7 @@ import type {
   AiConnectionRecord,
   LocalTerminalRequest,
   SessionProfileRecord,
+  SessionProfileSaveRequest,
   SettingsRecord,
   SftpListRequest,
   SftpRemoteEntry,
@@ -74,6 +75,9 @@ declare global {
       ) => { cancel: () => void };
       listProfiles: () => Promise<SessionProfileRecord[]>;
       saveProfile: (input: SessionProfileRecord) => Promise<SessionProfileRecord[]>;
+      saveProfileWithCredentials: (
+        input: SessionProfileSaveRequest
+      ) => Promise<SessionProfileRecord[]>;
       deleteProfile: (id: string) => Promise<SessionProfileRecord[]>;
       getUiState: () => Promise<UiStateRecord>;
       saveUiState: (input: UiStateRecord) => Promise<UiStateRecord>;

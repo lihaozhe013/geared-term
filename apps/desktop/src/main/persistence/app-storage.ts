@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import {
   AiConnectionInputSchema,
   AiConnectionRecordSchema,
+  type ProfileCredentials,
   SshTerminalRequestSchema,
   type AiConnectionInput,
   type AiConnectionRecord,
@@ -149,10 +150,76 @@ export class AppStorage {
   }
 
   public async saveProfile(profile: SessionProfile): Promise<SessionProfile[]> {
-    const nextProfile = SessionProfileSchema.parse(profile);
+    return this.saveProfileWithCredentials(profile);
+  }
+
+  public async saveProfileWithCredentials(
+    profile: SessionProfile,
+    credentials?: ProfileCredentials
+  ): Promise<SessionProfile[]> {
+    const parsedProfile = SessionProfileSchema.parse(profile);
+    const current = this.profileValue.sessions.find((item) => item.id === parsedProfile.id);
+    if (current && current.kind !== parsedProfile.kind) {
+      throw new Error('Session type cannot be changed after creation');
+    }
+    let nextProfile = parsedProfile;
+    let secrets = { ...this.profileValue.secrets };
+    const replacedSecretRefs: string[] = Object.values(current?.secretRefs ?? {});
+
+    if (credentials && parsedProfile.kind !== 'ssh') {
+      throw new Error('Credentials can only be saved for SSH profiles');
+    }
+
+    if (parsedProfile.kind === 'ssh') {
+      const secretRefs = {
+        ...(current?.secretRefs ?? {}),
+        ...(parsedProfile.secretRefs ?? {})
+      };
+      const credentialEntries: Array<['password' | 'privateKey' | 'passphrase', string]> = [
+        ['password', 'ssh-password'],
+        ['privateKey', 'ssh-private-key'],
+        ['passphrase', 'ssh-passphrase']
+      ];
+      const hasCredentialMutation = credentials
+        ? credentialEntries.some(([key]) => credentials[key] !== undefined)
+        : false;
+      if (hasCredentialMutation && !this.vault.isUnlocked) {
+        throw new Error('Vault is locked');
+      }
+      for (const [key, purpose] of credentialEntries) {
+        const value = credentials?.[key];
+        if (value === undefined) continue;
+        const previousRef = secretRefs[key];
+        if (previousRef) replacedSecretRefs.push(previousRef);
+        delete secretRefs[key];
+        if (value.length > 0) {
+          const id = randomUUID();
+          secrets[id] = this.vault.encrypt(`${purpose}:${parsedProfile.id}`, value);
+          secretRefs[key] = id;
+        }
+      }
+      if (!parsedProfile.host?.trim() || !parsedProfile.user?.trim()) {
+        throw new Error('SSH profile requires a host and user');
+      }
+      if (!secretRefs.password && !secretRefs.privateKey) {
+        throw new Error('SSH profile requires a password or private key');
+      }
+      nextProfile = {
+        ...parsedProfile,
+        secretRefs: Object.keys(secretRefs).length > 0 ? secretRefs : undefined
+      };
+    }
+
     const sessions = this.profileValue.sessions.filter((item) => item.id !== nextProfile.id);
     sessions.push(nextProfile);
-    this.profileValue = ProfileSchema.parse({ ...this.profileValue, sessions });
+    const retainedSecretRefs = this.collectSecretRefs(sessions);
+    for (const connection of this.profileValue.aiConnections) {
+      if (connection.apiKeyRef) retainedSecretRefs.add(connection.apiKeyRef);
+    }
+    for (const id of replacedSecretRefs) {
+      if (!retainedSecretRefs.has(id)) delete secrets[id];
+    }
+    this.profileValue = ProfileSchema.parse({ ...this.profileValue, sessions, secrets });
     await this.profile.save(this.profileValue);
     return this.profileSnapshot();
   }
@@ -185,9 +252,18 @@ export class AppStorage {
   }
 
   public async deleteProfile(id: string): Promise<SessionProfile[]> {
+    const removed = this.profileValue.sessions.find((item) => item.id === id);
     const sessions = this.profileValue.sessions.filter((item) => item.id !== id);
     if (sessions.length !== this.profileValue.sessions.length) {
-      this.profileValue = ProfileSchema.parse({ ...this.profileValue, sessions });
+      const secrets = { ...this.profileValue.secrets };
+      const retainedSecretRefs = this.collectSecretRefs(sessions);
+      for (const connection of this.profileValue.aiConnections) {
+        if (connection.apiKeyRef) retainedSecretRefs.add(connection.apiKeyRef);
+      }
+      for (const idToRemove of Object.values(removed?.secretRefs ?? {})) {
+        if (!retainedSecretRefs.has(idToRemove)) delete secrets[idToRemove];
+      }
+      this.profileValue = ProfileSchema.parse({ ...this.profileValue, sessions, secrets });
       await this.profile.save(this.profileValue);
     }
     return this.profileSnapshot();
@@ -326,5 +402,15 @@ export class AppStorage {
     const secret = this.profileValue.secrets[id];
     if (!secret) throw new Error('SSH profile references a missing secret');
     return this.vault.decrypt(secret);
+  }
+
+  private collectSecretRefs(sessions: SessionProfile[]): Set<string> {
+    const refs = new Set<string>();
+    for (const session of sessions) {
+      for (const id of Object.values(session.secretRefs ?? {})) {
+        refs.add(id);
+      }
+    }
+    return refs;
   }
 }

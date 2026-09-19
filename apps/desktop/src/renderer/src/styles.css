@@ -463,6 +463,110 @@ textarea {
   text-align: center;
 }
 
+.profile-editor {
+  width: min(760px, 100%);
+}
+
+.profile-editor-body {
+  display: grid;
+  gap: 14px;
+  min-height: 0;
+  overflow: auto;
+}
+
+.profile-editor-section {
+  padding-top: 2px;
+  border-top: 1px solid #263247;
+}
+
+.profile-editor-wide {
+  grid-column: 1 / -1;
+}
+
+.profile-editor textarea,
+.profile-editor input,
+.profile-editor select {
+  width: 100%;
+  border: 1px solid #344157;
+  border-radius: 5px;
+  outline: none;
+  color: #e4eaf3;
+  background: #0f141c;
+  font-size: 12px;
+}
+
+.profile-editor input,
+.profile-editor select {
+  min-height: 30px;
+  padding: 5px 7px;
+}
+
+.profile-editor textarea {
+  padding: 7px;
+  resize: vertical;
+  line-height: 1.4;
+}
+
+.profile-editor input:focus,
+.profile-editor select:focus,
+.profile-editor textarea:focus {
+  border-color: #5c8ea5;
+}
+
+.profile-editor .settings-grid {
+  align-items: start;
+}
+
+.vault-box {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid #31505c;
+  border-radius: 7px;
+  background: #102329;
+}
+
+.vault-header,
+.vault-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.vault-header p {
+  margin: 0;
+}
+
+.vault-actions input {
+  min-width: 0;
+  flex: 1;
+}
+
+.settings-error {
+  margin: 0;
+  padding: 8px;
+  border: 1px solid #75444d;
+  border-radius: 5px;
+  background: #29171d;
+  overflow-wrap: anywhere;
+}
+
+.profile-save {
+  width: auto;
+  text-align: center;
+}
+
+.quick-ssh-note {
+  margin: 0;
+  padding: 8px;
+  border: 1px solid #3b4b63;
+  border-radius: 5px;
+  background: #151c28;
+  line-height: 1.4;
+}
+
 .assistant-messages {
   min-height: 0;
   overflow: auto;
@@ -632,6 +736,11 @@ textarea {
   color: #e79b9b;
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 .primary-button {
   width: 100%;
   padding: 9px 10px;
@@ -641,6 +750,23 @@ textarea {
   background: #163c3e;
   text-align: left;
   font-size: 12px;
+}
+
+.secondary-button {
+  width: 100%;
+  margin-top: 6px;
+  padding: 7px 10px;
+  border: 1px solid #35435a;
+  border-radius: 7px;
+  color: #b7c7e3;
+  background: #151c28;
+  cursor: pointer;
+  text-align: left;
+  font-size: 11px;
+}
+
+.secondary-button:hover {
+  background: #202b3c;
 }
 
 .profile-list {

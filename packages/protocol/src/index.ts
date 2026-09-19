@@ -67,6 +67,28 @@ export const SessionProfileRecordSchema = z
 
 export const ProfileIdRequestSchema = z.object({ id: IdSchema }).strict();
 
+export const ProfileCredentialsSchema = z
+  .object({
+    password: z.string().max(4096).optional(),
+    privateKey: z
+      .string()
+      .max(1024 * 1024)
+      .optional(),
+    passphrase: z.string().max(4096).optional()
+  })
+  .strict();
+
+export const SessionProfileSaveProfileSchema = SessionProfileRecordSchema.omit({
+  secretRefs: true
+});
+
+export const SessionProfileSaveRequestSchema = z
+  .object({
+    profile: SessionProfileSaveProfileSchema,
+    credentials: ProfileCredentialsSchema.optional()
+  })
+  .strict();
+
 export const UiStateRecordSchema = z
   .object({
     schemaVersion: z.literal(1),
@@ -362,6 +384,9 @@ export type EnvironmentProbeRequest = z.infer<typeof EnvironmentProbeRequestSche
 export type VaultPasswordRequest = z.infer<typeof VaultPasswordRequestSchema>;
 export type VaultStatus = z.infer<typeof VaultStatusSchema>;
 export type SessionProfileRecord = z.infer<typeof SessionProfileRecordSchema>;
+export type ProfileCredentials = z.infer<typeof ProfileCredentialsSchema>;
+export type SessionProfileSaveProfile = z.infer<typeof SessionProfileSaveProfileSchema>;
+export type SessionProfileSaveRequest = z.infer<typeof SessionProfileSaveRequestSchema>;
 export type UiStateRecord = z.infer<typeof UiStateRecordSchema>;
 export type SettingsRecord = z.infer<typeof SettingsRecordSchema>;
 export type WslDistribution = z.infer<typeof WslDistributionSchema>;

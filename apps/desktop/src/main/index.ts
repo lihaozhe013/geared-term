@@ -14,6 +14,7 @@ import {
   EmptyRequestSchema,
   ProfileIdRequestSchema,
   SessionProfileRecordSchema,
+  SessionProfileSaveRequestSchema,
   SettingsRecordSchema,
   SftpListRequestSchema,
   SftpRemoteEntrySchema,
@@ -195,7 +196,16 @@ function registerIpc(): void {
   );
   ipcMain.handle('profile:save', async (_event, input: unknown) => {
     const profile = SessionProfileRecordSchema.parse(input);
-    return SessionProfileRecordSchema.array().parse(await storage.saveProfile(profile));
+    const { secretRefs: _secretRefs, ...profileWithoutSecrets } = profile;
+    return SessionProfileRecordSchema.array().parse(
+      await storage.saveProfile(profileWithoutSecrets)
+    );
+  });
+  ipcMain.handle('profile:save-with-credentials', async (_event, input: unknown) => {
+    const request = SessionProfileSaveRequestSchema.parse(input);
+    return SessionProfileRecordSchema.array().parse(
+      await storage.saveProfileWithCredentials(request.profile, request.credentials)
+    );
   });
   ipcMain.handle('profile:delete', async (_event, input: unknown) => {
     const request = ProfileIdRequestSchema.parse(input);

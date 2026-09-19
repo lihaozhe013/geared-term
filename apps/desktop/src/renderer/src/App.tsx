@@ -11,6 +11,8 @@ import type {
 } from '@geared-term/protocol';
 import { AssistantPanel } from './AssistantPanel';
 import { EnvironmentPanel } from './EnvironmentPanel';
+import { ProfileEditor } from './ProfileEditor';
+import { QuickSshDialog } from './QuickSshDialog';
 import { SettingsPanel } from './SettingsPanel';
 import { SftpPanel } from './SftpPanel';
 import { TerminalPane } from './TerminalPane';
@@ -147,6 +149,9 @@ export function App(): React.JSX.Element {
   const [activeTabId, setActiveTabId] = useState<string | null>(() => tabs[0]?.id ?? null);
   const [error, setError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [showProfileEditor, setShowProfileEditor] = useState(false);
+  const [editingProfile, setEditingProfile] = useState<SessionProfileRecord | undefined>();
+  const [showQuickSsh, setShowQuickSsh] = useState(false);
 
   useEffect(() => {
     void Promise.all([
@@ -226,7 +231,7 @@ export function App(): React.JSX.Element {
   const saveActiveProfile = useCallback(async (): Promise<void> => {
     const active = tabs.find((tab) => tab.id === activeTabId);
     if (!active || 'host' in active.request || 'profileId' in active.request) {
-      setError('Only local sessions can be saved until vault-backed SSH credentials are wired in.');
+      setError('Use the profile editor to save SSH or WSL session settings.');
       return;
     }
     const request = active.request;
@@ -267,6 +272,26 @@ export function App(): React.JSX.Element {
   }, [uiState]);
 
   const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? tabs[0];
+
+  const openNewProfile = useCallback((): void => {
+    setEditingProfile(undefined);
+    setShowProfileEditor(true);
+    setError(null);
+  }, []);
+
+  const openEditProfile = useCallback((profile: SessionProfileRecord): void => {
+    setEditingProfile(profile);
+    setShowProfileEditor(true);
+    setError(null);
+  }, []);
+
+  const openQuickSsh = useCallback((request: SshTerminalRequest, name: string): void => {
+    const tab: TerminalTab = { id: request.sessionId, name, request, status: 'starting' };
+    setTabs((current) => [...current, tab]);
+    setActiveTabId(tab.id);
+    setShowQuickSsh(false);
+    setError(null);
+  }, []);
 
   const toggleSftp = useCallback((): void => {
     if (!supportsSftp(activeTab?.request)) {
@@ -374,6 +399,16 @@ export function App(): React.JSX.Element {
             <button type="button" className="primary-button" onClick={addLocalTab}>
               + New local terminal
             </button>
+            <button type="button" className="secondary-button" onClick={openNewProfile}>
+              + New saved profile
+            </button>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => setShowQuickSsh(true)}
+            >
+              + Temporary SSH connection
+            </button>
             <div className="profile-list" aria-label="Saved sessions">
               {profiles.map((profile) => (
                 <div className="profile-row" key={profile.id}>
@@ -402,6 +437,14 @@ export function App(): React.JSX.Element {
                   >
                     ×
                   </button>
+                  <button
+                    type="button"
+                    className="icon-button"
+                    onClick={() => openEditProfile(profile)}
+                    aria-label={`Edit ${profile.name}`}
+                  >
+                    ✎
+                  </button>
                 </div>
               ))}
             </div>
@@ -424,6 +467,13 @@ export function App(): React.JSX.Element {
                     className="profile-button wsl-button"
                     key={distribution.name}
                     onDoubleClick={() => {
+                      if (
+                        !window.confirm(
+                          `Open the WSL distribution "${distribution.name}" in a new terminal?`
+                        )
+                      ) {
+                        return;
+                      }
                       const request: LocalTerminalRequest = {
                         sessionId: crypto.randomUUID(),
                         shell: 'wsl.exe',
@@ -598,6 +648,25 @@ export function App(): React.JSX.Element {
           settings={settings}
           onSave={saveSettings}
           onClose={() => setShowSettings(false)}
+        />
+      ) : null}
+
+      {showProfileEditor ? (
+        <ProfileEditor
+          key={editingProfile?.id ?? 'new-profile'}
+          profile={editingProfile}
+          defaultTerm={settings.defaultTerm}
+          onSaved={setProfiles}
+          onError={setError}
+          onClose={() => setShowProfileEditor(false)}
+        />
+      ) : null}
+
+      {showQuickSsh ? (
+        <QuickSshDialog
+          defaultTerm={settings.defaultTerm}
+          onConnect={openQuickSsh}
+          onClose={() => setShowQuickSsh(false)}
         />
       ) : null}
 

@@ -3,6 +3,7 @@ import {
   AppInfoSchema,
   SftpListRequestSchema,
   SftpRemoteEntrySchema,
+  SessionProfileSaveRequestSchema,
   TerminalCommandActionSchema,
   TerminalPortMessageSchema
 } from './index';
@@ -61,6 +62,28 @@ describe('protocol schemas', () => {
         action: 'run',
         payload: 'printf hello',
         revision: 'stale'
+      }).success
+    ).toBe(false);
+  });
+
+  it('keeps profile credential input transient at the IPC boundary', () => {
+    const base = {
+      id: 'ssh-1',
+      kind: 'ssh' as const,
+      name: 'Remote',
+      term: 'xterm-256color' as const,
+      host: 'server.example.test',
+      user: 'operator'
+    };
+    expect(
+      SessionProfileSaveRequestSchema.safeParse({
+        profile: base,
+        credentials: { password: 'secret' }
+      }).success
+    ).toBe(true);
+    expect(
+      SessionProfileSaveRequestSchema.safeParse({
+        profile: { ...base, secretRefs: { password: 'secret-ref' } }
       }).success
     ).toBe(false);
   });

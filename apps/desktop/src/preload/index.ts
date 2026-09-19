@@ -13,6 +13,7 @@ import {
   LocalTerminalRequestSchema,
   ProfileIdRequestSchema,
   SessionProfileRecordSchema,
+  SessionProfileSaveRequestSchema,
   SettingsRecordSchema,
   SftpListRequestSchema,
   SftpRemoteEntrySchema,
@@ -31,6 +32,7 @@ import {
   type EnvironmentProbeRequest,
   type EnvironmentRecord,
   type SessionProfileRecord,
+  type SessionProfileSaveRequest,
   type SettingsRecord,
   type SftpListRequest,
   type TerminalCommandAction,
@@ -168,8 +170,17 @@ const api = Object.freeze({
     SessionProfileRecordSchema.array().parse(await ipcRenderer.invoke('profile:list')),
   saveProfile: async (input: SessionProfileRecord) => {
     const profile = SessionProfileRecordSchema.parse(input);
+    const { secretRefs: _secretRefs, ...profileWithoutSecrets } = profile;
     return SessionProfileRecordSchema.array().parse(
-      await ipcRenderer.invoke('profile:save', profile)
+      await ipcRenderer.invoke('profile:save-with-credentials', {
+        profile: profileWithoutSecrets
+      })
+    );
+  },
+  saveProfileWithCredentials: async (input: SessionProfileSaveRequest) => {
+    const request = SessionProfileSaveRequestSchema.parse(input);
+    return SessionProfileRecordSchema.array().parse(
+      await ipcRenderer.invoke('profile:save-with-credentials', request)
     );
   },
   deleteProfile: async (id: string) => {

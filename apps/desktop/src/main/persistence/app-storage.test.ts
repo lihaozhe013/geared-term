@@ -1,4 +1,4 @@
-import { mkdtemp } from 'node:fs/promises';
+import { mkdtemp, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -108,5 +108,67 @@ describe('application storage', () => {
     expect(() => storage.resolveSshProfile('remote-prod', 'session-2', 80, 24)).toThrow(
       'Vault is locked'
     );
+  });
+
+  it('saves SSH profile credentials through the profile boundary and prunes replaced secrets', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'geared-term-profile-credentials-'));
+    const storage = new AppStorage(directory, testLogger());
+    await storage.load();
+    await storage.initializeVault('correct horse battery staple');
+
+    const profile = {
+      id: 'remote-editable',
+      kind: 'ssh' as const,
+      name: 'Editable remote',
+      term: 'xterm-256color' as const,
+      host: 'server.example.test',
+      port: 2200,
+      user: 'operator'
+    };
+    await storage.saveProfileWithCredentials(profile, { password: 'first-password' });
+    expect(JSON.stringify(storage.profileSnapshot())).not.toContain('first-password');
+    expect(storage.resolveSshProfile(profile.id, 'session-1', 80, 24).password).toBe(
+      'first-password'
+    );
+
+    await storage.saveProfileWithCredentials(profile, { password: 'second-password' });
+    expect(storage.resolveSshProfile(profile.id, 'session-2', 80, 24).password).toBe(
+      'second-password'
+    );
+    const persisted = JSON.parse(await readFile(join(directory, 'profile.json'), 'utf8')) as {
+      secrets: Record<string, unknown>;
+    };
+    expect(Object.keys(persisted.secrets)).toHaveLength(1);
+    expect(JSON.stringify(persisted)).not.toContain('first-password');
+    expect(JSON.stringify(persisted)).not.toContain('second-password');
+
+    await storage.deleteProfile(profile.id);
+    const afterDelete = JSON.parse(await readFile(join(directory, 'profile.json'), 'utf8')) as {
+      secrets: Record<string, unknown>;
+    };
+    expect(afterDelete.secrets).toEqual({});
+  });
+
+  it('does not allow a saved profile to change session type', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'geared-term-profile-kind-'));
+    const storage = new AppStorage(directory, testLogger());
+    await storage.load();
+    await storage.saveProfile({
+      id: 'local-session',
+      kind: 'local',
+      name: 'Local',
+      term: 'xterm-256color'
+    });
+
+    await expect(
+      storage.saveProfile({
+        id: 'local-session',
+        kind: 'ssh',
+        name: 'Local as SSH',
+        term: 'xterm-256color',
+        host: 'server.example.test',
+        user: 'operator'
+      })
+    ).rejects.toThrow('Session type cannot be changed');
   });
 });

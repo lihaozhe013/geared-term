@@ -28,15 +28,19 @@ main-process-only resolution of vault-backed SSH profile credentials. The fourth
 vault-referenced AI connections, cancellable provider-neutral streaming, and a bounded assistant
 panel. The fifth checkpoint adds conservative top-level command splitting with whole-block fallback
 for incomplete or conditional command text. The sixth checkpoint adds persisted terminal settings
-and English/Simplified-Chinese settings labels without exposing privileged state to the renderer. The
-seventh checkpoint attaches an independent SFTP channel to SSH sessions and exposes validated remote
-directory listing in a capability-gated panel. The eighth checkpoint adds bounded local/WSL
-environment probes, versioned environment records, and an editable context panel.
-The ninth checkpoint adds content revisions, explicit command cards, and a validated main-process
-action path that keeps Insert separate from one-submit Run.
-The tenth checkpoint adds conservative destructive-command classification (Run is withheld while
-Insert remains available) and attaches explicitly enabled environment context to AI requests with a
-renderer-visible preview.
+and English/Simplified-Chinese settings labels without exposing privileged state to the renderer.
+The seventh checkpoint attaches an independent SFTP channel to SSH sessions and exposes validated
+remote directory listing in a capability-gated panel. The eighth checkpoint adds bounded local/WSL
+environment probes, versioned environment records, and an editable context panel. The ninth
+checkpoint adds content revisions, explicit command cards, and a validated main-process action path
+that keeps Insert separate from one-submit Run. The tenth checkpoint adds conservative
+destructive-command classification (Run is withheld while Insert remains available) and attaches
+explicitly enabled environment context to AI requests with a renderer-visible preview. The eleventh
+checkpoint adds a session profile editor for local, WSL, and SSH targets, transient credential DTO
+validation, Vault initialization/unlock/lock controls, and main-process-only encrypted credential
+replacement and cleanup. The twelfth checkpoint adds a non-persistent SSH connection dialog that
+keeps one-shot credentials in the active tab only and reuses the same host-key and SFTP capability
+paths as saved SSH sessions.
 
 ## 2. Delivery rules
 
