@@ -272,6 +272,15 @@ export function App(): React.JSX.Element {
   }, [uiState]);
 
   const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? tabs[0];
+  const profileGroups = Array.from(
+    profiles.reduce((groups, profile) => {
+      const key = profile.group?.trim() || 'Ungrouped';
+      const group = groups.get(key) ?? [];
+      group.push(profile);
+      groups.set(key, group);
+      return groups;
+    }, new Map<string, SessionProfileRecord[]>())
+  );
 
   const openNewProfile = useCallback((): void => {
     setEditingProfile(undefined);
@@ -410,42 +419,49 @@ export function App(): React.JSX.Element {
               + Temporary SSH connection
             </button>
             <div className="profile-list" aria-label="Saved sessions">
-              {profiles.map((profile) => (
-                <div className="profile-row" key={profile.id}>
-                  <button
-                    type="button"
-                    className="profile-button"
-                    onClick={() => openProfile(profile)}
-                  >
-                    <span>{profile.name}</span>
-                    <small>{profile.kind}</small>
-                  </button>
-                  <button
-                    type="button"
-                    className="icon-button danger"
-                    onClick={() => {
-                      void window.geared
-                        .deleteProfile(profile.id)
-                        .then(setProfiles)
-                        .catch((reason: unknown) =>
-                          setError(
-                            reason instanceof Error ? reason.message : 'Unable to delete session'
-                          )
-                        );
-                    }}
-                    aria-label={`Delete ${profile.name}`}
-                  >
-                    ×
-                  </button>
-                  <button
-                    type="button"
-                    className="icon-button"
-                    onClick={() => openEditProfile(profile)}
-                    aria-label={`Edit ${profile.name}`}
-                  >
-                    ✎
-                  </button>
-                </div>
+              {profileGroups.map(([groupName, groupProfiles]) => (
+                <section className="profile-group" key={groupName} aria-label={groupName}>
+                  <p className="section-label">{groupName}</p>
+                  {groupProfiles.map((profile) => (
+                    <div className="profile-row" key={profile.id}>
+                      <button
+                        type="button"
+                        className="profile-button"
+                        onClick={() => openProfile(profile)}
+                      >
+                        <span>{profile.name}</span>
+                        <small>{profile.kind}</small>
+                      </button>
+                      <button
+                        type="button"
+                        className="icon-button danger"
+                        onClick={() => {
+                          void window.geared
+                            .deleteProfile(profile.id)
+                            .then(setProfiles)
+                            .catch((reason: unknown) =>
+                              setError(
+                                reason instanceof Error
+                                  ? reason.message
+                                  : 'Unable to delete session'
+                              )
+                            );
+                        }}
+                        aria-label={`Delete ${profile.name}`}
+                      >
+                        ×
+                      </button>
+                      <button
+                        type="button"
+                        className="icon-button"
+                        onClick={() => openEditProfile(profile)}
+                        aria-label={`Edit ${profile.name}`}
+                      >
+                        ✎
+                      </button>
+                    </div>
+                  ))}
+                </section>
               ))}
             </div>
             {info?.platform === 'win32' ? (

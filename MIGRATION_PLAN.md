@@ -44,7 +44,9 @@ paths as saved SSH sessions. The thirteenth checkpoint adds main-owned local fil
 upload/download, selected remote-file state, and validated transfer IPC without exposing arbitrary
 filesystem APIs to the renderer. The fourteenth checkpoint wires the persisted split-command
 presentation setting into assistant command-card rendering while retaining whole-block safety
-validation and revision checks in the main process.
+validation and revision checks in the main process. The fifteenth checkpoint renders saved profiles
+in explicit named and ungrouped sidebar sections, matching the profile editor's persisted group
+field.
 
 ## 2. Delivery rules
 

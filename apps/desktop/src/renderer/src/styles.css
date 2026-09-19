@@ -781,6 +781,18 @@ button:disabled {
   margin-top: 16px;
 }
 
+.profile-group {
+  display: grid;
+  gap: 4px;
+  margin-top: 10px;
+}
+
+.profile-group .section-label {
+  margin: 4px 4px 2px;
+  color: #71809a;
+  font-size: 9px;
+}
+
 .wsl-section {
   display: grid;
   gap: 4px;
