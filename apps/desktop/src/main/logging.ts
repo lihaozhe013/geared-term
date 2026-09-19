@@ -6,14 +6,16 @@ export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 const maxBytes = 2 * 1024 * 1024;
 
+const SECRET_JSON_PAIR =
+  /("(?:authorization|api[_-]?key|password|passphrase|private[_-]?key|token)"\s*:\s*)("[^"]*"|[^,}\s]+)/gi;
+const SECRET_KV_PAIR =
+  /((?:authorization|api[_-]?key|password|passphrase|private[_-]?key|token)\s*[:=]\s*)([^,}\r\n]+)/gi;
+
 function redact(value: unknown): string {
   const text = typeof value === 'string' ? value : JSON.stringify(value);
-  return text
-    .replace(/(authorization\s*[:=]\s*)([^\s,}]+)/gi, '$1[REDACTED]')
-    .replace(
-      /(api[_-]?key|password|passphrase|private[_-]?key|token)(\s*[:=]\s*)([^,}\s]+)/gi,
-      '$1$2[REDACTED]'
-    );
+  // JSON-shaped details need quote-aware matching; plain key=value strings fall
+  // through to the loose pattern.
+  return text.replace(SECRET_JSON_PAIR, '$1[REDACTED]').replace(SECRET_KV_PAIR, '$1[REDACTED]');
 }
 
 function rotate(path: string): void {
