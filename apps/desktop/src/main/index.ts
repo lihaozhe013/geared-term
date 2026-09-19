@@ -90,18 +90,29 @@ function createWindow(): BrowserWindow {
       spellcheck: false
     }
   });
+  let persistingWindowState = false;
 
   window.once('ready-to-show', () => {
     if (storage.uiStateSnapshot().maximized) window.maximize();
     window.show();
   });
-  window.on('close', () => {
+  window.on('close', (event) => {
+    if (persistingWindowState) return;
+    persistingWindowState = true;
+    event.preventDefault();
     const nextBounds = window.isMaximized() ? window.getNormalBounds() : window.getBounds();
-    void storage.saveUiState({
-      ...storage.uiStateSnapshot(),
-      bounds: nextBounds,
-      maximized: window.isMaximized()
-    });
+    void storage
+      .saveUiState({
+        ...storage.uiStateSnapshot(),
+        bounds: nextBounds,
+        maximized: window.isMaximized()
+      })
+      .catch((error: unknown) => {
+        logger.error('system', 'Unable to persist window state', {
+          error: error instanceof Error ? error.message : String(error)
+        });
+      })
+      .finally(() => window.close());
   });
   window.webContents.setWindowOpenHandler(({ url }) => {
     if (isAllowedExternalUrl(url)) {
