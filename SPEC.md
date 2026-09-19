@@ -1,25 +1,19 @@
-# Geared Term Electron Migration Specification
+# Geared Term Product Specification
 
 > Status: Draft for implementation approval
 >
 > Last updated: 2026-09-19
 >
 > Target repository: `E:\dev\geared-term`
->
-> Reference application: `E:\dev\augur-term`
->
-> Reference revision: `136c01b34931d9d496ecbc1e1fab66705e281d59`
 
 ## 1. Purpose
 
-This specification defines the replacement of Augur Term's Rust/GPUI desktop application with
-Geared Term, an Electron, TypeScript, React, and xterm.js application. The migration is a behavioral
-reimplementation. It is not a source-to-source translation and does not preserve the Rust module
-layout.
+This specification defines Geared Term, a standalone Electron, TypeScript, React, and xterm.js
+desktop terminal application. It covers local PTYs, WSL, SSH, SFTP, the encrypted vault, terminal
+environment detection, API-based AI chat, conversation history, and cross-platform packaging.
 
-The parity release must preserve the reference application's complete useful product behavior,
-including local PTYs, WSL, SSH, SFTP, the encrypted vault, terminal environment detection,
-API-based AI chat, conversation history, and cross-platform packaging.
+The specification is a behavioral product definition. It is independent of any other codebase and
+imposes no compatibility obligations on any other application's data formats.
 
 The key words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are normative.
 
@@ -27,74 +21,68 @@ The key words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are normative.
 
 The specification was derived from:
 
-1. the inspected Augur Term working tree and its tests;
-2. the reference application's English localization catalog, default configuration, packaging, and
-   CI definitions;
-3. [`docs/web-llm-page-support-requirements.md`](docs/web-llm-page-support-requirements.md), only to
-   keep that separate feature out of this migration.
+1. the product goals of a dependable daily-use terminal with integrated file transfer and an
+   AI assistant;
+2. [`docs/web-llm-page-support-requirements.md`](docs/web-llm-page-support-requirements.md), only to
+   keep that separate feature out of this product.
 
 When sources disagree, the following order applies:
 
 1. security, data integrity, and explicit safety invariants in this specification;
-2. explicit requirements and migration decisions in this specification;
-3. observable behavior of the reference application;
-4. descriptive README text.
-
-The inspected Augur Term working tree contains local changes beyond the named revision. Before
-implementation begins, Phase 0 of the migration plan must freeze an exact, reproducible reference
-baseline.
+2. explicit requirements and product decisions in this specification;
+3. recorded architecture decisions in the implementation plan.
 
 ## 3. Product goals
 
-The parity release MUST:
+The initial release MUST:
 
 - provide a dependable daily-use terminal for local shells, WSL, and SSH;
 - preserve saved sessions, groups, authentication choices, terminal settings, and host trust;
-- preserve the integrated SFTP and AI assistant workflows;
+- provide the integrated SFTP and AI assistant workflows;
 - keep terminal I/O independent from React rendering and AI availability;
 - keep secrets and privileged resources outside the renderer;
-- preserve the reference application's keyboard, focus, selection, and panel behavior unless an
-  intentional difference is listed below;
-- provide a supported, non-destructive path for importing an existing Augur Term profile;
-- produce installable or portable artifacts for the same release platforms as the reference build;
+- provide the keyboard, focus, selection, and panel behavior defined in this specification unless an
+  intentional exception is listed below;
+- produce installable or portable artifacts for the supported release platforms;
 - establish typed, validated boundaries that can support later product work without replacing the
   terminal core again.
 
 ## 4. Non-goals
 
-The parity release MUST NOT include:
+The initial release MUST NOT include:
 
 - direct embedding or DOM integration of third-party LLM websites;
 - an autonomous agent loop or unattended command execution;
 - SSH agent authentication, keyboard-interactive authentication, jump hosts, port forwarding, or
-  automatic reconnect, because the reference application does not provide them;
+  automatic reconnect;
 - WSL installation, import, uninstall, global shutdown, custom in-distro shell selection, or WSL
   SFTP browsing;
 - restoration of live PTY or SSH handles after an application restart;
-- multiple terminal panes or terminal splits. The reference layout has terminal tabs and a
+- multiple terminal panes or terminal splits. The product layout has terminal tabs and a
   terminal/right-panel split, not multiple simultaneous terminal panes;
-- a mechanical translation of Rust types, files, or rendering code;
 - storage of unlimited terminal scrollback or background upload of terminal content;
-- changing the established product UX merely to make it look more like a generic Electron app.
+- changing the established product UX merely to make it look more like a generic Electron app;
+- reading or converting data formats belonging to any other application.
 
-## 5. Normative migration decisions
+## 5. Normative product decisions
 
-These decisions resolve differences between the reference behavior and the target design.
+These decisions define behavior that a straightforward implementation might otherwise get wrong.
 
-| Area | Reference behavior | Geared Term requirement |
-| --- | --- | --- |
-| Terminal engine | `alacritty_terminal` and custom GPUI rendering | xterm.js owns VT state, display, selection, and scrollback. |
-| AI command action | Copy plus one Insert action whose global setting may append Enter | Copy, Insert, and Run are separate. Insert MUST never submit. Run requires an explicit click. |
-| Legacy auto-run setting | `ai_insert_auto_enter` defaults to `true` | The importer recognizes but does not enable implicit execution from this value. The setting is retired with an import notice. |
-| Command splitting | Optional display-only physical-line transform with limited continuation and heredoc handling | Optional shell-aware parsing by top-level statement, with a conservative whole-block fallback. |
-| Terminal context | Selection, otherwise visible viewport | Selection remains preferred; viewport and a user-bounded amount of preceding scrollback are supported with preview and truncation disclosure. |
-| External AI consent | Endpoint acceptance is primarily prompted when a snapshot is attached | The first request to a normalized endpoint requires consent whether or not a snapshot is attached. Endpoint changes require renewed consent. |
-| Workspace restore | Window and panel layout only | Preserve that behavior. Do not auto-reconnect or silently reopen live sessions in the parity release. |
-| SFTP command launch | A configured command can immediately run against a quoted remote path | Preserve as an explicit SFTP context-menu action. It is separate from AI command Insert/Run rules. |
+| Area | Geared Term requirement |
+| --- | --- |
+| Terminal engine | xterm.js owns VT state, display, selection, and scrollback. |
+| AI command action | Copy, Insert, and Run are separate. Insert MUST never submit. Run requires an explicit click. |
+| Implicit submit | No setting may cause inserted command text to be submitted automatically. |
+| Command splitting | Optional shell-aware parsing by top-level statement, with a conservative whole-block fallback. |
+| Terminal context | Selection remains preferred; viewport and a user-bounded amount of preceding scrollback are supported with preview and truncation disclosure. |
+| External AI consent | The first request to a normalized endpoint requires consent whether or not a snapshot is attached. Endpoint changes require renewed consent. |
+| Workspace restore | Window and panel layout only. Do not auto-reconnect or silently reopen live sessions. |
+| SFTP command launch | A configured command runs against a quoted remote path only as an explicit SFTP context-menu action. It is separate from AI command Insert/Run rules. |
+| Structured storage | Session profiles, vault-encrypted secrets, AI connections, and environment records live in one embedded SQLite database owned by the main process. |
 
 ## 6. Supported release platforms
 
-The first replacement release MUST build and smoke-test these artifacts:
+The initial release MUST build and smoke-test these artifacts:
 
 | Platform | Minimum release artifact | Required session backends |
 | --- | --- | --- |
@@ -131,7 +119,7 @@ architecture is not supported until its packaged application passes the same smo
 - **APP-010**: Off-screen saved bounds MUST fall back to a visible display. Restored sizes MUST be
   clamped to the current display and a usable minimum.
 - **APP-011**: Corrupt or missing UI state MUST fall back to safe defaults without blocking startup.
-- **APP-012**: Open tabs and live connections MUST NOT be automatically restored in the parity
+- **APP-012**: Open tabs and live connections MUST NOT be automatically restored in the initial
   release.
 
 ### 7.3 Focus, dialogs, and feedback
@@ -209,8 +197,8 @@ When terminal focus is active, the following behavior is required:
 - **VLT-002**: The renderer MUST never receive stored ciphertext, a vault key, or decrypted secrets.
 - **VLT-003**: First use MUST allow creation of a master password. Subsequent use MUST require unlock
   unless password-free unlock was explicitly enabled.
-- **VLT-004**: Master-password derivation MUST use an approved password KDF with recorded parameters.
-  Import compatibility MUST support the reference PBKDF2-HMAC-SHA256, 600,000-iteration vault.
+- **VLT-004**: Master-password derivation MUST use an approved password KDF with recorded, versioned
+  parameters.
 - **VLT-005**: Secret encryption MUST use authenticated encryption with a unique nonce per value.
 - **VLT-006**: Locking the vault MUST zero or release decrypted secret material, remove in-memory AI
   keys, hide saved sessions, and suppress password-free unlock for the rest of that process. It MUST
@@ -252,7 +240,7 @@ When terminal focus is active, the following behavior is required:
   the terminal MUST remain disabled unless a later security review approves them.
 - **TERM-011**: Interactive mode MUST accept input. Read-only mode MUST preserve selection, copy,
   scrolling, and search while suppressing terminal input.
-- **TERM-012**: Per-tab mode cycling MUST preserve the reference `F6` behavior.
+- **TERM-012**: Per-tab mode cycling MUST preserve the defined `F6` behavior.
 - **TERM-013**: `Ctrl+wheel` terminal zoom MUST remain bounded to a usable font-size range and MUST
   trigger a correct PTY resize.
 - **TERM-014**: Pasted and inserted text MUST normalize platform line endings predictably. NUL,
@@ -315,7 +303,7 @@ When terminal focus is active, the following behavior is required:
   process cwd.
 - **WSL-008**: WSL environment detection MUST execute the POSIX probe inside the selected
   distribution.
-- **WSL-009**: WSL sessions MUST NOT advertise SFTP capability in the parity release.
+- **WSL-009**: WSL sessions MUST NOT advertise SFTP capability in the initial release.
 
 ## 13. SSH sessions
 
@@ -337,7 +325,7 @@ When terminal focus is active, the following behavior is required:
   and channel failures MUST map to localized structured errors.
 - **SSH-009**: Closing a session MUST cancel terminal, SFTP, environment-probe, and pending host-key
   or passphrase work without leaving a usable privileged handle.
-- **SSH-010**: There is no automatic reconnect in the parity release. A disconnect ends the session
+- **SSH-010**: There is no automatic reconnect in the initial release. A disconnect ends the session
   with an explicit terminal state.
 
 ## 14. SFTP and local file panel
@@ -351,8 +339,8 @@ When terminal focus is active, the following behavior is required:
 - **SFTP-004**: The panel MUST support upload and download of files and directory trees, new folders,
   rename, recursive delete without following remote symlinks, local open/open-location, and copying
   selected paths.
-- **SFTP-005**: Multi-selection MUST be supported where the reference application supports it.
-  Destructive operations MUST identify the item or count and warn that they cannot be undone.
+- **SFTP-005**: Multi-selection MUST be supported for listing, download, and deletion. Destructive
+  operations MUST identify the item or count and warn that they cannot be undone.
 - **SFTP-006**: Transfers MUST have stable IDs, byte progress when available, success/failure state,
   and a visible transfer list. Completion MUST refresh the relevant directory.
 - **SFTP-007**: Remote listing MUST canonicalize the path when possible and use the canonical result
@@ -498,9 +486,8 @@ When terminal focus is active, the following behavior is required:
   first submission is pending.
 - **CMD-020**: Clearly destructive commands MUST receive stronger confirmation or be limited to
   Insert. Risk matching is a warning aid, not a security sandbox.
-- **CMD-021**: The optional split-command display setting MUST remain available and default to off
-  when no legacy value exists. Turning it on or off changes presentation only, not stored provider
-  content or history.
+- **CMD-021**: The optional split-command display setting MUST remain available and default to off.
+  Turning it on or off changes presentation only, not stored provider content or history.
 
 ## 18. Settings, appearance, and localization
 
@@ -513,9 +500,8 @@ When terminal focus is active, the following behavior is required:
   adjustments, preserve order, and remove blanks, duplicates, and the primary font.
 - **SET-004**: Font sizes MUST remain within 8-32 logical pixels and terminal line height within
   1.00-2.00 in stable 0.05 steps.
-- **SET-005**: Built-in themes MUST include an Augur Dark+-compatible theme and the four Catppuccin
-  variants present in the reference application. UI, terminal, selection, cursor, search, and code
-  highlighting colors MUST remain coordinated.
+- **SET-005**: Built-in themes MUST include a dark default theme and the four Catppuccin variants.
+  UI, terminal, selection, cursor, search, and code highlighting colors MUST remain coordinated.
 - **SET-006**: User theme JSON files MUST be loadable from a documented theme directory. A valid
   user theme MAY override a built-in theme of the same name. Invalid files MUST be isolated and
   reported without blocking startup.
@@ -524,47 +510,42 @@ When terminal focus is active, the following behavior is required:
 - **SET-008**: A language change MUST refresh windows, menus, dialogs, and errors without requiring a
   process restart where technically practical.
 
-## 19. Persistence and legacy import
+## 19. Persistence
 
-### 19.1 Target persistence
+### 19.1 General persistence rules
 
-- **DATA-001**: Settings, UI state, profile metadata, vault metadata, host keys, environments, and
-  history MUST each have a versioned schema or format identifier.
+- **DATA-001**: Settings, UI state, the structured database, vault metadata, host keys, environments,
+  and history MUST each have a versioned schema or format identifier.
 - **DATA-002**: Writes MUST be atomic or transactional. On failure, the last valid version MUST remain
   recoverable.
-- **DATA-003**: Corrupt files MUST be quarantined or preserved for diagnosis before safe defaults are
-  written.
+- **DATA-003**: Corrupt persisted data MUST be quarantined or preserved for diagnosis before safe
+  defaults are written.
 - **DATA-004**: xterm instances, PTY/SSH handles, raw WebContents objects, and unlimited scrollback
   MUST never be persisted.
-- **DATA-005**: Data paths MUST use a Geared Term namespace and MUST NOT overwrite Augur Term data.
+- **DATA-005**: Data paths MUST use a Geared Term namespace.
 
-### 19.2 Import requirements
+### 19.2 Embedded structured storage
 
-The importer MUST be explicit, previewable, non-destructive, restartable, and idempotent. It MUST
-leave the source profile unchanged and write an import receipt only after the target transaction
-commits.
-
-| Augur Term source | Required import behavior |
-| --- | --- |
-| `config.json` | Import supported appearance, terminal, language, SFTP, and AI instruction settings; retire `ai_insert_auto_enter` safely. |
-| `ui_state.json` | Import visible window/panel layout after validating current displays. |
-| `profile.redb` sessions | Import SSH/local/WSL targets, names, groups, TERM, and encrypted credentials through a reviewed compatibility helper. |
-| `profile.redb` AI connections | Import protocol, endpoint consent identity, models/defaults, and API keys. Endpoint consent MUST be re-confirmed in Geared Term. |
-| `profile.redb` host environments | Import facts, notes, custom instructions, attach flag, verification, and timestamps. |
-| `known_hosts` | Import parseable host keys without weakening changed-key checks. |
-| `ai-history/` | Copy valid Markdown conversations without rewriting originals; report invalid files. |
-| `themes/` | Copy valid user theme JSON files with collision reporting. |
-| `vault-auto.key` | Use only inside the compatibility import flow with explicit consent; never copy it as the new auto-unlock key. |
-
-- **DATA-006**: The legacy Redb/vault compatibility helper MUST be narrowly scoped, versioned,
-  checksummed with the application package, and unavailable to the renderer.
-- **DATA-007**: A master password MUST be passed to the helper over a private process pipe, never
-  command-line arguments, environment variables, files, or logs.
-- **DATA-008**: Decrypted import material MUST remain in memory and be re-encrypted by the target
-  vault before the transaction commits. No plaintext export file is allowed.
-- **DATA-009**: Import preview MUST report counts and conflicts without revealing secrets. A failed
-  import MUST be safe to retry.
-- **DATA-010**: Users MUST be able to skip secret import and re-enter credentials later.
+- **DATA-006**: Session profiles, vault-encrypted secrets, AI connections, and environment records
+  MUST be stored in a single embedded SQLite database owned exclusively by the main process. The
+  database MUST be accessed through `better-sqlite3` and MUST NOT be reachable from the preload or
+  renderer.
+- **DATA-007**: The database MUST enable write-ahead logging and foreign-key enforcement. Any
+  mutation touching multiple rows or tables (profile saves with credentials, secret-reference
+  cleanup, master-password rotation, bulk record operations) MUST execute as one transaction.
+- **DATA-008**: Schema changes MUST be forward-only migrations recorded in code, each executed in one
+  transaction with a pre-migration backup. An unreadable database or an unknown newer schema version
+  MUST be quarantined with its contents preserved and replaced by a fresh database with a
+  user-visible notice. It MUST NOT be silently deleted or downgraded.
+- **DATA-009**: Secret material MUST exist in the database only as vault-encrypted rows carrying
+  purpose, algorithm, and version metadata. Plaintext secret columns and secret values in logs are
+  forbidden.
+- **DATA-010**: Database rows MUST map one-to-one onto the validated protocol records
+  (`SessionProfileRecord`, `EncryptedSecret`, `AiConnectionRecord`, `EnvironmentRecord`). Runtime
+  schema validation remains at every IPC boundary independent of storage validation.
+- **DATA-011**: Settings, UI state, known hosts, AI history Markdown, user themes, and logs remain in
+  their documented versioned file stores. Moving one of these artifacts into the database requires a
+  recorded architecture decision.
 
 ## 20. Electron security boundary
 
@@ -576,7 +557,7 @@ commits.
 - **SEC-003**: Every IPC request, response, event, and MessagePort message MUST be runtime-validated
   at the trust boundary in addition to TypeScript checking.
 - **SEC-004**: The renderer MUST never access PTY handles, SSH sockets, SFTP handles, filesystem APIs,
-  network credentials, or decrypted secrets.
+  the SQLite database, network credentials, or decrypted secrets.
 - **SEC-005**: Navigation, new windows, downloads, permissions, and external URLs MUST be denied by
   default and handled through allowlisted schemes and explicit application actions.
 - **SEC-006**: External URLs MUST be limited to `https:` unless a specific local-development flow
@@ -586,8 +567,8 @@ commits.
   operation.
 - **SEC-008**: Production renderer reload/navigation MUST be blocked except through controlled app
   recovery. Renderer crashes MUST produce a defined session cleanup or reattachment outcome.
-- **SEC-009**: Dependency updates, especially Electron, Chromium, `node-pty`, xterm.js, and `ssh2`,
-  MUST be reviewed and package-smoke-tested as a compatibility set.
+- **SEC-009**: Dependency updates, especially Electron, Chromium, `node-pty`, `better-sqlite3`,
+  xterm.js, and `ssh2`, MUST be reviewed and package-smoke-tested as a compatibility set.
 
 ## 21. Diagnostics and privacy
 
@@ -612,11 +593,12 @@ commits.
   streaming.
 - **REL-003**: PTY, SSH, SFTP, AI, persistence, and parser failures MUST be isolated by subsystem.
 - **REL-004**: Closing a window or quitting MUST dispose sessions, transfers, network requests,
-  subscriptions, timers, workers, and native handles without hanging the process.
+  subscriptions, timers, workers, native handles, and the database connection without hanging the
+  process.
 - **REL-005**: Suspend/resume, network loss, display-scale change, and WebGL context loss MUST reach a
   recoverable or clearly terminal state.
-- **REL-006**: Packaged applications MUST load the rebuilt `node-pty` native module on every supported
-  platform. A development-only success is insufficient.
+- **REL-006**: Packaged applications MUST load every rebuilt native module (`node-pty`,
+  `better-sqlite3`) on every supported platform. A development-only success is insufficient.
 - **REL-007**: Large terminal output, long scrollback, rapid resize, CJK/emoji, alternate-screen
   tools, and simultaneous SFTP or AI work MUST be included in release regression tests.
 
@@ -648,8 +630,8 @@ At minimum, automated tests MUST cover:
   usage, continuation, and error classification;
 - Bash-family and PowerShell command fixtures, incomplete streaming fences, comments, prompt
   stripping, and conservative fallback;
-- settings, UI state, profile, vault, history, and schema migrations;
-- import of a sanitized legacy fixture for every supported old schema.
+- settings, UI state, database repositories, schema migrations, vault, history, and corruption
+  quarantine.
 
 ### 24.2 Integration and end-to-end tests
 
@@ -661,31 +643,32 @@ The suite MUST exercise:
 - main/preload/renderer request and stream boundaries;
 - Insert sending no Enter and Run sending exactly one submission to the validated target;
 - tab switching and closing while data, AI, or transfers are in flight;
-- vault create/unlock/lock/change-password/auto-unlock and legacy import;
-- packaged-app launch and `node-pty` loading;
+- vault create/unlock/lock/change-password/auto-unlock;
+- transactional database mutations, migration, and corruption recovery;
+- packaged-app launch and native module loading;
 - IME, high DPI, multiple displays, alternate-screen applications, and WebGL fallback through a
   documented manual matrix where automation is insufficient.
 
 ### 24.3 Traceability
 
-Every normative requirement ID MUST appear in a parity matrix with implementation owner, automated
-test or manual procedure, evidence, and status. A feature is not complete merely because a module
-with a matching name exists.
+Every normative requirement ID MUST appear in a requirements matrix with implementation owner,
+automated test or manual procedure, evidence, and status. A feature is not complete merely because a
+module with a matching name exists.
 
-## 25. Replacement release definition of done
+## 25. Initial release definition of done
 
-Geared Term may replace Augur Term only when:
+Geared Term's initial release is complete only when:
 
 1. every MUST requirement is implemented or explicitly waived in a recorded product decision;
-2. the complete reference feature inventory has a closed mapping with evidence;
+2. every requirement group has closed requirements-matrix rows with owners and evidence;
 3. local, WSL, SSH, SFTP, vault, environment, AI, history, and command-action acceptance suites pass;
 4. Insert never submits and Run cannot operate on an incomplete or stale candidate;
-5. saved credentials and imported secrets remain outside the renderer and plaintext storage;
+5. stored credentials remain outside the renderer and outside plaintext storage;
 6. unknown and changed SSH host keys fail closed without explicit approval;
-7. supported packaged artifacts launch and pass PTY, SSH, and settings smoke tests;
+7. supported packaged artifacts launch and pass PTY, SSH, database, and settings smoke tests;
 8. shortcuts, focus, IME, Unicode, alternate screen, scaling, and panel layout complete manual
    regression;
-9. the importer is non-destructive, idempotent, and verified against sanitized legacy fixtures;
+9. the SQLite storage layer passes transaction, migration, rotation, and corruption-recovery suites;
 10. no direct LLM web-page integration has been coupled into the terminal or API AI core;
-11. known parity gaps are empty, or each has an explicit owner, user-visible limitation, and approved
-    release waiver.
+11. known requirement gaps are empty, or each has an explicit owner, user-visible limitation, and
+    approved release waiver.
