@@ -11,6 +11,7 @@ import {
   EmptyRequestSchema,
   ProfileIdRequestSchema,
   SessionProfileRecordSchema,
+  SettingsRecordSchema,
   SshProfileTerminalRequestSchema,
   UiStateRecordSchema,
   VaultPasswordRequestSchema,
@@ -196,6 +197,11 @@ function registerIpc(): void {
   ipcMain.handle('ui:save-state', async (_event, input: unknown) => {
     const nextState = UiStateRecordSchema.parse(input);
     return UiStateRecordSchema.parse(await storage.saveUiState(nextState));
+  });
+  ipcMain.handle('settings:get', () => SettingsRecordSchema.parse(storage.settingsSnapshot()));
+  ipcMain.handle('settings:save', async (_event, input: unknown) => {
+    const settings = SettingsRecordSchema.parse(input);
+    return SettingsRecordSchema.parse(await storage.saveSettings(settings));
   });
   ipcMain.handle('wsl:list', async () => WslDistributionSchema.array().parse(await discoverWsl()));
   ipcMain.handle('ai:list', () =>

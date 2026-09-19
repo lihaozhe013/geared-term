@@ -34,6 +34,12 @@ describe('application storage', () => {
       sidebarCollapsed: true,
       bounds: { x: 10, y: 20, width: 1200, height: 800 }
     });
+    await storage.saveSettings({
+      ...storage.settingsSnapshot(),
+      language: 'zh-CN',
+      terminalFontSize: 16,
+      terminalCursor: 'bar'
+    });
 
     const reloaded = new AppStorage(directory, testLogger());
     await reloaded.load();
@@ -41,6 +47,9 @@ describe('application storage', () => {
     expect(reloaded.profileSnapshot()[0]?.name).toBe('Development shell');
     expect(reloaded.uiStateSnapshot().sidebarCollapsed).toBe(true);
     expect(reloaded.uiStateSnapshot().bounds?.width).toBe(1200);
+    expect(reloaded.settingsSnapshot().language).toBe('zh-CN');
+    expect(reloaded.settingsSnapshot().terminalFontSize).toBe(16);
+    expect(reloaded.settingsSnapshot().terminalCursor).toBe('bar');
 
     await reloaded.deleteProfile('local-dev');
     expect(reloaded.profileSnapshot()).toEqual([]);

@@ -85,6 +85,20 @@ export const UiStateRecordSchema = z
   })
   .strict();
 
+export const SettingsRecordSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    language: z.enum(['en-US', 'zh-CN', 'system']),
+    theme: z.string().min(1).max(160),
+    terminalFontSize: z.number().min(8).max(32),
+    terminalLineHeight: z.number().min(1).max(2),
+    terminalCursor: z.enum(['block', 'underline', 'bar']),
+    defaultTerm: z.enum(['xterm-256color', 'xterm', 'vt520', 'linux', 'screen']),
+    splitCommandPresentation: z.boolean(),
+    terminalContextPrecedingLines: z.number().int().min(0).max(2000)
+  })
+  .strict();
+
 export const WslDistributionSchema = z.object({
   name: z.string().min(1).max(256),
   isDefault: z.boolean(),
@@ -269,6 +283,7 @@ export type VaultPasswordRequest = z.infer<typeof VaultPasswordRequestSchema>;
 export type VaultStatus = z.infer<typeof VaultStatusSchema>;
 export type SessionProfileRecord = z.infer<typeof SessionProfileRecordSchema>;
 export type UiStateRecord = z.infer<typeof UiStateRecordSchema>;
+export type SettingsRecord = z.infer<typeof SettingsRecordSchema>;
 export type WslDistribution = z.infer<typeof WslDistributionSchema>;
 export type AiConnectionRecord = z.infer<typeof AiConnectionRecordSchema>;
 export type AiConnectionInput = z.infer<typeof AiConnectionInputSchema>;

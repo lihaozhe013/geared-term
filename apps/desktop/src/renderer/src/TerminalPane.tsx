@@ -7,6 +7,7 @@ import {
   type LocalTerminalRequest,
   type SshProfileTerminalRequest,
   type SshTerminalRequest,
+  type SettingsRecord,
   type TerminalPortMessage
 } from '@geared-term/protocol';
 
@@ -18,6 +19,7 @@ type TerminalClient =
 
 type TerminalPaneProps = {
   request: TerminalRequest;
+  settings: SettingsRecord;
   active: boolean;
   onState: (state: TerminalPortMessage & { kind: 'state' }) => void;
   onHostKeyPrompt: (
@@ -34,8 +36,19 @@ function isSavedSshRequest(request: TerminalRequest): request is SshProfileTermi
   return 'profileId' in request;
 }
 
+function terminalTheme(theme: string): { background: string; foreground: string; cursor: string } {
+  if (theme === 'Light') {
+    return { background: '#f6f8fb', foreground: '#1d2633', cursor: '#245c69' };
+  }
+  if (theme === 'Midnight') {
+    return { background: '#070b12', foreground: '#dce7f7', cursor: '#9fe6d5' };
+  }
+  return { background: '#0d1117', foreground: '#d7deea', cursor: '#9fe6d5' };
+}
+
 export function TerminalPane({
   request,
+  settings,
   active,
   onState,
   onHostKeyPrompt
@@ -58,9 +71,11 @@ export function TerminalPane({
     const terminal = new Terminal({
       cursorBlink: true,
       fontFamily: '"Cascadia Code", "SFMono-Regular", Consolas, monospace',
-      fontSize: 14,
+      fontSize: settings.terminalFontSize,
+      lineHeight: settings.terminalLineHeight,
+      cursorStyle: settings.terminalCursor,
       scrollback: 10_000,
-      theme: { background: '#0d1117', foreground: '#d7deea', cursor: '#9fe6d5' }
+      theme: terminalTheme(settings.theme)
     });
     const fit = new FitAddon();
     terminal.loadAddon(fit);
@@ -144,6 +159,16 @@ export function TerminalPane({
       clientRef.current = null;
     };
   }, [request]);
+
+  useEffect(() => {
+    const terminal = terminalRef.current;
+    if (!terminal) return;
+    terminal.options.fontSize = settings.terminalFontSize;
+    terminal.options.lineHeight = settings.terminalLineHeight;
+    terminal.options.cursorStyle = settings.terminalCursor;
+    terminal.options.theme = terminalTheme(settings.theme);
+    fitRef.current?.fit();
+  }, [settings]);
 
   useEffect(() => {
     if (!active) return;

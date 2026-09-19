@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
   AiConnectionRecordSchema,
   SessionProfileRecordSchema,
+  SettingsRecordSchema,
   UiStateRecordSchema
 } from '@geared-term/protocol';
 
@@ -9,17 +10,7 @@ export const settingsSchemaVersion = 1;
 export const profileSchemaVersion = 1;
 export const uiStateSchemaVersion = 1;
 
-export const SettingsSchema = z.object({
-  schemaVersion: z.literal(settingsSchemaVersion),
-  language: z.enum(['en-US', 'zh-CN', 'system']),
-  theme: z.string().min(1).max(160),
-  terminalFontSize: z.number().min(8).max(32),
-  terminalLineHeight: z.number().min(1).max(2),
-  terminalCursor: z.enum(['block', 'underline', 'bar']),
-  defaultTerm: z.enum(['xterm-256color', 'xterm', 'vt520', 'linux', 'screen']),
-  splitCommandPresentation: z.boolean(),
-  terminalContextPrecedingLines: z.number().int().min(0).max(2000)
-});
+export const SettingsSchema = SettingsRecordSchema;
 
 export const UiStateSchema = UiStateRecordSchema;
 

@@ -10,6 +10,7 @@ import {
   LocalTerminalRequestSchema,
   ProfileIdRequestSchema,
   SessionProfileRecordSchema,
+  SettingsRecordSchema,
   SshProfileTerminalRequestSchema,
   SshTerminalRequestSchema,
   VaultPasswordRequestSchema,
@@ -22,6 +23,7 @@ import {
   type AiConnectionInput,
   type AiStreamRequest,
   type SessionProfileRecord,
+  type SettingsRecord,
   type SshProfileTerminalRequest,
   type SshTerminalRequest,
   type UiStateRecord,
@@ -170,6 +172,11 @@ const api = Object.freeze({
   saveUiState: async (input: UiStateRecord) => {
     const state = UiStateRecordSchema.parse(input);
     return UiStateRecordSchema.parse(await ipcRenderer.invoke('ui:save-state', state));
+  },
+  getSettings: async () => SettingsRecordSchema.parse(await ipcRenderer.invoke('settings:get')),
+  saveSettings: async (input: SettingsRecord) => {
+    const settings = SettingsRecordSchema.parse(input);
+    return SettingsRecordSchema.parse(await ipcRenderer.invoke('settings:save', settings));
   },
   discoverWsl: async (): Promise<WslDistribution[]> =>
     WslDistributionSchema.array().parse(await ipcRenderer.invoke('wsl:list'))

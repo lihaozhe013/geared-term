@@ -7,6 +7,7 @@ import type {
   AiConnectionRecord,
   LocalTerminalRequest,
   SessionProfileRecord,
+  SettingsRecord,
   SshProfileTerminalRequest,
   SshTerminalRequest,
   AiStreamRequest,
@@ -70,6 +71,8 @@ declare global {
       deleteProfile: (id: string) => Promise<SessionProfileRecord[]>;
       getUiState: () => Promise<UiStateRecord>;
       saveUiState: (input: UiStateRecord) => Promise<UiStateRecord>;
+      getSettings: () => Promise<SettingsRecord>;
+      saveSettings: (input: SettingsRecord) => Promise<SettingsRecord>;
       discoverWsl: () => Promise<WslDistribution[]>;
     };
   }

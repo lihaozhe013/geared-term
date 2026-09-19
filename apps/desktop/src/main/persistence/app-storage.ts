@@ -35,6 +35,7 @@ export class AppStorage {
   public readonly vaultState: VersionedJsonStore<VaultState>;
   public vault: Vault;
   private vaultStateSnapshot: VaultState;
+  private settingsValue: Settings = defaultSettings;
   private profileValue: Profile = defaultProfile;
   private uiStateValue: UiState = defaultUiState;
 
@@ -79,6 +80,7 @@ export class AppStorage {
       this.vaultState.load()
     ]);
     this.vaultStateSnapshot = vaultState.value;
+    this.settingsValue = settings.value;
     this.profileValue = profile.value;
     this.uiStateValue = uiState.value;
     this.vault = new Vault(vaultState.value.metadata as VaultMetadata);
@@ -96,6 +98,16 @@ export class AppStorage {
         vault: vaultState.source
       });
     }
+  }
+
+  public settingsSnapshot(): Settings {
+    return { ...this.settingsValue };
+  }
+
+  public async saveSettings(value: Settings): Promise<Settings> {
+    this.settingsValue = SettingsSchema.parse(value);
+    await this.settings.save(this.settingsValue);
+    return this.settingsSnapshot();
   }
 
   public async initializeVault(password: string): Promise<void> {

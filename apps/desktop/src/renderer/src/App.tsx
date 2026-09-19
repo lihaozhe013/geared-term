@@ -4,11 +4,13 @@ import type {
   SessionProfileRecord,
   SshProfileTerminalRequest,
   SshTerminalRequest,
+  SettingsRecord,
   TerminalPortMessage,
   UiStateRecord,
   WslDistribution
 } from '@geared-term/protocol';
 import { AssistantPanel } from './AssistantPanel';
+import { SettingsPanel } from './SettingsPanel';
 import { TerminalPane } from './TerminalPane';
 
 type AppInfo = Awaited<ReturnType<Window['geared']['getAppInfo']>>;
@@ -22,6 +24,18 @@ type TerminalTab = {
   status: TabStatus;
 };
 
+const defaultSettings: SettingsRecord = {
+  schemaVersion: 1,
+  language: 'system',
+  theme: 'Augur Dark+',
+  terminalFontSize: 14,
+  terminalLineHeight: 1.2,
+  terminalCursor: 'block',
+  defaultTerm: 'xterm-256color',
+  splitCommandPresentation: false,
+  terminalContextPrecedingLines: 100
+};
+
 const defaultUiState: UiStateRecord = {
   schemaVersion: 1,
   maximized: false,
@@ -31,7 +45,9 @@ const defaultUiState: UiStateRecord = {
   splitRatio: 0.7
 };
 
-function createLocalTab(): TerminalTab {
+function createLocalTab(
+  term: LocalTerminalRequest['term'] = defaultSettings.defaultTerm
+): TerminalTab {
   const id = crypto.randomUUID();
   return {
     id,
@@ -42,7 +58,7 @@ function createLocalTab(): TerminalTab {
       args: [],
       cols: 80,
       rows: 24,
-      term: 'xterm-256color'
+      term
     }
   };
 }
@@ -104,23 +120,27 @@ function statusLabel(status: TabStatus): string {
 export function App(): React.JSX.Element {
   const [info, setInfo] = useState<AppInfo | null>(null);
   const [profiles, setProfiles] = useState<SessionProfileRecord[]>([]);
+  const [settings, setSettings] = useState<SettingsRecord>(defaultSettings);
   const [uiState, setUiState] = useState<UiStateRecord>(defaultUiState);
   const [wslDistributions, setWslDistributions] = useState<WslDistribution[]>([]);
   const [wslLoading, setWslLoading] = useState(false);
   const [tabs, setTabs] = useState<TerminalTab[]>(() => [createLocalTab()]);
   const [activeTabId, setActiveTabId] = useState<string | null>(() => tabs[0]?.id ?? null);
   const [error, setError] = useState<string | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
     void Promise.all([
       window.geared.getAppInfo(),
       window.geared.listProfiles(),
-      window.geared.getUiState()
+      window.geared.getUiState(),
+      window.geared.getSettings()
     ])
-      .then(([appInfo, savedProfiles, savedUiState]) => {
+      .then(([appInfo, savedProfiles, savedUiState, savedSettings]) => {
         setInfo(appInfo);
         setProfiles(savedProfiles);
         setUiState(savedUiState);
+        setSettings(savedSettings);
       })
       .catch((reason: unknown) =>
         setError(reason instanceof Error ? reason.message : 'Unable to read application state')
@@ -144,11 +164,11 @@ export function App(): React.JSX.Element {
   }, [discoverWsl, info?.platform]);
 
   const addLocalTab = useCallback((): void => {
-    const tab = createLocalTab();
+    const tab = createLocalTab(settings.defaultTerm);
     setTabs((current) => [...current, tab]);
     setActiveTabId(tab.id);
     setError(null);
-  }, []);
+  }, [settings.defaultTerm]);
 
   const closeTab = useCallback((id: string): void => {
     setTabs((current) => {
@@ -226,6 +246,16 @@ export function App(): React.JSX.Element {
       setError(reason instanceof Error ? reason.message : 'Unable to save UI state');
     });
   }, [uiState]);
+
+  const saveSettings = useCallback(async (nextSettings: SettingsRecord): Promise<void> => {
+    try {
+      setSettings(await window.geared.saveSettings(nextSettings));
+      setError(null);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Unable to save settings');
+      throw reason;
+    }
+  }, []);
 
   const handleState = useCallback(
     (tabId: string, message: TerminalPortMessage & { kind: 'state' }): void => {
@@ -348,7 +378,7 @@ export function App(): React.JSX.Element {
                         args: ['--distribution', distribution.name, '--cd', '~'],
                         cols: 80,
                         rows: 24,
-                        term: 'xterm-256color'
+                        term: settings.defaultTerm
                       };
                       const tab: TerminalTab = {
                         id: request.sessionId,
@@ -443,6 +473,14 @@ export function App(): React.JSX.Element {
             >
               {uiState.rightPanel === 'assistant' ? 'Hide assistant' : 'Assistant'}
             </button>
+            <button
+              type="button"
+              className="toolbar-button"
+              onClick={() => setShowSettings(true)}
+              aria-haspopup="dialog"
+            >
+              Settings
+            </button>
             <span className="toolbar-chip">Renderer isolated</span>
           </div>
           <div className="terminal-surface">
@@ -450,6 +488,7 @@ export function App(): React.JSX.Element {
               <TerminalPane
                 key={tab.id}
                 request={tab.request}
+                settings={settings}
                 active={tab.id === activeTab?.id}
                 onState={(message) => handleState(tab.id, message)}
                 onHostKeyPrompt={handleHostKeyPrompt}
@@ -465,6 +504,14 @@ export function App(): React.JSX.Element {
         </section>
         {uiState.rightPanel === 'assistant' ? <AssistantPanel /> : null}
       </section>
+
+      {showSettings ? (
+        <SettingsPanel
+          settings={settings}
+          onSave={saveSettings}
+          onClose={() => setShowSettings(false)}
+        />
+      ) : null}
 
       <footer className="statusbar">
         <span>Secure context bridge</span>
