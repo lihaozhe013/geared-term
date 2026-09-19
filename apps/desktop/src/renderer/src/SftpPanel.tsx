@@ -628,6 +628,7 @@ export function SftpPanel({
                 void refreshLocal(localDirectory ? localDirname(localDirectory) : null)
               }
               disabled={!localDirectory}
+              title={localDirectory ? 'Parent folder' : 'Open a folder first to go up'}
             >
               Parent
             </button>

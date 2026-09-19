@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useModalFocus } from './useModalFocus';
 import type { SessionProfileRecord, VaultStatus, AutoUnlockStatus } from '@geared-term/protocol';
 
 type ProfileEditorProps = {
@@ -72,6 +73,7 @@ export function ProfileEditor({
   const [autoUnlock, setAutoUnlock] = useState<AutoUnlockStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { containerRef } = useModalFocus<HTMLFormElement>();
 
   const isSsh = draft.kind === 'ssh';
   const savedCredentialLabels = useMemo(() => {
@@ -222,7 +224,14 @@ export function ProfileEditor({
 
   return (
     <div className="settings-backdrop" role="presentation">
-      <form className="settings-panel profile-editor" onSubmit={(event) => void save(event)}>
+      <form
+        ref={containerRef}
+        className="settings-panel profile-editor"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Session profile editor"
+        onSubmit={(event) => void save(event)}
+      >
         <div className="settings-header">
           <div>
             <p className="section-label">Session profile</p>
@@ -232,6 +241,7 @@ export function ProfileEditor({
             type="button"
             className="icon-button"
             onClick={onClose}
+            data-modal-cancel
             aria-label="Close profile editor"
           >
             ×
@@ -500,7 +510,13 @@ export function ProfileEditor({
         </div>
 
         <div className="settings-actions">
-          <button type="button" className="toolbar-button" onClick={onClose} disabled={busy}>
+          <button
+            type="button"
+            className="toolbar-button"
+            onClick={onClose}
+            data-modal-cancel
+            disabled={busy}
+          >
             Cancel
           </button>
           <button

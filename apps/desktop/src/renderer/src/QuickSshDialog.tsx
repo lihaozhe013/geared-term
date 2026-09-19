@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { SshTerminalRequest } from '@geared-term/protocol';
+import { useModalFocus } from './useModalFocus';
 
 type QuickSshDialogProps = {
   defaultTerm: SshTerminalRequest['term'];
@@ -24,6 +25,7 @@ export function QuickSshDialog({
   const [passphrase, setPassphrase] = useState('');
   const [term, setTerm] = useState(defaultTerm);
   const [error, setError] = useState<string | null>(null);
+  const { containerRef } = useModalFocus<HTMLFormElement>();
 
   const connect = (event: React.FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
@@ -56,16 +58,24 @@ export function QuickSshDialog({
 
   return (
     <div className="settings-backdrop" role="presentation">
-      <form className="settings-panel profile-editor quick-ssh-dialog" onSubmit={connect}>
+      <form
+        ref={containerRef}
+        className="settings-panel profile-editor quick-ssh-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="quick-ssh-title"
+        onSubmit={connect}
+      >
         <div className="settings-header">
           <div>
             <p className="section-label">Temporary connection</p>
-            <h2>Connect with SSH</h2>
+            <h2 id="quick-ssh-title">Connect with SSH</h2>
           </div>
           <button
             type="button"
             className="icon-button"
             onClick={onClose}
+            data-modal-cancel
             aria-label="Close SSH dialog"
           >
             ×

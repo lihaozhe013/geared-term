@@ -7,6 +7,7 @@ import type {
   SettingsRecord,
   TerminalFontFallbackEntry
 } from '@geared-term/protocol';
+import { useModalFocus } from './useModalFocus';
 import { settingsLocale, translate } from './i18n';
 
 type SettingsPanelProps = {
@@ -39,6 +40,7 @@ export function SettingsPanel({
     terminalFontFallbacks: settings.terminalFontFallbacks.map((entry) => ({ ...entry }))
   }));
   const [saving, setSaving] = useState(false);
+  const { containerRef } = useModalFocus<HTMLFormElement>();
   const locale = settingsLocale(draft.language);
   const t = (key: Parameters<typeof translate>[1]): string => translate(draft.language, key);
 
@@ -89,6 +91,7 @@ export function SettingsPanel({
   return (
     <div className="settings-backdrop" role="presentation" onMouseDown={onClose}>
       <form
+        ref={containerRef}
         className="settings-panel"
         role="dialog"
         aria-modal="true"
@@ -473,7 +476,7 @@ export function SettingsPanel({
           </section>
         </div>
         <div className="settings-actions">
-          <button type="button" className="toolbar-button" onClick={onClose}>
+          <button type="button" className="toolbar-button" data-modal-cancel onClick={onClose}>
             {locale === 'zh-CN' ? '取消' : 'Cancel'}
           </button>
           <button type="submit" className="primary-button settings-save" disabled={saving}>

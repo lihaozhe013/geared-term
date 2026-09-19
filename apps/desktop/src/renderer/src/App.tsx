@@ -762,7 +762,11 @@ export function App(): React.JSX.Element {
                 bridge: {info.name} {info.version} ({info.platform})
               </p>
             ) : null}
-            {error ? <p className="terminal-line error">{error}</p> : null}
+            {error ? (
+              <p className="terminal-line error" role="alert">
+                {error}
+              </p>
+            ) : null}
           </div>
         </section>
         {uiState.rightPanel === 'assistant' ? (
