@@ -13,7 +13,14 @@ import type {
   VaultStatus,
   WslDistribution
 } from '@geared-term/protocol';
-import { Bot, FolderSync, Lock, PanelRightClose, SquareTerminal } from 'lucide-react';
+import {
+  Bot,
+  FolderSync,
+  Lock,
+  PanelRightClose,
+  PanelRightOpen,
+  SquareTerminal
+} from 'lucide-react';
 import { applyPalette, resolvePalette } from './themes';
 import { AssistantPanel } from './AssistantPanel';
 import { EnvironmentPanel } from './EnvironmentPanel';
@@ -325,7 +332,8 @@ export function App(): React.JSX.Element {
   const toggleAssistant = useCallback((): void => {
     const next: UiStateRecord = {
       ...uiState,
-      rightPanel: uiState.rightPanel === 'assistant' ? null : 'assistant'
+      rightPanel: 'assistant',
+      rightPanelCollapsed: uiState.rightPanel === 'assistant' && !uiState.rightPanelCollapsed
     };
     setUiState(next);
     void window.geared.saveUiState(next).catch((reason: unknown) => {
@@ -371,7 +379,8 @@ export function App(): React.JSX.Element {
     }
     const next: UiStateRecord = {
       ...uiState,
-      rightPanel: uiState.rightPanel === 'sftp' ? null : 'sftp'
+      rightPanel: 'sftp',
+      rightPanelCollapsed: uiState.rightPanel === 'sftp' && !uiState.rightPanelCollapsed
     };
     setUiState(next);
     void window.geared.saveUiState(next).catch((reason: unknown) => {
@@ -387,7 +396,8 @@ export function App(): React.JSX.Element {
     }
     const next: UiStateRecord = {
       ...uiState,
-      rightPanel: uiState.rightPanel === 'environment' ? null : 'environment'
+      rightPanel: 'environment',
+      rightPanelCollapsed: uiState.rightPanel === 'environment' && !uiState.rightPanelCollapsed
     };
     setUiState(next);
     void window.geared.saveUiState(next).catch((reason: unknown) => {
@@ -457,7 +467,8 @@ export function App(): React.JSX.Element {
         const next = order[(index + 1) % order.length] as 'assistant' | 'sftp' | 'environment';
         const nextState: UiStateRecord = {
           ...handlers.uiState,
-          rightPanel: handlers.uiState.rightPanel === next ? null : next
+          rightPanel: next,
+          rightPanelCollapsed: false
         };
         handlers.setUiState(nextState);
         void window.geared.saveUiState(nextState).catch(() => undefined);
@@ -517,7 +528,7 @@ export function App(): React.JSX.Element {
 
       <section
         className={`workspace ${uiState.sidebarCollapsed ? 'sidebar-collapsed' : ''} ${
-          uiState.rightPanel ? 'with-panel' : ''
+          uiState.rightPanel && !uiState.rightPanelCollapsed ? 'with-panel' : ''
         }`}
         aria-label="Workspace"
       >
@@ -754,7 +765,7 @@ export function App(): React.JSX.Element {
             ) : null}
           </div>
         </section>
-        {uiState.rightPanel ? (
+        {uiState.rightPanel && !uiState.rightPanelCollapsed ? (
           <div className="right-panel">
             <div className="right-panel-switcher" role="tablist" aria-label="Right panel">
               <button
@@ -801,7 +812,7 @@ export function App(): React.JSX.Element {
                 aria-label="Collapse panel"
                 title="Collapse panel"
                 onClick={() => {
-                  const next: UiStateRecord = { ...uiState, rightPanel: null };
+                  const next: UiStateRecord = { ...uiState, rightPanelCollapsed: true };
                   setUiState(next);
                   void window.geared.saveUiState(next).catch(() => undefined);
                 }}
@@ -847,6 +858,23 @@ export function App(): React.JSX.Element {
                 onClose={toggleEnvironment}
               />
             ) : null}
+          </div>
+        ) : null}
+        {uiState.rightPanel && uiState.rightPanelCollapsed ? (
+          <div className="right-panel-expand">
+            <button
+              type="button"
+              className="right-panel-expand-button"
+              aria-label="Expand panel"
+              title="Expand panel"
+              onClick={() => {
+                const next: UiStateRecord = { ...uiState, rightPanelCollapsed: false };
+                setUiState(next);
+                void window.geared.saveUiState(next).catch(() => undefined);
+              }}
+            >
+              <PanelRightOpen size={16} aria-hidden="true" />
+            </button>
           </div>
         ) : null}
       </section>
