@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto';
+import { existsSync } from 'node:fs';
+import { rename } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
   AiConnectionInputSchema,
@@ -8,11 +10,13 @@ import {
   type AiConnectionInput,
   type AiConnectionRecord,
   type EnvironmentRecord,
+  type SessionProfileRecord,
   type SshTerminalRequest
 } from '@geared-term/protocol';
 import type { Logger } from '../logging';
 import { createVaultMetadata, Vault, type VaultMetadata } from '../vault/vault';
 import { normalizeEndpoint } from '../ai/endpoint';
+import { ProfileDatabase, newSecretId } from './profile-database';
 import { VersionedJsonStore } from './json-store';
 import {
   defaultProfile,
@@ -24,6 +28,7 @@ import {
   SettingsSchema,
   UiStateSchema,
   VaultStateSchema,
+  type EncryptedSecret,
   type Profile,
   type SessionProfile,
   type Settings,
@@ -33,28 +38,23 @@ import {
 
 export class AppStorage {
   public readonly settings: VersionedJsonStore<Settings>;
-  public readonly profile: VersionedJsonStore<Profile>;
   public readonly uiState: VersionedJsonStore<UiState>;
   public readonly vaultState: VersionedJsonStore<VaultState>;
   public vault: Vault;
+  private readonly rootDirectory: string;
+  private readonly logger: Logger;
   private vaultStateSnapshot: VaultState;
   private settingsValue: Settings = defaultSettings;
-  private profileValue: Profile = defaultProfile;
   private uiStateValue: UiState = defaultUiState;
+  private profileDatabase: ProfileDatabase | undefined;
 
-  public constructor(
-    private readonly rootDirectory: string,
-    private readonly logger: Logger
-  ) {
+  public constructor(rootDirectory: string, logger: Logger) {
+    this.rootDirectory = rootDirectory;
+    this.logger = logger;
     this.settings = new VersionedJsonStore(
       join(rootDirectory, 'config.json'),
       SettingsSchema,
       defaultSettings
-    );
-    this.profile = new VersionedJsonStore(
-      join(rootDirectory, 'profile.json'),
-      ProfileSchema,
-      defaultProfile
     );
     this.uiState = new VersionedJsonStore(
       join(rootDirectory, 'ui-state.json'),
@@ -76,31 +76,101 @@ export class AppStorage {
   }
 
   public async load(): Promise<void> {
-    const [settings, profile, uiState, vaultState] = await Promise.all([
+    const [settings, uiState, vaultState] = await Promise.all([
       this.settings.load(),
-      this.profile.load(),
       this.uiState.load(),
       this.vaultState.load()
     ]);
     this.vaultStateSnapshot = vaultState.value;
     this.settingsValue = settings.value;
-    this.profileValue = profile.value;
     this.uiStateValue = uiState.value;
     this.vault = new Vault(vaultState.value.metadata as VaultMetadata);
     await Promise.all([
       settings.source === 'default' ? this.settings.save(settings.value) : Promise.resolve(),
-      profile.source === 'default' ? this.profile.save(profile.value) : Promise.resolve(),
       uiState.source === 'default' ? this.uiState.save(uiState.value) : Promise.resolve(),
       vaultState.source === 'default' ? this.vaultState.save(vaultState.value) : Promise.resolve()
     ]);
-    if (settings.recovered || profile.recovered || uiState.recovered || vaultState.recovered) {
+    if (settings.recovered || uiState.recovered || vaultState.recovered) {
       this.logger.warn('system', 'Application storage recovered', {
         settings: settings.source,
-        profile: profile.source,
         uiState: uiState.source,
         vault: vaultState.source
       });
     }
+    this.openProfileDatabase();
+    await this.adoptLegacyProfileFile();
+  }
+
+  private openProfileDatabase(): void {
+    try {
+      this.profileDatabase = new ProfileDatabase(this.rootDirectory, this.logger);
+    } catch (error) {
+      // Quarantined databases start empty rather than blocking startup; the
+      // quarantined copy stays on disk for diagnosis.
+      this.logger.error('system', 'Profile database unavailable, starting empty', {
+        error: String(error)
+      });
+      this.profileDatabase = new ProfileDatabase(this.rootDirectory, this.logger);
+    }
+  }
+
+  private async adoptLegacyProfileFile(): Promise<void> {
+    const database = this.requireDatabase();
+    const path = join(this.rootDirectory, 'profile.json');
+    if (!existsSync(path)) return;
+    const store = new VersionedJsonStore<Profile>(path, ProfileSchema, defaultProfile);
+    let result;
+    try {
+      result = await store.load();
+    } catch (error) {
+      this.logger.warn('system', 'profile.json adoption failed', { error: String(error) });
+      return;
+    }
+    if (result.source === 'default') return;
+    const profile = result.value;
+    const hasRows =
+      profile.sessions.length > 0 ||
+      profile.aiConnections.length > 0 ||
+      profile.environments.length > 0 ||
+      Object.keys(profile.secrets).length > 0;
+    const markMigrated = async () =>
+      rename(path, `${path}.migrated`).catch(() => undefined);
+    if (!hasRows) {
+      await markMigrated();
+      return;
+    }
+    if (database.listProfiles().length > 0) {
+      await markMigrated();
+      return;
+    }
+    database.transaction(() => {
+      for (const [id, secret] of Object.entries(profile.secrets)) {
+        database.putSecret(id, secret);
+      }
+      for (const environment of profile.environments) {
+        database.upsertEnvironment(environment, new Date().toISOString());
+      }
+      for (const session of profile.sessions) {
+        database.upsertProfile(session, new Date().toISOString());
+      }
+      for (const connection of profile.aiConnections) {
+        database.upsertAiConnection(connection, new Date().toISOString());
+      }
+      database.sweepUnreferencedSecrets();
+    });
+    await markMigrated();
+    this.logger.info('system', 'Adopted previous profile.json into the SQLite store', {
+      sessions: profile.sessions.length,
+      aiConnections: profile.aiConnections.length,
+      environments: profile.environments.length
+    });
+  }
+
+  private requireDatabase(): ProfileDatabase {
+    if (!this.profileDatabase) {
+      throw new Error('Storage has not been loaded');
+    }
+    return this.profileDatabase;
   }
 
   public settingsSnapshot(): Settings {
@@ -114,12 +184,11 @@ export class AppStorage {
   }
 
   public async initializeVault(password: string): Promise<void> {
-    const current = await this.vaultState.load();
-    if (current.value.verifier) {
+    if (this.vaultStateSnapshot.verifier) {
       throw new Error('Vault is already initialized');
     }
     this.vault.initialize(password);
-    this.vaultStateSnapshot = { ...current.value, verifier: this.vault.createVerifier() };
+    this.vaultStateSnapshot = { ...this.vaultStateSnapshot, verifier: this.vault.createVerifier() };
     await this.vaultState.save(this.vaultStateSnapshot);
   }
 
@@ -142,11 +211,9 @@ export class AppStorage {
   }
 
   public profileSnapshot(): SessionProfile[] {
-    return this.profileValue.sessions.map((profile) => ({
-      ...profile,
-      args: profile.args ? [...profile.args] : undefined,
-      secretRefs: profile.secretRefs ? { ...profile.secretRefs } : undefined
-    }));
+    return this.requireDatabase()
+      .listProfiles()
+      .map((profile) => this.copyProfile(profile));
   }
 
   public async saveProfile(profile: SessionProfile): Promise<SessionProfile[]> {
@@ -157,14 +224,13 @@ export class AppStorage {
     profile: SessionProfile,
     credentials?: ProfileCredentials
   ): Promise<SessionProfile[]> {
+    const database = this.requireDatabase();
     const parsedProfile = SessionProfileSchema.parse(profile);
-    const current = this.profileValue.sessions.find((item) => item.id === parsedProfile.id);
+    const current = database.getProfileRow(parsedProfile.id);
     if (current && current.kind !== parsedProfile.kind) {
       throw new Error('Session type cannot be changed after creation');
     }
-    let nextProfile = parsedProfile;
-    let secrets = { ...this.profileValue.secrets };
-    const replacedSecretRefs: string[] = Object.values(current?.secretRefs ?? {});
+    let nextProfile: SessionProfileRecord = parsedProfile;
 
     if (credentials && parsedProfile.kind !== 'ssh') {
       throw new Error('Credentials can only be saved for SSH profiles');
@@ -186,6 +252,8 @@ export class AppStorage {
       if (hasCredentialMutation && !this.vault.isUnlocked) {
         throw new Error('Vault is locked');
       }
+      const replacedSecretRefs: string[] = Object.values(current?.secretRefs ?? {});
+      const newSecrets: Array<[string, EncryptedSecret]> = [];
       for (const [key, purpose] of credentialEntries) {
         const value = credentials?.[key];
         if (value === undefined) continue;
@@ -193,8 +261,8 @@ export class AppStorage {
         if (previousRef) replacedSecretRefs.push(previousRef);
         delete secretRefs[key];
         if (value.length > 0) {
-          const id = randomUUID();
-          secrets[id] = this.vault.encrypt(`${purpose}:${parsedProfile.id}`, value);
+          const id = newSecretId();
+          newSecrets.push([id, this.vault.encrypt(`${purpose}:${parsedProfile.id}`, value)]);
           secretRefs[key] = id;
         }
       }
@@ -208,64 +276,53 @@ export class AppStorage {
         ...parsedProfile,
         secretRefs: Object.keys(secretRefs).length > 0 ? secretRefs : undefined
       };
+      const updatedAt = new Date().toISOString();
+      database.transaction(() => {
+        for (const [id, secret] of newSecrets) {
+          database.putSecret(id, secret);
+        }
+        database.upsertProfile(nextProfile, updatedAt);
+        database.sweepUnreferencedSecrets();
+      });
+      return this.profileSnapshot();
     }
 
-    const sessions = this.profileValue.sessions.filter((item) => item.id !== nextProfile.id);
-    sessions.push(nextProfile);
-    const retainedSecretRefs = this.collectSecretRefs(sessions);
-    for (const connection of this.profileValue.aiConnections) {
-      if (connection.apiKeyRef) retainedSecretRefs.add(connection.apiKeyRef);
-    }
-    for (const id of replacedSecretRefs) {
-      if (!retainedSecretRefs.has(id)) delete secrets[id];
-    }
-    this.profileValue = ProfileSchema.parse({ ...this.profileValue, sessions, secrets });
-    await this.profile.save(this.profileValue);
+    database.transaction(() => {
+      database.upsertProfile(nextProfile, new Date().toISOString());
+      database.sweepUnreferencedSecrets();
+    });
     return this.profileSnapshot();
   }
 
   public environmentSnapshot(): EnvironmentRecord[] {
-    return this.profileValue.environments.map((environment) => ({
-      ...environment,
-      facts: { ...environment.facts }
-    }));
+    return this.requireDatabase()
+      .listEnvironments()
+      .map((environment) => ({ ...environment, facts: { ...environment.facts } }));
   }
 
   public async saveEnvironment(environment: EnvironmentRecord): Promise<EnvironmentRecord[]> {
+    const database = this.requireDatabase();
     const nextEnvironment = EnvironmentSchema.parse(environment);
-    const environments = this.profileValue.environments.filter(
-      (item) => item.id !== nextEnvironment.id
-    );
-    environments.push(nextEnvironment);
-    this.profileValue = ProfileSchema.parse({ ...this.profileValue, environments });
-    await this.profile.save(this.profileValue);
+    database.transaction(() => {
+      database.upsertEnvironment(nextEnvironment, new Date().toISOString());
+    });
     return this.environmentSnapshot();
   }
 
   public async deleteEnvironment(id: string): Promise<EnvironmentRecord[]> {
-    const environments = this.profileValue.environments.filter((item) => item.id !== id);
-    if (environments.length !== this.profileValue.environments.length) {
-      this.profileValue = ProfileSchema.parse({ ...this.profileValue, environments });
-      await this.profile.save(this.profileValue);
-    }
+    const database = this.requireDatabase();
+    database.transaction(() => {
+      database.deleteEnvironment(id);
+    });
     return this.environmentSnapshot();
   }
 
   public async deleteProfile(id: string): Promise<SessionProfile[]> {
-    const removed = this.profileValue.sessions.find((item) => item.id === id);
-    const sessions = this.profileValue.sessions.filter((item) => item.id !== id);
-    if (sessions.length !== this.profileValue.sessions.length) {
-      const secrets = { ...this.profileValue.secrets };
-      const retainedSecretRefs = this.collectSecretRefs(sessions);
-      for (const connection of this.profileValue.aiConnections) {
-        if (connection.apiKeyRef) retainedSecretRefs.add(connection.apiKeyRef);
-      }
-      for (const idToRemove of Object.values(removed?.secretRefs ?? {})) {
-        if (!retainedSecretRefs.has(idToRemove)) delete secrets[idToRemove];
-      }
-      this.profileValue = ProfileSchema.parse({ ...this.profileValue, sessions, secrets });
-      await this.profile.save(this.profileValue);
-    }
+    const database = this.requireDatabase();
+    database.transaction(() => {
+      database.deleteProfile(id);
+      database.sweepUnreferencedSecrets();
+    });
     return this.profileSnapshot();
   }
 
@@ -285,21 +342,16 @@ export class AppStorage {
   public async saveSecret(purpose: string, value: string): Promise<string> {
     if (!this.vault.isUnlocked) throw new Error('Vault is locked');
     const id = randomUUID();
-    const secret = this.vault.encrypt(purpose, value);
-    this.profileValue = ProfileSchema.parse({
-      ...this.profileValue,
-      secrets: { ...this.profileValue.secrets, [id]: secret }
-    });
-    await this.profile.save(this.profileValue);
+    this.requireDatabase().putSecret(id, this.vault.encrypt(purpose, value));
     return id;
   }
 
   public async deleteSecret(id: string): Promise<void> {
-    if (!Object.hasOwn(this.profileValue.secrets, id)) return;
-    const secrets = { ...this.profileValue.secrets };
-    delete secrets[id];
-    this.profileValue = ProfileSchema.parse({ ...this.profileValue, secrets });
-    await this.profile.save(this.profileValue);
+    const database = this.requireDatabase();
+    database.transaction(() => {
+      database.deleteSecret(id);
+      database.sweepUnreferencedSecrets();
+    });
   }
 
   public resolveSshProfile(
@@ -308,7 +360,7 @@ export class AppStorage {
     cols: number,
     rows: number
   ): SshTerminalRequest {
-    const profile = this.profileValue.sessions.find((item) => item.id === profileId);
+    const profile = this.requireDatabase().getProfileRow(profileId);
     if (!profile || profile.kind !== 'ssh' || !profile.host || !profile.user) {
       throw new Error('SSH profile is missing its connection target');
     }
@@ -331,26 +383,27 @@ export class AppStorage {
   }
 
   public aiConnectionsSnapshot(): AiConnectionRecord[] {
-    return this.profileValue.aiConnections.map((connection) => ({
-      ...connection,
-      models: [...connection.models]
-    }));
+    return this.requireDatabase()
+      .listAiConnections()
+      .map((connection) => ({ ...connection, models: [...connection.models] }));
   }
 
   public async saveAiConnection(rawInput: AiConnectionInput): Promise<AiConnectionRecord[]> {
+    const database = this.requireDatabase();
     const input = AiConnectionInputSchema.parse(rawInput);
     const endpoint = normalizeEndpoint(input.baseUrl, input.protocol);
     const id = input.id ?? randomUUID();
-    const current = this.profileValue.aiConnections.find((connection) => connection.id === id);
-    let apiKeyRef = current?.apiKeyRef;
-    if (input.apiKey !== undefined) {
-      if (input.apiKey.length === 0) {
-        if (apiKeyRef) await this.deleteSecret(apiKeyRef);
-        apiKeyRef = undefined;
-      } else {
-        if (apiKeyRef) await this.deleteSecret(apiKeyRef);
-        apiKeyRef = await this.saveSecret(`ai-api-key:${id}`, input.apiKey);
-      }
+    const current = database.listAiConnections().find((connection) => connection.id === id);
+    const previousRef = current?.apiKeyRef;
+    let apiKeyRef = previousRef;
+    let newSecret: [string, EncryptedSecret] | undefined;
+    if (input.apiKey !== undefined && input.apiKey.length > 0) {
+      if (!this.vault.isUnlocked) throw new Error('Vault is locked');
+      const secretId = newSecretId();
+      newSecret = [secretId, this.vault.encrypt(`ai-api-key:${id}`, input.apiKey)];
+      apiKeyRef = secretId;
+    } else if (input.apiKey !== undefined) {
+      apiKeyRef = undefined;
     }
     const connection = AiConnectionRecordSchema.parse({
       id,
@@ -361,20 +414,20 @@ export class AppStorage {
       defaultModel: input.model,
       apiKeyRef
     });
-    const aiConnections = this.profileValue.aiConnections.filter((item) => item.id !== id);
-    aiConnections.push(connection);
-    this.profileValue = ProfileSchema.parse({ ...this.profileValue, aiConnections });
-    await this.profile.save(this.profileValue);
+    database.transaction(() => {
+      if (newSecret) database.putSecret(newSecret[0], newSecret[1]);
+      database.upsertAiConnection(connection, new Date().toISOString());
+      database.sweepUnreferencedSecrets();
+    });
     return this.aiConnectionsSnapshot();
   }
 
   public async deleteAiConnection(id: string): Promise<AiConnectionRecord[]> {
-    const current = this.profileValue.aiConnections.find((connection) => connection.id === id);
-    if (!current) return this.aiConnectionsSnapshot();
-    if (current.apiKeyRef) await this.deleteSecret(current.apiKeyRef);
-    const aiConnections = this.profileValue.aiConnections.filter((item) => item.id !== id);
-    this.profileValue = ProfileSchema.parse({ ...this.profileValue, aiConnections });
-    await this.profile.save(this.profileValue);
+    const database = this.requireDatabase();
+    database.transaction(() => {
+      database.deleteAiConnection(id);
+      database.sweepUnreferencedSecrets();
+    });
     return this.aiConnectionsSnapshot();
   }
 
@@ -387,7 +440,9 @@ export class AppStorage {
     model: string;
     apiKey?: string;
   } {
-    const connection = this.profileValue.aiConnections.find((item) => item.id === id);
+    const connection = this.requireDatabase()
+      .listAiConnections()
+      .find((item) => item.id === id);
     if (!connection) throw new Error('AI connection was not found');
     const apiKey = connection.apiKeyRef ? this.decryptSecret(connection.apiKeyRef) : undefined;
     return {
@@ -398,19 +453,22 @@ export class AppStorage {
     };
   }
 
+  public close(): void {
+    this.profileDatabase?.close();
+    this.profileDatabase = undefined;
+  }
+
   private decryptSecret(id: string): string {
-    const secret = this.profileValue.secrets[id];
+    const secret = this.requireDatabase().getSecret(id);
     if (!secret) throw new Error('SSH profile references a missing secret');
     return this.vault.decrypt(secret);
   }
 
-  private collectSecretRefs(sessions: SessionProfile[]): Set<string> {
-    const refs = new Set<string>();
-    for (const session of sessions) {
-      for (const id of Object.values(session.secretRefs ?? {})) {
-        refs.add(id);
-      }
-    }
-    return refs;
+  private copyProfile(profile: SessionProfileRecord): SessionProfile {
+    return {
+      ...profile,
+      args: profile.args ? [...profile.args] : undefined,
+      secretRefs: profile.secretRefs ? { ...profile.secretRefs } : undefined
+    };
   }
 }

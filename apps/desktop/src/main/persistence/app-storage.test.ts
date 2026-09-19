@@ -1,7 +1,9 @@
-import { mkdtemp, readFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
+import Database from 'better-sqlite3';
 import { AppStorage } from './app-storage';
 import type { Logger } from '../logging';
 
@@ -12,6 +14,15 @@ function testLogger(): Logger {
     warn: vi.fn(),
     error: vi.fn()
   } as unknown as Logger;
+}
+
+function countSecretRows(directory: string): number {
+  const database = new Database(join(directory, 'geared-term.db'));
+  try {
+    return (database.prepare('SELECT COUNT(*) AS c FROM secrets').get() as { c: number }).c;
+  } finally {
+    database.close();
+  }
 }
 
 describe('application storage', () => {
@@ -135,18 +146,10 @@ describe('application storage', () => {
     expect(storage.resolveSshProfile(profile.id, 'session-2', 80, 24).password).toBe(
       'second-password'
     );
-    const persisted = JSON.parse(await readFile(join(directory, 'profile.json'), 'utf8')) as {
-      secrets: Record<string, unknown>;
-    };
-    expect(Object.keys(persisted.secrets)).toHaveLength(1);
-    expect(JSON.stringify(persisted)).not.toContain('first-password');
-    expect(JSON.stringify(persisted)).not.toContain('second-password');
+    expect(await countSecretRows(directory)).toBe(1);
 
     await storage.deleteProfile(profile.id);
-    const afterDelete = JSON.parse(await readFile(join(directory, 'profile.json'), 'utf8')) as {
-      secrets: Record<string, unknown>;
-    };
-    expect(afterDelete.secrets).toEqual({});
+    expect(await countSecretRows(directory)).toBe(0);
   });
 
   it('does not allow a saved profile to change session type', async () => {
@@ -170,5 +173,37 @@ describe('application storage', () => {
         user: 'operator'
       })
     ).rejects.toThrow('Session type cannot be changed');
+  });
+
+  it('adopts an existing profile.json into the SQLite store once', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'geared-term-profile-adoption-'));
+    const legacy = {
+      schemaVersion: 1,
+      sessions: [
+        {
+          id: 'legacy-local',
+          kind: 'local',
+          name: 'Legacy shell',
+          term: 'xterm-256color',
+          shell: 'bash'
+        }
+      ],
+      secrets: {},
+      aiConnections: [],
+      environments: []
+    };
+    await writeFile(join(directory, 'profile.json'), JSON.stringify(legacy), 'utf8');
+
+    const storage = new AppStorage(directory, testLogger());
+    await storage.load();
+    expect(storage.profileSnapshot()).toHaveLength(1);
+    expect(storage.profileSnapshot()[0]?.name).toBe('Legacy shell');
+    expect(existsSync(join(directory, 'profile.json'))).toBe(false);
+    expect(existsSync(join(directory, 'profile.json.migrated'))).toBe(true);
+
+    // The migrated marker must not be re-imported on the next launch.
+    const reloaded = new AppStorage(directory, testLogger());
+    await reloaded.load();
+    expect(reloaded.profileSnapshot()).toHaveLength(1);
   });
 });
