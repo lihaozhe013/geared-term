@@ -92,6 +92,66 @@ export const WslDistributionSchema = z.object({
   version: z.union([z.literal(1), z.literal(2), z.null()])
 });
 
+export const AiConnectionRecordSchema = z
+  .object({
+    id: IdSchema,
+    name: z.string().min(1).max(160),
+    protocol: z.enum(['responses', 'chat-completions']),
+    baseUrl: z.string().url(),
+    models: z.array(z.string().min(1).max(256)).max(256),
+    defaultModel: z.string().min(1).max(256),
+    apiKeyRef: IdSchema.optional()
+  })
+  .strict();
+
+export const AiConnectionInputSchema = z
+  .object({
+    id: IdSchema.optional(),
+    name: z.string().min(1).max(160),
+    protocol: z.enum(['responses', 'chat-completions']),
+    baseUrl: z.string().min(1).max(2048),
+    model: z.string().min(1).max(256),
+    apiKey: z.string().max(4096).optional()
+  })
+  .strict();
+
+export const AiConnectionDeleteRequestSchema = z.object({ id: IdSchema }).strict();
+
+export const AiChatMessageSchema = z
+  .object({
+    role: z.enum(['system', 'user', 'assistant']),
+    content: z.string().max(256 * 1024)
+  })
+  .strict();
+
+export const AiStreamRequestSchema = z
+  .object({
+    streamId: IdSchema,
+    connectionId: IdSchema,
+    model: z.string().min(1).max(256),
+    messages: z.array(AiChatMessageSchema).min(1).max(100)
+  })
+  .strict();
+
+export const AiStreamClientMessageSchema = z.object({ kind: z.literal('cancel') }).strict();
+
+export const AiStreamEventSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('delta'), text: z.string() }),
+  z.object({ kind: z.literal('reasoning'), text: z.string() }),
+  z.object({
+    kind: z.literal('usage'),
+    inputTokens: z.number().int().nonnegative().optional(),
+    outputTokens: z.number().int().nonnegative().optional()
+  }),
+  z.object({
+    kind: z.literal('source'),
+    url: z.string().url(),
+    title: z.string().max(512).optional()
+  }),
+  z.object({ kind: z.literal('complete') }),
+  z.object({ kind: z.literal('error'), message: z.string().min(1).max(1024) })
+]);
+
 export const TerminalPortMessageSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('output'),
@@ -210,3 +270,8 @@ export type VaultStatus = z.infer<typeof VaultStatusSchema>;
 export type SessionProfileRecord = z.infer<typeof SessionProfileRecordSchema>;
 export type UiStateRecord = z.infer<typeof UiStateRecordSchema>;
 export type WslDistribution = z.infer<typeof WslDistributionSchema>;
+export type AiConnectionRecord = z.infer<typeof AiConnectionRecordSchema>;
+export type AiConnectionInput = z.infer<typeof AiConnectionInputSchema>;
+export type AiChatMessage = z.infer<typeof AiChatMessageSchema>;
+export type AiStreamRequest = z.infer<typeof AiStreamRequestSchema>;
+export type AiStreamEvent = z.infer<typeof AiStreamEventSchema>;

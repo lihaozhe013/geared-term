@@ -3,10 +3,13 @@ export {};
 declare module '*.css';
 
 import type {
+  AiConnectionInput,
+  AiConnectionRecord,
   LocalTerminalRequest,
   SessionProfileRecord,
   SshProfileTerminalRequest,
   SshTerminalRequest,
+  AiStreamRequest,
   UiStateRecord,
   WslDistribution,
   VaultPasswordRequest,
@@ -55,6 +58,13 @@ declare global {
       initializeVault: (input: VaultPasswordRequest) => Promise<VaultStatus>;
       unlockVault: (input: VaultPasswordRequest) => Promise<VaultStatus>;
       lockVault: () => Promise<VaultStatus>;
+      listAiConnections: () => Promise<AiConnectionRecord[]>;
+      saveAiConnection: (input: AiConnectionInput) => Promise<AiConnectionRecord[]>;
+      deleteAiConnection: (id: string) => Promise<AiConnectionRecord[]>;
+      streamAi: (
+        input: AiStreamRequest,
+        onEvent: (event: unknown) => void
+      ) => { cancel: () => void };
       listProfiles: () => Promise<SessionProfileRecord[]>;
       saveProfile: (input: SessionProfileRecord) => Promise<SessionProfileRecord[]>;
       deleteProfile: (id: string) => Promise<SessionProfileRecord[]>;

@@ -67,6 +67,18 @@ describe('application storage', () => {
     expect(request.password).toBe('remote-password');
     expect(JSON.stringify(storage.profileSnapshot())).not.toContain('remote-password');
 
+    await storage.saveAiConnection({
+      name: 'Local model',
+      protocol: 'chat-completions',
+      baseUrl: 'http://127.0.0.1:11434/v1',
+      model: 'local-model',
+      apiKey: 'ai-secret'
+    });
+    expect(storage.aiConnectionsSnapshot()[0]?.apiKeyRef).toBeTruthy();
+    expect(storage.resolveAiConnection(storage.aiConnectionsSnapshot()[0]!.id, '').apiKey).toBe(
+      'ai-secret'
+    );
+
     storage.lockVault();
     expect(() => storage.resolveSshProfile('remote-prod', 'session-2', 80, 24)).toThrow(
       'Vault is locked'

@@ -1,5 +1,9 @@
 import { z } from 'zod';
-import { SessionProfileRecordSchema, UiStateRecordSchema } from '@geared-term/protocol';
+import {
+  AiConnectionRecordSchema,
+  SessionProfileRecordSchema,
+  UiStateRecordSchema
+} from '@geared-term/protocol';
 
 export const settingsSchemaVersion = 1;
 export const profileSchemaVersion = 1;
@@ -42,22 +46,13 @@ export const VaultStateSchema = z.object({
 });
 
 export const SessionProfileSchema = SessionProfileRecordSchema;
+export const AiConnectionSchema = AiConnectionRecordSchema;
 
 export const ProfileSchema = z.object({
   schemaVersion: z.literal(profileSchemaVersion),
   sessions: z.array(SessionProfileSchema),
   secrets: z.record(z.string(), EncryptedSecretSchema),
-  aiConnections: z.array(
-    z.object({
-      id: z.string().min(1).max(128),
-      name: z.string().min(1).max(160),
-      protocol: z.enum(['responses', 'chat-completions']),
-      baseUrl: z.string().url(),
-      apiKey: z.string().max(128).optional(),
-      models: z.array(z.string().max(256)),
-      defaultModel: z.string().max(256)
-    })
-  )
+  aiConnections: z.array(AiConnectionSchema)
 });
 
 export type Settings = z.infer<typeof SettingsSchema>;
@@ -66,6 +61,7 @@ export type EncryptedSecret = z.infer<typeof EncryptedSecretSchema>;
 export type VaultState = z.infer<typeof VaultStateSchema>;
 export type SessionProfile = z.infer<typeof SessionProfileSchema>;
 export type Profile = z.infer<typeof ProfileSchema>;
+export type AiConnection = z.infer<typeof AiConnectionSchema>;
 
 export const defaultSettings: Settings = {
   schemaVersion: settingsSchemaVersion,

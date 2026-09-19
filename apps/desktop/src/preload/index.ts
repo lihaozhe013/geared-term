@@ -1,6 +1,12 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import {
   AppInfoSchema,
+  AiConnectionDeleteRequestSchema,
+  AiConnectionInputSchema,
+  AiConnectionRecordSchema,
+  AiStreamClientMessageSchema,
+  AiStreamEventSchema,
+  AiStreamRequestSchema,
   LocalTerminalRequestSchema,
   ProfileIdRequestSchema,
   SessionProfileRecordSchema,
@@ -13,6 +19,8 @@ import {
   UiStateRecordSchema,
   WslDistributionSchema,
   type LocalTerminalRequest,
+  type AiConnectionInput,
+  type AiStreamRequest,
   type SessionProfileRecord,
   type SshProfileTerminalRequest,
   type SshTerminalRequest,
@@ -118,6 +126,32 @@ const api = Object.freeze({
     return VaultStatusSchema.parse(await ipcRenderer.invoke('vault:unlock', request));
   },
   lockVault: async () => VaultStatusSchema.parse(await ipcRenderer.invoke('vault:lock')),
+  listAiConnections: async () =>
+    AiConnectionRecordSchema.array().parse(await ipcRenderer.invoke('ai:list')),
+  saveAiConnection: async (input: AiConnectionInput) => {
+    const connection = AiConnectionInputSchema.parse(input);
+    return AiConnectionRecordSchema.array().parse(await ipcRenderer.invoke('ai:save', connection));
+  },
+  deleteAiConnection: async (id: string) => {
+    const request = AiConnectionDeleteRequestSchema.parse({ id });
+    return AiConnectionRecordSchema.array().parse(await ipcRenderer.invoke('ai:delete', request));
+  },
+  streamAi: (input: AiStreamRequest, onEvent: (event: unknown) => void) => {
+    const request = AiStreamRequestSchema.parse(input);
+    const channel = new MessageChannel();
+    channel.port1.onmessage = (event) => {
+      const result = AiStreamEventSchema.safeParse(event.data);
+      if (result.success) onEvent(result.data);
+    };
+    channel.port1.start();
+    ipcRenderer.postMessage('ai:stream', request, [channel.port2]);
+    return Object.freeze({
+      cancel: () => {
+        channel.port1.postMessage(AiStreamClientMessageSchema.parse({ kind: 'cancel' }));
+        channel.port1.close();
+      }
+    });
+  },
   listProfiles: async () =>
     SessionProfileRecordSchema.array().parse(await ipcRenderer.invoke('profile:list')),
   saveProfile: async (input: SessionProfileRecord) => {

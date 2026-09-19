@@ -2,6 +2,12 @@ import { app, BrowserWindow, ipcMain, screen, session, shell } from 'electron';
 import { join } from 'node:path';
 import {
   AppInfoSchema,
+  AiConnectionDeleteRequestSchema,
+  AiConnectionInputSchema,
+  AiConnectionRecordSchema,
+  AiStreamClientMessageSchema,
+  AiStreamEventSchema,
+  AiStreamRequestSchema,
   EmptyRequestSchema,
   ProfileIdRequestSchema,
   SessionProfileRecordSchema,
@@ -11,6 +17,8 @@ import {
   WslDistributionSchema
 } from '@geared-term/protocol';
 import { createLogger, type Logger } from './logging';
+import { buildChatCompletionsPayload, buildResponsesPayload } from './ai/endpoint';
+import { streamAiRequest } from './ai/provider';
 import { LocalTerminalManager } from './local-terminal';
 import { AppStorage } from './persistence/app-storage';
 import { KnownHostsStore } from './ssh/known-hosts';
@@ -23,6 +31,7 @@ let mainWindow: BrowserWindow | undefined;
 let localTerminals: LocalTerminalManager;
 let storage: AppStorage;
 let sshSessions: SshSessionManager;
+const aiControllers = new Map<string, AbortController>();
 
 function isAllowedExternalUrl(value: string): boolean {
   try {
@@ -178,6 +187,17 @@ function registerIpc(): void {
     return UiStateRecordSchema.parse(await storage.saveUiState(nextState));
   });
   ipcMain.handle('wsl:list', async () => WslDistributionSchema.array().parse(await discoverWsl()));
+  ipcMain.handle('ai:list', () =>
+    AiConnectionRecordSchema.array().parse(storage.aiConnectionsSnapshot())
+  );
+  ipcMain.handle('ai:save', async (_event, input: unknown) => {
+    const connection = AiConnectionInputSchema.parse(input);
+    return AiConnectionRecordSchema.array().parse(await storage.saveAiConnection(connection));
+  });
+  ipcMain.handle('ai:delete', async (_event, input: unknown) => {
+    const request = AiConnectionDeleteRequestSchema.parse(input);
+    return AiConnectionRecordSchema.array().parse(await storage.deleteAiConnection(request.id));
+  });
 
   ipcMain.on('terminal:create-local', (event, input: unknown) => {
     const port = event.ports[0];
@@ -236,6 +256,76 @@ function registerIpc(): void {
       });
       port.close();
     }
+  });
+
+  ipcMain.on('ai:stream', (event, input: unknown) => {
+    const port = event.ports[0];
+    if (!port) {
+      logger.warn('assistant', 'AI stream request did not include a MessagePort');
+      return;
+    }
+    let request;
+    try {
+      request = AiStreamRequestSchema.parse(input);
+    } catch (error) {
+      port.postMessage({
+        kind: 'error',
+        message: error instanceof Error ? error.message : 'Invalid AI stream request'
+      });
+      port.close();
+      return;
+    }
+    if (aiControllers.has(request.streamId)) {
+      port.postMessage({ kind: 'error', message: 'AI stream ID is already active' });
+      port.close();
+      return;
+    }
+    const controller = new AbortController();
+    aiControllers.set(request.streamId, controller);
+    let closed = false;
+    port.start();
+    port.on('message', (messageEvent) => {
+      const message = AiStreamClientMessageSchema.safeParse(messageEvent.data);
+      if (message.success && message.data.kind === 'cancel') controller.abort();
+    });
+    port.on('close', () => {
+      closed = true;
+      controller.abort();
+      aiControllers.delete(request.streamId);
+    });
+    void (async () => {
+      try {
+        const connection = storage.resolveAiConnection(request.connectionId, request.model);
+        const payload =
+          connection.protocol === 'responses'
+            ? buildResponsesPayload(connection.model, request.messages)
+            : buildChatCompletionsPayload(connection.model, request.messages);
+        await streamAiRequest({
+          endpoint: connection.endpoint,
+          protocol: connection.protocol,
+          model: connection.model,
+          payload,
+          apiKey: connection.apiKey,
+          signal: controller.signal,
+          onEvent: (streamEvent) => {
+            if (!closed) port.postMessage(AiStreamEventSchema.parse(streamEvent));
+          }
+        });
+      } catch (error) {
+        if (!controller.signal.aborted && !closed) {
+          port.postMessage({
+            kind: 'error',
+            message: error instanceof Error ? error.message : 'AI request failed'
+          });
+        }
+      } finally {
+        aiControllers.delete(request.streamId);
+        if (!closed) {
+          closed = true;
+          port.close();
+        }
+      }
+    })();
   });
 }
 

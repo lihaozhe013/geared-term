@@ -94,10 +94,135 @@ textarea {
   background: #2a3140;
 }
 
+.workspace.with-assistant {
+  grid-template-columns: 240px minmax(0, 1fr) 360px;
+}
+
 .sidebar,
 .terminal-card {
   min-width: 0;
   background: #12151c;
+}
+
+.assistant-panel {
+  display: grid;
+  min-width: 0;
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+  gap: 12px;
+  padding: 16px;
+  overflow: hidden;
+  border-left: 1px solid #2a3140;
+  background: #12151c;
+}
+
+.assistant-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.assistant-header h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.assistant-config {
+  display: grid;
+  gap: 7px;
+  max-height: 310px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.assistant-config label {
+  display: grid;
+  gap: 4px;
+  color: #9aa8bd;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.assistant-config input,
+.assistant-config select,
+.assistant-composer textarea {
+  width: 100%;
+  border: 1px solid #344157;
+  border-radius: 5px;
+  outline: none;
+  color: #e4eaf3;
+  background: #0f141c;
+  font-size: 11px;
+}
+
+.assistant-config input,
+.assistant-config select {
+  min-height: 28px;
+  padding: 5px 7px;
+}
+
+.assistant-config input:focus,
+.assistant-config select:focus,
+.assistant-composer textarea:focus {
+  border-color: #5c8ea5;
+}
+
+.assistant-messages {
+  min-height: 0;
+  overflow: auto;
+  padding-right: 3px;
+}
+
+.assistant-message {
+  margin-bottom: 10px;
+  padding: 8px 9px;
+  border-radius: 6px;
+  background: #171e2a;
+}
+
+.assistant-message.user {
+  background: #1a2c35;
+}
+
+.assistant-message small {
+  color: #8da0ba;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.assistant-message p,
+.assistant-reasoning p {
+  margin: 5px 0 0;
+  color: #d6deeb;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.assistant-reasoning {
+  margin: 8px 0;
+  color: #8e9bb1;
+  font-size: 11px;
+}
+
+.assistant-source {
+  margin: 8px 0;
+  color: #9ac8ef;
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+
+.assistant-composer {
+  display: grid;
+  gap: 7px;
+}
+
+.assistant-composer textarea {
+  min-height: 68px;
+  resize: vertical;
+  padding: 7px;
+  line-height: 1.4;
 }
 
 .sidebar {

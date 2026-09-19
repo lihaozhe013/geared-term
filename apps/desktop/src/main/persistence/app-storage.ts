@@ -1,8 +1,16 @@
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
-import { SshTerminalRequestSchema, type SshTerminalRequest } from '@geared-term/protocol';
+import {
+  AiConnectionInputSchema,
+  AiConnectionRecordSchema,
+  SshTerminalRequestSchema,
+  type AiConnectionInput,
+  type AiConnectionRecord,
+  type SshTerminalRequest
+} from '@geared-term/protocol';
 import type { Logger } from '../logging';
 import { createVaultMetadata, Vault, type VaultMetadata } from '../vault/vault';
+import { normalizeEndpoint } from '../ai/endpoint';
 import { VersionedJsonStore } from './json-store';
 import {
   defaultProfile,
@@ -203,6 +211,74 @@ export class AppStorage {
       privateKey,
       passphrase
     });
+  }
+
+  public aiConnectionsSnapshot(): AiConnectionRecord[] {
+    return this.profileValue.aiConnections.map((connection) => ({
+      ...connection,
+      models: [...connection.models]
+    }));
+  }
+
+  public async saveAiConnection(rawInput: AiConnectionInput): Promise<AiConnectionRecord[]> {
+    const input = AiConnectionInputSchema.parse(rawInput);
+    const endpoint = normalizeEndpoint(input.baseUrl, input.protocol);
+    const id = input.id ?? randomUUID();
+    const current = this.profileValue.aiConnections.find((connection) => connection.id === id);
+    let apiKeyRef = current?.apiKeyRef;
+    if (input.apiKey !== undefined) {
+      if (input.apiKey.length === 0) {
+        if (apiKeyRef) await this.deleteSecret(apiKeyRef);
+        apiKeyRef = undefined;
+      } else {
+        if (apiKeyRef) await this.deleteSecret(apiKeyRef);
+        apiKeyRef = await this.saveSecret(`ai-api-key:${id}`, input.apiKey);
+      }
+    }
+    const connection = AiConnectionRecordSchema.parse({
+      id,
+      name: input.name,
+      protocol: input.protocol,
+      baseUrl: endpoint.baseUrl,
+      models: [input.model],
+      defaultModel: input.model,
+      apiKeyRef
+    });
+    const aiConnections = this.profileValue.aiConnections.filter((item) => item.id !== id);
+    aiConnections.push(connection);
+    this.profileValue = ProfileSchema.parse({ ...this.profileValue, aiConnections });
+    await this.profile.save(this.profileValue);
+    return this.aiConnectionsSnapshot();
+  }
+
+  public async deleteAiConnection(id: string): Promise<AiConnectionRecord[]> {
+    const current = this.profileValue.aiConnections.find((connection) => connection.id === id);
+    if (!current) return this.aiConnectionsSnapshot();
+    if (current.apiKeyRef) await this.deleteSecret(current.apiKeyRef);
+    const aiConnections = this.profileValue.aiConnections.filter((item) => item.id !== id);
+    this.profileValue = ProfileSchema.parse({ ...this.profileValue, aiConnections });
+    await this.profile.save(this.profileValue);
+    return this.aiConnectionsSnapshot();
+  }
+
+  public resolveAiConnection(
+    id: string,
+    model: string
+  ): {
+    endpoint: string;
+    protocol: 'responses' | 'chat-completions';
+    model: string;
+    apiKey?: string;
+  } {
+    const connection = this.profileValue.aiConnections.find((item) => item.id === id);
+    if (!connection) throw new Error('AI connection was not found');
+    const apiKey = connection.apiKeyRef ? this.decryptSecret(connection.apiKeyRef) : undefined;
+    return {
+      endpoint: connection.baseUrl,
+      protocol: connection.protocol,
+      model: model || connection.defaultModel,
+      apiKey
+    };
   }
 
   private decryptSecret(id: string): string {

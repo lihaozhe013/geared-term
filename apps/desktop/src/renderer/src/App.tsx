@@ -8,6 +8,7 @@ import type {
   UiStateRecord,
   WslDistribution
 } from '@geared-term/protocol';
+import { AssistantPanel } from './AssistantPanel';
 import { TerminalPane } from './TerminalPane';
 
 type AppInfo = Awaited<ReturnType<Window['geared']['getAppInfo']>>;
@@ -215,6 +216,17 @@ export function App(): React.JSX.Element {
     });
   }, [uiState]);
 
+  const toggleAssistant = useCallback((): void => {
+    const next: UiStateRecord = {
+      ...uiState,
+      rightPanel: uiState.rightPanel === 'assistant' ? null : 'assistant'
+    };
+    setUiState(next);
+    void window.geared.saveUiState(next).catch((reason: unknown) => {
+      setError(reason instanceof Error ? reason.message : 'Unable to save UI state');
+    });
+  }, [uiState]);
+
   const handleState = useCallback(
     (tabId: string, message: TerminalPortMessage & { kind: 'state' }): void => {
       setTabs((current) =>
@@ -260,7 +272,10 @@ export function App(): React.JSX.Element {
         <span className="status-pill">{activeTab ? statusLabel(activeTab.status) : 'Ready'}</span>
       </header>
 
-      <section className="workspace" aria-label="Workspace">
+      <section
+        className={`workspace ${uiState.rightPanel === 'assistant' ? 'with-assistant' : ''}`}
+        aria-label="Workspace"
+      >
         {!uiState.sidebarCollapsed ? (
           <aside className="sidebar">
             <div className="sidebar-heading">
@@ -420,6 +435,14 @@ export function App(): React.JSX.Element {
             >
               Save session
             </button>
+            <button
+              type="button"
+              className="toolbar-button"
+              onClick={toggleAssistant}
+              aria-pressed={uiState.rightPanel === 'assistant'}
+            >
+              {uiState.rightPanel === 'assistant' ? 'Hide assistant' : 'Assistant'}
+            </button>
             <span className="toolbar-chip">Renderer isolated</span>
           </div>
           <div className="terminal-surface">
@@ -440,6 +463,7 @@ export function App(): React.JSX.Element {
             {error ? <p className="terminal-line error">{error}</p> : null}
           </div>
         </section>
+        {uiState.rightPanel === 'assistant' ? <AssistantPanel /> : null}
       </section>
 
       <footer className="statusbar">
