@@ -496,6 +496,47 @@ textarea {
   overflow-wrap: anywhere;
 }
 
+.command-card {
+  margin-top: 9px;
+  padding: 8px;
+  border: 1px solid #344157;
+  border-radius: 6px;
+  background: #0f141c;
+}
+
+.command-card-header,
+.command-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.command-card-header {
+  color: #8da0ba;
+  font-size: 10px;
+}
+
+.command-card pre {
+  max-height: 180px;
+  margin: 7px 0;
+  overflow: auto;
+  color: #d6deeb;
+  font-family: 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.command-card-actions {
+  justify-content: flex-start;
+}
+
+.command-run {
+  color: #c6d5ff;
+}
+
 .assistant-reasoning {
   margin: 8px 0;
   color: #8e9bb1;

@@ -3,6 +3,7 @@ import {
   AppInfoSchema,
   SftpListRequestSchema,
   SftpRemoteEntrySchema,
+  TerminalCommandActionSchema,
   TerminalPortMessageSchema
 } from './index';
 
@@ -42,5 +43,25 @@ describe('protocol schemas', () => {
         modifiedAt: null
       }).success
     ).toBe(true);
+  });
+
+  it('requires an explicit shell and revision for command actions', () => {
+    expect(
+      TerminalCommandActionSchema.safeParse({
+        sessionId: 'local-1',
+        action: 'run',
+        shell: 'bash',
+        payload: 'printf hello',
+        revision: '0123456789abcdef0123456789abcdef'
+      }).success
+    ).toBe(true);
+    expect(
+      TerminalCommandActionSchema.safeParse({
+        sessionId: 'local-1',
+        action: 'run',
+        payload: 'printf hello',
+        revision: 'stale'
+      }).success
+    ).toBe(false);
   });
 });

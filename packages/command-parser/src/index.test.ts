@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseCommandBlock, splitCommandBlock } from './index';
+import { commandRevision, parseCommandBlock, splitCommandBlock } from './index';
 
 describe('conservative command parsing', () => {
   it('recognizes explicit shell fences', () => {
@@ -7,12 +7,15 @@ describe('conservative command parsing', () => {
     expect(result.shell).toBe('bash');
     expect(result.runAllowed).toBe(true);
     expect(result.exactText).toBe('printf hello');
+    expect(result.stability).toBe('stable');
+    expect(result.revision).toBe(commandRevision(result.exactText));
   });
 
   it('withholds execution for data fences', () => {
     const result = parseCommandBlock('```json\n{"ok": true}\n```');
     expect(result.runAllowed).toBe(false);
     expect(result.fallbackReason).toBe('data-fence');
+    expect(result.stability).toBe('unsafe');
   });
 
   it('withholds execution for incomplete syntax', () => {

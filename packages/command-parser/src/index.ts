@@ -3,6 +3,8 @@ export type SupportedShell = 'bash' | 'zsh' | 'fish' | 'powershell' | 'cmd' | 'u
 export type CommandCandidate = {
   shell: SupportedShell;
   exactText: string;
+  revision: string;
+  stability: 'stable' | 'incomplete' | 'unsafe';
   confidence: 'high' | 'medium' | 'low';
   complete: boolean;
   runAllowed: boolean;
@@ -33,6 +35,19 @@ const dataLabels = new Set(['json', 'yaml', 'yml', 'toml', 'diff', 'text', 'txt'
 
 function byteLength(value: string): number {
   return new TextEncoder().encode(value).byteLength;
+}
+
+export function commandRevision(value: string): string {
+  const bytes = new TextEncoder().encode(value);
+  let first = 2166136261;
+  let second = 2246822519;
+  for (const byte of bytes) {
+    first = Math.imul(first ^ byte, 16777619);
+    second = Math.imul(second ^ byte, 3266489917);
+  }
+  return `${(first >>> 0).toString(16).padStart(8, '0')}${(second >>> 0)
+    .toString(16)
+    .padStart(8, '0')}`;
 }
 
 function shellForLabel(label: string | undefined): SupportedShell | undefined {
@@ -181,6 +196,8 @@ export function parseCommandBlock(input: string): CommandCandidate {
     return {
       shell: 'unknown',
       exactText: '',
+      revision: commandRevision(''),
+      stability: 'incomplete',
       confidence: 'low',
       complete: false,
       runAllowed: false,
@@ -195,6 +212,8 @@ export function parseCommandBlock(input: string): CommandCandidate {
     return {
       shell: 'unknown',
       exactText: normalized,
+      revision: commandRevision(normalized),
+      stability: 'unsafe',
       confidence: 'high',
       complete: true,
       runAllowed: false,
@@ -208,6 +227,8 @@ export function parseCommandBlock(input: string): CommandCandidate {
   return {
     shell,
     exactText: normalized,
+    revision: commandRevision(normalized),
+    stability: complete && shell !== 'unknown' ? 'stable' : complete ? 'unsafe' : 'incomplete',
     confidence,
     complete,
     runAllowed: complete && confidence === 'high',

@@ -18,6 +18,7 @@ import {
   SftpListRequestSchema,
   SftpRemoteEntrySchema,
   SshProfileTerminalRequestSchema,
+  TerminalCommandActionSchema,
   UiStateRecordSchema,
   VaultPasswordRequestSchema,
   WslDistributionSchema
@@ -26,6 +27,7 @@ import { createLogger, type Logger } from './logging';
 import { buildChatCompletionsPayload, buildResponsesPayload } from './ai/endpoint';
 import { streamAiRequest } from './ai/provider';
 import { LocalTerminalManager } from './local-terminal';
+import { commandRevision, parseCommandBlock } from '@geared-term/command-parser';
 import { AppStorage } from './persistence/app-storage';
 import { KnownHostsStore } from './ssh/known-hosts';
 import { SshSessionManager } from './ssh/ssh-session';
@@ -229,6 +231,26 @@ function registerIpc(): void {
   ipcMain.handle('environment:probe', async (_event, input: unknown) => {
     const request = EnvironmentProbeRequestSchema.parse(input);
     return EnvironmentFactsSchema.parse(await probeEnvironment(request.kind, request.distribution));
+  });
+  ipcMain.handle('terminal:command-action', (_event, input: unknown) => {
+    const request = TerminalCommandActionSchema.parse(input);
+    if (commandRevision(request.payload) !== request.revision) {
+      throw new Error('The command changed before the action was submitted');
+    }
+    if (request.action === 'run') {
+      const candidate = parseCommandBlock(`\`\`\`${request.shell}\n${request.payload}\n\`\`\``);
+      if (!candidate.runAllowed || candidate.exactText !== request.payload) {
+        throw new Error('The command is not safe to run');
+      }
+    }
+    const data = request.action === 'run' ? `${request.payload}\r` : request.payload;
+    try {
+      localTerminals.sendInput(request.sessionId, data);
+      return { accepted: true };
+    } catch {
+      sshSessions.sendInput(request.sessionId, data);
+      return { accepted: true };
+    }
   });
   ipcMain.handle('wsl:list', async () => WslDistributionSchema.array().parse(await discoverWsl()));
   ipcMain.handle('ai:list', () =>

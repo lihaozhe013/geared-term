@@ -10,6 +10,7 @@ import type {
   SettingsRecord,
   SftpListRequest,
   SftpRemoteEntry,
+  TerminalCommandAction,
   SshProfileTerminalRequest,
   SshTerminalRequest,
   AiStreamRequest,
@@ -79,6 +80,7 @@ declare global {
       getSettings: () => Promise<SettingsRecord>;
       saveSettings: (input: SettingsRecord) => Promise<SettingsRecord>;
       listSftp: (input: SftpListRequest) => Promise<SftpRemoteEntry[]>;
+      executeCommandAction: (input: TerminalCommandAction) => Promise<{ accepted: true }>;
       listEnvironments: () => Promise<EnvironmentRecord[]>;
       saveEnvironment: (input: EnvironmentRecord) => Promise<EnvironmentRecord[]>;
       deleteEnvironment: (id: string) => Promise<EnvironmentRecord[]>;

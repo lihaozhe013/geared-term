@@ -290,6 +290,19 @@ export const SftpRemoteEntrySchema = z
   })
   .strict();
 
+export const TerminalCommandActionSchema = z
+  .object({
+    sessionId: IdSchema,
+    action: z.enum(['insert', 'run']),
+    shell: z.enum(['bash', 'zsh', 'fish', 'powershell', 'cmd', 'unknown']),
+    payload: z
+      .string()
+      .min(1)
+      .max(256 * 1024),
+    revision: IdSchema
+  })
+  .strict();
+
 export const EnvironmentFactsSchema = z
   .object({
     os: z.string().max(160).optional(),
@@ -342,6 +355,7 @@ export type SshTerminalRequest = z.infer<typeof SshTerminalRequestSchema>;
 export type SshProfileTerminalRequest = z.infer<typeof SshProfileTerminalRequestSchema>;
 export type SftpListRequest = z.infer<typeof SftpListRequestSchema>;
 export type SftpRemoteEntry = z.infer<typeof SftpRemoteEntrySchema>;
+export type TerminalCommandAction = z.infer<typeof TerminalCommandActionSchema>;
 export type EnvironmentFacts = z.infer<typeof EnvironmentFactsSchema>;
 export type EnvironmentRecord = z.infer<typeof EnvironmentRecordSchema>;
 export type EnvironmentProbeRequest = z.infer<typeof EnvironmentProbeRequestSchema>;

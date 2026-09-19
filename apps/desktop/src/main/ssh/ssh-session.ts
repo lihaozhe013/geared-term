@@ -139,6 +139,14 @@ export class SshSessionManager {
     return service.list(directory);
   }
 
+  public sendInput(sessionId: string, data: string): void {
+    const session = this.sessions.get(sessionId);
+    if (!session || session.closed || !session.channel) {
+      throw new Error('SSH terminal is not available');
+    }
+    session.channel.write(data);
+  }
+
   private async verifyHost(
     session: SshSession,
     key: Buffer,

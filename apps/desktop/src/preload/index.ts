@@ -18,6 +18,7 @@ import {
   SftpRemoteEntrySchema,
   SshProfileTerminalRequestSchema,
   SshTerminalRequestSchema,
+  TerminalCommandActionSchema,
   VaultPasswordRequestSchema,
   VaultStatusSchema,
   TerminalClientMessageSchema,
@@ -32,6 +33,7 @@ import {
   type SessionProfileRecord,
   type SettingsRecord,
   type SftpListRequest,
+  type TerminalCommandAction,
   type SshProfileTerminalRequest,
   type SshTerminalRequest,
   type UiStateRecord,
@@ -189,6 +191,10 @@ const api = Object.freeze({
   listSftp: async (input: SftpListRequest) => {
     const request = SftpListRequestSchema.parse(input);
     return SftpRemoteEntrySchema.array().parse(await ipcRenderer.invoke('sftp:list', request));
+  },
+  executeCommandAction: async (input: TerminalCommandAction) => {
+    const action = TerminalCommandActionSchema.parse(input);
+    return ipcRenderer.invoke('terminal:command-action', action) as Promise<{ accepted: true }>;
   },
   listEnvironments: async () =>
     EnvironmentRecordSchema.array().parse(await ipcRenderer.invoke('environment:list')),

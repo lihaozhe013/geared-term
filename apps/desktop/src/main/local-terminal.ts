@@ -152,6 +152,12 @@ export class LocalTerminalManager {
     }
   }
 
+  public sendInput(sessionId: string, data: string): void {
+    const session = this.sessions.get(sessionId);
+    if (!session || session.closed) throw new Error('Local terminal is not available');
+    session.pty.write(data);
+  }
+
   private onClientMessage(session: LocalSession, rawMessage: unknown): void {
     const result = TerminalClientMessageSchema.safeParse(rawMessage);
     if (!result.success) {

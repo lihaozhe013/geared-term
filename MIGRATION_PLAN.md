@@ -32,6 +32,8 @@ and English/Simplified-Chinese settings labels without exposing privileged state
 seventh checkpoint attaches an independent SFTP channel to SSH sessions and exposes validated remote
 directory listing in a capability-gated panel. The eighth checkpoint adds bounded local/WSL
 environment probes, versioned environment records, and an editable context panel.
+The ninth checkpoint adds content revisions, explicit command cards, and a validated main-process
+action path that keeps Insert separate from one-submit Run.
 
 ## 2. Delivery rules
 

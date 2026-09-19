@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { parseCommandBlock, type CommandCandidate } from '@geared-term/command-parser';
 import type { AiConnectionRecord, AiStreamEvent } from '@geared-term/protocol';
 
 type Message = {
@@ -6,7 +7,109 @@ type Message = {
   content: string;
 };
 
-export function AssistantPanel(): React.JSX.Element {
+type AssistantPanelProps = {
+  targetSessionId?: string;
+};
+
+function commandCandidates(content: string): CommandCandidate[] {
+  const result: CommandCandidate[] = [];
+  const fencePattern = /```[^\n]*\n[\s\S]*?```/g;
+  for (const match of content.matchAll(fencePattern)) {
+    const block = match[0];
+    if (block) result.push(parseCommandBlock(block));
+  }
+  return result;
+}
+
+function CommandCard({
+  candidate,
+  targetSessionId,
+  disabled,
+  onError
+}: {
+  candidate: CommandCandidate;
+  targetSessionId?: string;
+  disabled: boolean;
+  onError: (message: string) => void;
+}): React.JSX.Element {
+  const insertAllowed = Boolean(targetSessionId) && candidate.stability === 'stable';
+  const runAllowed =
+    Boolean(targetSessionId) && candidate.runAllowed && candidate.stability === 'stable';
+
+  const copy = async (): Promise<void> => {
+    try {
+      await navigator.clipboard.writeText(candidate.exactText);
+    } catch (reason) {
+      onError(reason instanceof Error ? reason.message : 'Unable to copy command');
+    }
+  };
+
+  const execute = async (action: 'insert' | 'run'): Promise<void> => {
+    if (!targetSessionId) {
+      onError('Select a visible terminal session before using this action.');
+      return;
+    }
+    try {
+      await window.geared.executeCommandAction({
+        sessionId: targetSessionId,
+        action,
+        shell: candidate.shell,
+        payload: candidate.exactText,
+        revision: candidate.revision
+      });
+    } catch (reason) {
+      onError(reason instanceof Error ? reason.message : 'Unable to submit command');
+    }
+  };
+
+  return (
+    <div className="command-card">
+      <div className="command-card-header">
+        <small>
+          {candidate.shell} · {candidate.confidence} confidence
+        </small>
+        <small>{candidate.stability}</small>
+      </div>
+      <pre>{candidate.exactText}</pre>
+      <div className="command-card-actions">
+        <button
+          type="button"
+          className="toolbar-button"
+          onClick={() => void copy()}
+          disabled={disabled}
+        >
+          Copy
+        </button>
+        <button
+          type="button"
+          className="toolbar-button"
+          onClick={() => void execute('insert')}
+          disabled={disabled || !insertAllowed}
+          title={
+            insertAllowed ? 'Insert without submitting' : 'A stable visible terminal is required'
+          }
+        >
+          Insert
+        </button>
+        <button
+          type="button"
+          className="toolbar-button command-run"
+          onClick={() => void execute('run')}
+          disabled={disabled || !runAllowed}
+          title={
+            runAllowed
+              ? 'Insert and submit once'
+              : 'Run is disabled until a stable shell block is available'
+          }
+        >
+          Run
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export function AssistantPanel({ targetSessionId }: AssistantPanelProps): React.JSX.Element {
   const [connections, setConnections] = useState<AiConnectionRecord[]>([]);
   const [selectedId, setSelectedId] = useState('');
   const [name, setName] = useState('Local model');
@@ -98,6 +201,8 @@ export function AssistantPanel(): React.JSX.Element {
     }
   };
 
+  const handleCommandError = (message: string): void => setError(message);
+
   const send = (): void => {
     const text = composer.trim();
     if (!text || !selectedId || !model || streaming) return;
@@ -129,7 +234,11 @@ export function AssistantPanel(): React.JSX.Element {
           <button
             type="button"
             className="toolbar-button"
-            onClick={() => streamRef.current?.cancel()}
+            onClick={() => {
+              streamRef.current?.cancel();
+              streamRef.current = null;
+              setStreaming(false);
+            }}
           >
             Stop
           </button>
@@ -196,6 +305,17 @@ export function AssistantPanel(): React.JSX.Element {
           <div className={`assistant-message ${message.role}`} key={`${message.role}-${index}`}>
             <small>{message.role === 'user' ? 'You' : 'Assistant'}</small>
             <p>{message.content || (streaming && message.role === 'assistant' ? '…' : '')}</p>
+            {message.role === 'assistant'
+              ? commandCandidates(message.content).map((candidate, candidateIndex) => (
+                  <CommandCard
+                    key={`${candidate.revision}-${candidateIndex}`}
+                    candidate={candidate}
+                    targetSessionId={targetSessionId}
+                    disabled={streaming}
+                    onError={handleCommandError}
+                  />
+                ))
+              : null}
           </div>
         ))}
         {reasoning ? (

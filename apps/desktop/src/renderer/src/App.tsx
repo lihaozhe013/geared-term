@@ -572,7 +572,9 @@ export function App(): React.JSX.Element {
             {error ? <p className="terminal-line error">{error}</p> : null}
           </div>
         </section>
-        {uiState.rightPanel === 'assistant' ? <AssistantPanel /> : null}
+        {uiState.rightPanel === 'assistant' ? (
+          <AssistantPanel targetSessionId={activeTab?.id} />
+        ) : null}
         {uiState.rightPanel === 'sftp' && activeTab && supportsSftp(activeTab.request) ? (
           <SftpPanel sessionId={activeTab.id} onClose={toggleSftp} />
         ) : null}

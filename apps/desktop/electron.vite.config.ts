@@ -4,14 +4,22 @@ import { defineConfig, externalizeDepsPlugin } from 'electron-vite';
 
 const aliases = {
   '@geared-term/domain': resolve(__dirname, '../../packages/domain/src/index.ts'),
-  '@geared-term/protocol': resolve(__dirname, '../../packages/protocol/src/index.ts')
+  '@geared-term/protocol': resolve(__dirname, '../../packages/protocol/src/index.ts'),
+  '@geared-term/command-parser': resolve(__dirname, '../../packages/command-parser/src/index.ts')
 };
 
 export default defineConfig({
   main: {
     resolve: { alias: aliases },
     plugins: [
-      externalizeDepsPlugin({ exclude: ['@geared-term/protocol', '@geared-term/domain', 'zod'] })
+      externalizeDepsPlugin({
+        exclude: [
+          '@geared-term/protocol',
+          '@geared-term/domain',
+          '@geared-term/command-parser',
+          'zod'
+        ]
+      })
     ]
   },
   preload: {
@@ -22,7 +30,14 @@ export default defineConfig({
       }
     },
     plugins: [
-      externalizeDepsPlugin({ exclude: ['@geared-term/protocol', '@geared-term/domain', 'zod'] })
+      externalizeDepsPlugin({
+        exclude: [
+          '@geared-term/protocol',
+          '@geared-term/domain',
+          '@geared-term/command-parser',
+          'zod'
+        ]
+      })
     ]
   },
   renderer: {
