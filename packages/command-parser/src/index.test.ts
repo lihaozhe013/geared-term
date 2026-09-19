@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseCommandBlock } from './index';
+import { parseCommandBlock, splitCommandBlock } from './index';
 
 describe('conservative command parsing', () => {
   it('recognizes explicit shell fences', () => {
@@ -19,5 +19,31 @@ describe('conservative command parsing', () => {
     const result = parseCommandBlock('```bash\nprintf "unfinished\n```');
     expect(result.complete).toBe(false);
     expect(result.runAllowed).toBe(false);
+  });
+
+  it('splits only top-level statements and preserves quoted separators', () => {
+    expect(splitCommandBlock('echo "a;b"; printf two\nls | sort', 'bash')).toEqual({
+      parts: ['echo "a;b"', 'printf two', 'ls | sort'],
+      complete: true,
+      splitAllowed: true
+    });
+  });
+
+  it('falls back to one block when conditional semantics would be lost', () => {
+    expect(splitCommandBlock('build && deploy', 'bash')).toEqual({
+      parts: ['build && deploy'],
+      complete: true,
+      splitAllowed: false,
+      fallbackReason: 'ambiguous'
+    });
+  });
+
+  it('does not split incomplete blocks', () => {
+    expect(splitCommandBlock('Write-Output "unfinished', 'powershell')).toEqual({
+      parts: ['Write-Output "unfinished'],
+      complete: false,
+      splitAllowed: false,
+      fallbackReason: 'incomplete'
+    });
   });
 });

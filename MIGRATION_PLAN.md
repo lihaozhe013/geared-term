@@ -26,7 +26,8 @@ sidebar collapse state, and multiple independent terminal tabs. The remaining ph
 required for parity and release. The third checkpoint adds validated WSL discovery/launch tabs and
 main-process-only resolution of vault-backed SSH profile credentials. The fourth checkpoint adds
 vault-referenced AI connections, cancellable provider-neutral streaming, and a bounded assistant
-panel.
+panel. The fifth checkpoint adds conservative top-level command splitting with whole-block fallback
+for incomplete or conditional command text.
 
 ## 2. Delivery rules
 

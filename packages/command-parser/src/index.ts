@@ -9,6 +9,13 @@ export type CommandCandidate = {
   fallbackReason?: 'data-fence' | 'ambiguous' | 'incomplete' | 'oversized';
 };
 
+export type CommandSplitResult = {
+  parts: string[];
+  complete: boolean;
+  splitAllowed: boolean;
+  fallbackReason?: 'ambiguous' | 'incomplete' | 'oversized';
+};
+
 const maxInputBytes = 256 * 1024;
 const shellLabels = new Map<string, SupportedShell>([
   ['sh', 'bash'],
@@ -90,6 +97,83 @@ function hasUnbalancedSyntax(value: string, shell: SupportedShell): boolean {
     parenDepth !== 0 ||
     hasUnclosedPowerShellString
   );
+}
+
+export function splitCommandBlock(value: string, shell: SupportedShell): CommandSplitResult {
+  if (byteLength(value) > maxInputBytes) {
+    return { parts: [], complete: false, splitAllowed: false, fallbackReason: 'oversized' };
+  }
+  const input = value.trim();
+  if (!input) return { parts: [], complete: true, splitAllowed: true };
+
+  let start = 0;
+  let quote: 'single' | 'double' | null = null;
+  let escaped = false;
+  let braceDepth = 0;
+  let bracketDepth = 0;
+  let parenDepth = 0;
+  let ambiguous = false;
+  const parts: string[] = [];
+  const pushPart = (end: number): void => {
+    const part = input.slice(start, end).trim();
+    if (part) parts.push(part);
+    start = end + 1;
+  };
+
+  for (let index = 0; index < input.length; index += 1) {
+    const character = input[index];
+    if (!character) continue;
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (shell === 'powershell' && character === '`') {
+      escaped = true;
+      continue;
+    }
+    if (character === '\\' && quote !== 'single') {
+      escaped = true;
+      continue;
+    }
+    if (character === "'" && quote !== 'double') {
+      quote = quote === 'single' ? null : 'single';
+      continue;
+    }
+    if (character === '"' && quote !== 'single') {
+      quote = quote === 'double' ? null : 'double';
+      continue;
+    }
+    if (quote) continue;
+    if (character === '{') braceDepth += 1;
+    if (character === '}') braceDepth -= 1;
+    if (character === '[') bracketDepth += 1;
+    if (character === ']') bracketDepth -= 1;
+    if (character === '(') parenDepth += 1;
+    if (character === ')') parenDepth -= 1;
+    if (braceDepth < 0 || bracketDepth < 0 || parenDepth < 0) {
+      return { parts: [input], complete: false, splitAllowed: false, fallbackReason: 'incomplete' };
+    }
+    if (braceDepth !== 0 || bracketDepth !== 0 || parenDepth !== 0) continue;
+    if (
+      (character === '&' && input[index + 1] === '&') ||
+      (character === '|' && input[index + 1] === '|')
+    ) {
+      ambiguous = true;
+      index += 1;
+      continue;
+    }
+    if (character === ';' || character === '\n') pushPart(index);
+  }
+
+  if (quote || escaped || braceDepth !== 0 || bracketDepth !== 0 || parenDepth !== 0) {
+    return { parts: [input], complete: false, splitAllowed: false, fallbackReason: 'incomplete' };
+  }
+  const trailing = input.slice(start).trim();
+  if (trailing) parts.push(trailing);
+  if (ambiguous) {
+    return { parts: [input], complete: true, splitAllowed: false, fallbackReason: 'ambiguous' };
+  }
+  return { parts, complete: true, splitAllowed: true };
 }
 
 export function parseCommandBlock(input: string): CommandCandidate {
