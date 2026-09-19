@@ -89,20 +89,27 @@ function runProbe(invocation: ProbeInvocation, timeoutMs: number): Promise<strin
       if (error) reject(error);
       else resolve(value ?? '');
     };
-    const accept = (chunk: Buffer | string): void => {
+    const trackBytes = (chunk: Buffer | string): boolean => {
       const text = chunk.toString();
       outputBytes += Buffer.byteLength(text);
       if (outputBytes > maxOutputBytes) {
         child.kill();
         finish(new Error('Environment probe output exceeded its limit'));
-        return;
+        return false;
       }
+      return true;
+    };
+    const accept = (chunk: Buffer | string): void => {
+      const text = chunk.toString();
+      if (!trackBytes(chunk)) return;
       output += text;
     };
     child.stdout.setEncoding('utf8');
     child.stderr.setEncoding('utf8');
     child.stdout.on('data', accept);
-    child.stderr.on('data', () => undefined);
+    child.stderr.on('data', (chunk) => {
+      trackBytes(chunk);
+    });
     child.on('error', (error) => finish(error));
     child.on('close', (code) => {
       if (code === 0) finish(null, output);
