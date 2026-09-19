@@ -161,6 +161,7 @@ export function App(): React.JSX.Element {
   const [showProfileEditor, setShowProfileEditor] = useState(false);
   const [editingProfile, setEditingProfile] = useState<SessionProfileRecord | undefined>();
   const [showQuickSsh, setShowQuickSsh] = useState(false);
+  const [pendingHistoryId, setPendingHistoryId] = useState<string | null>(null);
   const snapshotExtractors = useRef(new Map<string, SnapshotExtractor>());
 
   useEffect(() => {
@@ -189,6 +190,19 @@ export function App(): React.JSX.Element {
   }, []);
 
   useEffect(() => window.geared.onSettingsChanged(setSettings), []);
+
+  useEffect(
+    () =>
+      window.geared.onAiHistoryContinue((id) => {
+        setPendingHistoryId(id);
+        setUiState((current) =>
+          current.rightPanel === 'assistant'
+            ? current
+            : { ...current, rightPanel: 'assistant', rightPanelCollapsed: false }
+        );
+      }),
+    []
+  );
 
   const palette = useMemo(
     () => resolvePalette(settings.theme, userThemes),
@@ -762,9 +776,18 @@ export function App(): React.JSX.Element {
         {uiState.rightPanel === 'assistant' ? (
           <AssistantPanel
             targetSessionId={activeTab?.id}
+            sessionLabel={activeTab?.name}
             environmentTargetKey={environmentTarget(activeTab?.request)?.targetKey}
             splitCommandPresentation={settings.splitCommandPresentation}
+            onToggleSplitCommand={() => {
+              void saveSettings({
+                ...settings,
+                splitCommandPresentation: !settings.splitCommandPresentation
+              }).catch(() => undefined);
+            }}
             globalInstructions={settings.globalAiInstructions}
+            pendingHistoryId={pendingHistoryId}
+            onPendingHistoryConsumed={() => setPendingHistoryId(null)}
             getSnapshot={() => {
               const extractor = activeTab ? snapshotExtractors.current.get(activeTab.id) : null;
               return extractor ? extractor() : null;

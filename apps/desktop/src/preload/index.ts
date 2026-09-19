@@ -4,6 +4,7 @@ import {
   AiConnectionDeleteRequestSchema,
   AiConnectionInputSchema,
   AiConnectionRecordSchema,
+  AiHistoryContinueSchema,
   AiStreamClientMessageSchema,
   AiStreamEventSchema,
   AiStreamRequestSchema,
@@ -293,6 +294,22 @@ const api = Object.freeze({
     };
     ipcRenderer.on('settings:navigate', handler);
     return () => ipcRenderer.removeListener('settings:navigate', handler);
+  },
+  openHistoryWindow: async () =>
+    SftpOperationResultSchema.parse(await ipcRenderer.invoke('app:open-history', {})),
+  continueAiHistory: async (id: string) => {
+    const request = AiHistoryLoadRequestSchema.parse({ id });
+    return SftpOperationResultSchema.parse(
+      await ipcRenderer.invoke('app:continue-history', request)
+    );
+  },
+  onAiHistoryContinue: (listener: (id: string) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, payload: unknown): void => {
+      const result = AiHistoryContinueSchema.safeParse(payload);
+      if (result.success) listener(result.data.id);
+    };
+    ipcRenderer.on('ai:history:continue', handler);
+    return () => ipcRenderer.removeListener('ai:history:continue', handler);
   },
   listSftp: async (input: SftpListRequest) => {
     const request = SftpListRequestSchema.parse(input);

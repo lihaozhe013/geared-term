@@ -47,6 +47,7 @@ test('exposes exactly the documented preload surface', async () => {
   expect(keys).toEqual(
     [
       'cancelSftpTransfer',
+      'continueAiHistory',
       'createLocalTerminal',
       'createSavedSshTerminal',
       'createSshTerminal',
@@ -81,12 +82,14 @@ test('exposes exactly the documented preload surface', async () => {
       'lockVault',
       'makeLocalDirectory',
       'onMenuCommand',
+      'onAiHistoryContinue',
       'onSettingsChanged',
       'onSettingsNavigate',
       'onSftpCd',
       'onSftpTransferEvent',
       'openAiHistoryDirectory',
       'openConfigFolder',
+      'openHistoryWindow',
       'openLocalPath',
       'openSettings',
       'openThemesFolder',

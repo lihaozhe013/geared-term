@@ -5,27 +5,52 @@ import {
   type CommandCandidate,
   type SupportedShell
 } from '@geared-term/command-parser';
-import type {
-  AiConnectionRecord,
-  AiHistorySummary,
-  AiStreamEvent,
-  EnvironmentRecord
-} from '@geared-term/protocol';
+import type { AiConnectionRecord, AiStreamEvent, EnvironmentRecord } from '@geared-term/protocol';
+import {
+  ArrowUp,
+  Bot,
+  ChevronDown,
+  Copy,
+  FileText,
+  History,
+  List,
+  Plus,
+  Settings2,
+  SquareTerminal,
+  SquarePlus,
+  X
+} from 'lucide-react';
 import { MarkdownView } from './assistant/MarkdownView';
 import { formatSnapshotForPrompt, type TerminalSnapshot } from './terminal/snapshot';
 
 type Message = {
   role: 'user' | 'assistant';
   content: string;
+  model?: string;
+  usage?: { input?: number; output?: number };
 };
+
+type SourceReference = { url: string; title?: string };
 
 type AssistantPanelProps = {
   targetSessionId?: string;
+  sessionLabel?: string;
   environmentTargetKey?: string;
   splitCommandPresentation?: boolean;
+  onToggleSplitCommand?: () => void;
   globalInstructions?: string;
+  pendingHistoryId?: string | null;
+  onPendingHistoryConsumed?: () => void;
   getSnapshot?: () => TerminalSnapshot | null;
 };
+
+function estimateTokens(text: string): number {
+  let tokens = 0;
+  for (const char of text) {
+    tokens += (char.codePointAt(0) ?? 0) <= 0x7f ? 0.25 : 1;
+  }
+  return Math.ceil(tokens);
+}
 
 function commandCandidates(content: string, splitPresentation: boolean): CommandCandidate[] {
   const result: CommandCandidate[] = [];
@@ -112,7 +137,7 @@ function CommandCard({
           onClick={() => void copy()}
           disabled={disabled}
         >
-          Copy
+          <Copy size={12} aria-hidden="true" /> Copy
         </button>
         <button
           type="button"
@@ -123,11 +148,11 @@ function CommandCard({
             insertAllowed ? 'Insert without submitting' : 'A stable visible terminal is required'
           }
         >
-          Insert
+          <SquareTerminal size={12} aria-hidden="true" /> Insert
         </button>
         <button
           type="button"
-          className="toolbar-button command-run"
+          className="toolbar-button"
           onClick={() => void execute('run')}
           disabled={disabled || !runAllowed}
           title={
@@ -136,42 +161,49 @@ function CommandCard({
               : 'Run is disabled until a stable shell block is available'
           }
         >
-          Run
+          <SquarePlus size={12} aria-hidden="true" /> Run
         </button>
       </div>
     </div>
   );
 }
 
+function MetaChip({ children }: { children: React.ReactNode }): React.JSX.Element {
+  return <span className="meta-chip">{children}</span>;
+}
+
 export function AssistantPanel({
   targetSessionId,
+  sessionLabel,
   environmentTargetKey,
   splitCommandPresentation = false,
+  onToggleSplitCommand,
   globalInstructions = '',
+  pendingHistoryId,
+  onPendingHistoryConsumed,
   getSnapshot
 }: AssistantPanelProps): React.JSX.Element {
   const [connections, setConnections] = useState<AiConnectionRecord[]>([]);
-  const [selectedId, setSelectedId] = useState('');
-  const [name, setName] = useState('Local model');
-  const [protocol, setProtocol] = useState<'responses' | 'chat-completions'>('chat-completions');
-  const [baseUrl, setBaseUrl] = useState('http://127.0.0.1:11434/v1');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [model, setModel] = useState('');
-  const [apiKey, setApiKey] = useState('');
+  const [modelMenuOpen, setModelMenuOpen] = useState(false);
+  const [attachMenuOpen, setAttachMenuOpen] = useState(false);
   const [composer, setComposer] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [reasoning, setReasoning] = useState('');
-  const [source, setSource] = useState<string | undefined>();
+  const [reasoningLive, setReasoningLive] = useState(false);
+  const [sources, setSources] = useState<SourceReference[]>([]);
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [attachedEnvironment, setAttachedEnvironment] = useState<EnvironmentRecord | null>(null);
-  const [snapshotPreview, setSnapshotPreview] = useState<TerminalSnapshot | null>(null);
-  const [discoveredModels, setDiscoveredModels] = useState<string[]>([]);
-  const [discovering, setDiscovering] = useState(false);
+  const [pendingSnapshot, setPendingSnapshot] = useState<TerminalSnapshot | null>(null);
+  const [attachedSnapshot, setAttachedSnapshot] = useState<TerminalSnapshot | null>(null);
   const [conversationId, setConversationId] = useState<string>(() => crypto.randomUUID());
-  const [historyEntries, setHistoryEntries] = useState<AiHistorySummary[] | null>(null);
   const streamRef = useRef<{ cancel: () => void } | null>(null);
   const messagesRef = useRef<Message[]>([]);
   messagesRef.current = messages;
+  const reasoningBoxRef = useRef<HTMLDivElement | null>(null);
+  const composerRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     void window.geared
@@ -181,9 +213,6 @@ export function AssistantPanel({
         const first = saved[0];
         if (first) {
           setSelectedId(first.id);
-          setName(first.name);
-          setProtocol(first.protocol);
-          setBaseUrl(first.baseUrl);
           setModel(first.defaultModel);
         }
       })
@@ -211,39 +240,51 @@ export function AssistantPanel({
       );
   }, [environmentTargetKey]);
 
-  const handleSelect = (id: string): void => {
-    const connection = connections.find((item) => item.id === id);
-    setSelectedId(id);
-    if (!connection) return;
-    setName(connection.name);
-    setProtocol(connection.protocol);
-    setBaseUrl(connection.baseUrl);
-    setModel(connection.defaultModel);
-    setApiKey('');
-    setError(null);
-  };
-
-  const saveConnection = async (): Promise<void> => {
-    try {
-      const saved = await window.geared.saveAiConnection({
-        id: selectedId || undefined,
-        name,
-        protocol,
-        baseUrl,
-        model,
-        ...(apiKey ? { apiKey } : {})
-      });
-      setConnections(saved);
-      const latest = saved.at(-1);
-      if (latest) {
-        setSelectedId(latest.id);
-        setModel(latest.defaultModel);
-      }
-      setApiKey('');
-      setError(null);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to save AI connection');
+  useEffect(() => {
+    if (!pendingHistoryId) return;
+    if (streaming) {
+      setError('History cannot be loaded while a request is active.');
+      onPendingHistoryConsumed?.();
+      return;
     }
+    void window.geared
+      .loadAiHistory({ id: pendingHistoryId })
+      .then((record) => {
+        setMessages(
+          record.messages.map((message) => ({ role: message.role, content: message.content }))
+        );
+        setConversationId(record.id);
+        setReasoning('');
+        setReasoningLive(false);
+        setSources([]);
+        setError(null);
+      })
+      .catch((reason: unknown) =>
+        setError(reason instanceof Error ? reason.message : 'Unable to load conversation')
+      )
+      .finally(() => onPendingHistoryConsumed?.());
+  }, [pendingHistoryId, streaming, onPendingHistoryConsumed]);
+
+  useEffect(() => {
+    const box = reasoningBoxRef.current;
+    if (box) box.scrollTop = box.scrollHeight;
+  }, [reasoning]);
+
+  useEffect(() => {
+    const element = composerRef.current;
+    if (!element) return;
+    element.style.height = 'auto';
+    element.style.height = `${Math.min(element.scrollHeight, 190)}px`;
+  }, [composer]);
+
+  const selectedConnection = connections.find((connection) => connection.id === selectedId);
+  const modelOptions = selectedConnection?.models ?? [];
+
+  const pickConnectionModel = (id: string | null): void => {
+    setSelectedId(id);
+    const connection = connections.find((item) => item.id === id);
+    setModel(connection ? connection.defaultModel : '');
+    setModelMenuOpen(false);
   };
 
   const receiveEvent = (event: AiStreamEvent): void => {
@@ -251,18 +292,37 @@ export function AssistantPanel({
       setMessages((current) => {
         const last = current.at(-1);
         if (!last || last.role !== 'assistant')
-          return [...current, { role: 'assistant', content: event.text }];
+          return [...current, { role: 'assistant', content: event.text, model }];
         return [...current.slice(0, -1), { ...last, content: last.content + event.text }];
       });
     } else if (event.kind === 'reasoning') {
       setReasoning((current) => current + event.text);
+      setReasoningLive(true);
+    } else if (event.kind === 'usage') {
+      setMessages((current) => {
+        const last = current.at(-1);
+        if (!last || last.role !== 'assistant') return current;
+        return [
+          ...current.slice(0, -1),
+          {
+            ...last,
+            usage: { input: event.inputTokens, output: event.outputTokens }
+          }
+        ];
+      });
     } else if (event.kind === 'source') {
-      setSource(event.title ? `${event.title} — ${event.url}` : event.url);
+      setSources((current) =>
+        current.some((source) => source.url === event.url)
+          ? current
+          : [...current, { url: event.url, title: event.title }]
+      );
     } else if (event.kind === 'error') {
       setError(event.message);
       setStreaming(false);
+      setReasoningLive(false);
     } else if (event.kind === 'complete') {
       setStreaming(false);
+      setReasoningLive(false);
       streamRef.current = null;
       const turn = messagesRef.current.filter((message) => message.content.trim().length > 0);
       if (turn.length > 0) {
@@ -280,33 +340,16 @@ export function AssistantPanel({
     }
   };
 
-  const discoverModels = async (): Promise<void> => {
-    setDiscovering(true);
-    setError(null);
-    try {
-      const result = await window.geared.discoverAiModels({
-        ...(selectedId ? { connectionId: selectedId } : {}),
-        ...(selectedId ? {} : { protocol, baseUrl }),
-        ...(model ? { model } : {}),
-        ...(apiKey && !selectedId ? { apiKey } : {})
-      });
-      setDiscoveredModels(result.models);
-      if (result.models.length > 0 && !model) setModel(result.models[0] as string);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to discover models');
-    } finally {
-      setDiscovering(false);
-    }
-  };
-
   const startNewChat = (): void => {
     streamRef.current?.cancel();
     streamRef.current = null;
     setMessages([]);
     setComposer('');
     setReasoning('');
-    setSource(undefined);
-    setSnapshotPreview(null);
+    setReasoningLive(false);
+    setSources([]);
+    setPendingSnapshot(null);
+    setAttachedSnapshot(null);
     setStreaming(false);
     setConversationId(crypto.randomUUID());
     setError(null);
@@ -317,40 +360,19 @@ export function AssistantPanel({
       setError('History cannot be loaded while a request is active.');
       return;
     }
-    void window.geared
-      .listAiHistory()
-      .then((result) => setHistoryEntries(result.entries))
-      .catch((reason: unknown) =>
-        setError(reason instanceof Error ? reason.message : 'Unable to list conversations')
-      );
-  };
-
-  const loadConversation = async (id: string): Promise<void> => {
-    if (streaming) {
-      setError('History cannot be loaded while a request is active.');
-      return;
-    }
-    try {
-      const record = await window.geared.loadAiHistory({ id });
-      setMessages(record.messages.map((message) => ({ ...message })));
-      setConversationId(record.id);
-      setReasoning('');
-      setSource(undefined);
-      setError(null);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to load conversation');
-    }
+    void window.geared.openHistoryWindow();
   };
 
   const handleCommandError = (message: string): void => setError(message);
 
   const attachSnapshot = (): void => {
+    setAttachMenuOpen(false);
     const snapshot = getSnapshot?.() ?? null;
     if (!snapshot) {
       setError('The active terminal has no context to attach.');
       return;
     }
-    setSnapshotPreview(snapshot);
+    setPendingSnapshot(snapshot);
     setError(null);
   };
 
@@ -385,239 +407,260 @@ export function AssistantPanel({
         )}`
       });
     }
-    if (snapshotPreview) {
+    if (attachedSnapshot) {
       // The snapshot is an untrusted observation, never application instructions.
       systemMessages.push({
         role: 'system',
-        content: formatSnapshotForPrompt(snapshotPreview)
+        content: formatSnapshotForPrompt(attachedSnapshot)
       });
     }
     const requestMessages = [...systemMessages, ...nextMessages];
-    setMessages([...nextMessages, { role: 'assistant', content: '' }]);
+    setMessages([...nextMessages, { role: 'assistant', content: '', model }]);
     setComposer('');
-    setSnapshotPreview(null);
+    setPendingSnapshot(null);
+    setAttachedSnapshot(null);
     setReasoning('');
-    setSource(undefined);
+    setSources([]);
     setError(null);
     setStreaming(true);
     const streamId = crypto.randomUUID();
     streamRef.current = window.geared.streamAi(
       { streamId, connectionId: selectedId, model, messages: requestMessages },
       (event) => {
-        const parsed = event as AiStreamEvent;
-        receiveEvent(parsed);
+        receiveEvent(event as AiStreamEvent);
       }
     );
+  };
+
+  const stop = (): void => {
+    streamRef.current?.cancel();
+    streamRef.current = null;
+    setStreaming(false);
+    setReasoningLive(false);
   };
 
   return (
     <aside className="assistant-panel" aria-label="AI assistant">
       <div className="assistant-header">
-        <div>
-          <p className="eyebrow">PROVIDER-NEUTRAL STREAM</p>
-          <h2>Assistant</h2>
+        <Bot size={16} aria-hidden="true" className="assistant-header-icon" />
+        <div className="assistant-header-titles">
+          <span className="assistant-header-title">AI Assistant</span>
+          {sessionLabel ? <span className="assistant-header-subtitle">{sessionLabel}</span> : null}
         </div>
-        {streaming ? (
+        <div className="assistant-header-actions">
           <button
             type="button"
-            className="toolbar-button"
-            onClick={() => {
-              streamRef.current?.cancel();
-              streamRef.current = null;
-              setStreaming(false);
-            }}
+            className="icon-button"
+            aria-label="New chat"
+            title="New chat"
+            onClick={startNewChat}
           >
-            Stop
+            <Plus size={14} aria-hidden="true" />
           </button>
-        ) : (
-          <div className="assistant-header-actions">
-            <button type="button" className="toolbar-button" onClick={openHistory}>
-              History
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="Chat history"
+            title="Chat history"
+            onClick={openHistory}
+          >
+            <History size={14} aria-hidden="true" />
+          </button>
+          {onToggleSplitCommand ? (
+            <button
+              type="button"
+              className={`icon-button ${splitCommandPresentation ? 'active' : ''}`}
+              aria-label="Split command blocks"
+              aria-pressed={splitCommandPresentation}
+              title="Split command blocks"
+              onClick={onToggleSplitCommand}
+            >
+              <List size={14} aria-hidden="true" />
             </button>
-            <button type="button" className="toolbar-button" onClick={startNewChat}>
-              New chat
-            </button>
-          </div>
-        )}
+          ) : null}
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="AI settings"
+            title="AI settings"
+            onClick={() => void window.geared.openSettings('ai-connections')}
+          >
+            <Settings2 size={14} aria-hidden="true" />
+          </button>
+        </div>
       </div>
 
-      {historyEntries ? (
-        <details className="assistant-history" open>
-          <summary>Conversations ({historyEntries.length})</summary>
-          <div className="assistant-history-list">
-            {historyEntries.length === 0 ? (
-              <p className="muted">No saved conversations yet.</p>
-            ) : null}
-            {historyEntries.map((entry) => (
-              <div className="assistant-history-row" key={entry.id}>
-                <button
-                  type="button"
-                  className="profile-button"
-                  onClick={() => void loadConversation(entry.id)}
-                  disabled={streaming}
-                >
-                  <span>{entry.title}</span>
-                  <small>
-                    {new Date(entry.updatedAt).toLocaleString()} · {entry.messageCount} messages
-                  </small>
-                </button>
-                <button
-                  type="button"
-                  className="icon-button danger"
-                  aria-label={`Delete ${entry.title}`}
-                  onClick={() => {
-                    if (!window.confirm(`Delete the conversation "${entry.title}"?`)) return;
-                    void window.geared
-                      .deleteAiHistory(entry.id)
-                      .then(openHistory)
-                      .catch(() => setError('Unable to delete conversation'));
-                  }}
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-          </div>
-          <div className="command-card-actions">
-            <button
-              type="button"
-              className="toolbar-button"
-              onClick={() => void window.geared.openAiHistoryDirectory()}
-            >
-              Open folder
-            </button>
-            <button
-              type="button"
-              className="toolbar-button"
-              onClick={() => setHistoryEntries(null)}
-            >
-              Close
-            </button>
-          </div>
-        </details>
-      ) : null}
-
-      <div className="assistant-config">
-        <label>
-          Connection
-          <select value={selectedId} onChange={(event) => handleSelect(event.target.value)}>
-            <option value="">New connection</option>
-            {connections.map((connection) => (
-              <option key={connection.id} value={connection.id}>
-                {connection.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Name
-          <input value={name} onChange={(event) => setName(event.target.value)} />
-        </label>
-        <label>
-          Protocol
-          <select
-            value={protocol}
-            onChange={(event) => setProtocol(event.target.value as typeof protocol)}
-          >
-            <option value="chat-completions">Chat Completions</option>
-            <option value="responses">Responses</option>
-          </select>
-        </label>
-        <label>
-          Base URL
-          <input value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} />
-        </label>
-        <label>
-          Model
-          <input
-            value={model}
-            onChange={(event) => setModel(event.target.value)}
-            placeholder="model-name"
-            list="assistant-model-options"
-          />
-          <datalist id="assistant-model-options">
-            {discoveredModels.map((entry) => (
-              <option value={entry} key={entry} />
-            ))}
-          </datalist>
-        </label>
+      <div className="assistant-model-row">
         <button
           type="button"
-          className="toolbar-button"
-          onClick={() => void discoverModels()}
-          disabled={discovering}
+          className="assistant-picker-button"
+          onClick={() => setModelMenuOpen((open) => !open)}
+          title="Switch model for this chat"
         >
-          {discovering ? 'Discovering…' : 'Discover models'}
+          <span className="assistant-picker-label">{model || 'No model selected'}</span>
+          <ChevronDown size={13} aria-hidden="true" />
         </button>
-        <label>
-          API key <span className="muted">(optional; stored in vault)</span>
-          <input
-            type="password"
-            value={apiKey}
-            onChange={(event) => setApiKey(event.target.value)}
-            autoComplete="off"
-          />
-        </label>
-        <button type="button" className="primary-button" onClick={() => void saveConnection()}>
-          Save connection
-        </button>
+        {modelMenuOpen ? (
+          <>
+            <div className="assistant-menu-backdrop" onClick={() => setModelMenuOpen(false)} />
+            <div className="assistant-picker-menu" role="menu">
+              {modelOptions.length === 0 ? (
+                <p className="settings-hint">No models on this connection yet.</p>
+              ) : null}
+              {modelOptions.map((option) => (
+                <button
+                  type="button"
+                  key={option}
+                  role="menuitem"
+                  className={`assistant-menu-item ${option === model ? 'active' : ''}`}
+                  onClick={() => {
+                    setModel(option);
+                    setModelMenuOpen(false);
+                  }}
+                >
+                  {option}
+                </button>
+              ))}
+              <div className="assistant-menu-separator" />
+              <button
+                type="button"
+                className="assistant-menu-item"
+                onClick={() => {
+                  setModelMenuOpen(false);
+                  void window.geared.openSettings('ai-connections');
+                }}
+              >
+                Manage connections…
+              </button>
+            </div>
+          </>
+        ) : null}
       </div>
 
       <div className="assistant-messages" aria-live="polite">
         {attachedEnvironment ? (
-          <details className="assistant-context">
-            <summary>Environment context attached</summary>
-            <p>
-              {attachedEnvironment.targetKey}: {attachedEnvironment.facts.os ?? 'unknown OS'} ·{' '}
-              {attachedEnvironment.facts.hostname ?? 'unknown host'}
-            </p>
-          </details>
+          <div className="assistant-context-chip">
+            Environment context attached · {attachedEnvironment.facts.os ?? 'unknown OS'} ·{' '}
+            {attachedEnvironment.facts.hostname ?? 'unknown host'}
+          </div>
         ) : null}
         {messages.length === 0 ? (
-          <p className="muted">Configure a connection, then ask a question.</p>
-        ) : null}
-        {messages.map((message, index) => (
-          <div className={`assistant-message ${message.role}`} key={`${message.role}-${index}`}>
-            <small>{message.role === 'user' ? 'You' : 'Assistant'}</small>
-            {message.role === 'assistant' ? (
-              <MarkdownView source={message.content || (streaming ? '…' : '')} />
-            ) : (
-              <p>{message.content}</p>
-            )}
-            {message.role === 'assistant'
-              ? commandCandidates(message.content, splitCommandPresentation).map(
-                  (candidate, candidateIndex) => (
-                    <CommandCard
-                      key={`${candidate.revision}-${candidateIndex}`}
-                      candidate={candidate}
-                      targetSessionId={targetSessionId}
-                      disabled={streaming}
-                      onError={handleCommandError}
-                    />
-                  )
-                )
-              : null}
+          <div className="assistant-empty">
+            <Bot size={24} aria-hidden="true" />
+            <p>Ask about this terminal</p>
           </div>
-        ))}
-        {reasoning ? (
-          <details className="assistant-reasoning">
-            <summary>Reasoning summary</summary>
-            <p>{reasoning}</p>
-          </details>
         ) : null}
-        {source ? <p className="assistant-source">Source: {source}</p> : null}
+        {messages.map((message, index) =>
+          message.role === 'user' ? (
+            <div className="assistant-message user" key={`user-${index}`}>
+              <div className="assistant-message-label">
+                <ArrowUp size={12} aria-hidden="true" /> You
+              </div>
+              <p>{message.content}</p>
+              <div className="assistant-meta-row">
+                <MetaChip>~{estimateTokens(message.content)} estimated tokens</MetaChip>
+              </div>
+            </div>
+          ) : (
+            <div className="assistant-message assistant" key={`assistant-${index}`}>
+              <div className="assistant-message-label">
+                <Bot size={12} aria-hidden="true" /> AI Assistant
+                {message.model ? (
+                  <span className="assistant-message-model">{message.model}</span>
+                ) : null}
+              </div>
+              {reasoning ? (
+                reasoningLive && index === messages.length - 1 ? (
+                  <div className="assistant-reasoning-live" ref={reasoningBoxRef}>
+                    <p>{reasoning}</p>
+                  </div>
+                ) : (
+                  <details className="assistant-reasoning">
+                    <summary>Reasoning summary</summary>
+                    <p>{reasoning}</p>
+                  </details>
+                )
+              ) : null}
+              <MarkdownView source={message.content || (streaming ? '…' : '')} />
+              {message.role === 'assistant'
+                ? commandCandidates(message.content, splitCommandPresentation).map(
+                    (candidate, candidateIndex) => (
+                      <CommandCard
+                        key={`${candidate.revision}-${candidateIndex}`}
+                        candidate={candidate}
+                        targetSessionId={targetSessionId}
+                        disabled={streaming}
+                        onError={handleCommandError}
+                      />
+                    )
+                  )
+                : null}
+              {sources.length > 0 && index === messages.length - 1 ? (
+                <div className="assistant-sources">
+                  <span className="assistant-sources-label">Sources</span>
+                  <div className="chip-row">
+                    {sources.map((source) => (
+                      <a
+                        className="chip"
+                        key={source.url}
+                        href={source.url}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        title={source.title ?? source.url}
+                      >
+                        {source.title ?? source.url}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              {message.content ? (
+                <div className="assistant-meta-row">
+                  {message.model ? <MetaChip>{message.model}</MetaChip> : null}
+                  {message.usage?.input !== undefined ? (
+                    <MetaChip>in {message.usage.input}</MetaChip>
+                  ) : null}
+                  {message.usage?.output !== undefined ? (
+                    <MetaChip>out {message.usage.output}</MetaChip>
+                  ) : null}
+                  {!message.usage ? (
+                    <MetaChip>~{estimateTokens(message.content)} estimated tokens</MetaChip>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          )
+        )}
       </div>
 
-      {error ? <p className="terminal-line error">{error}</p> : null}
-      {snapshotPreview ? (
+      {error ? (
+        <div className="assistant-error-card" role="alert">
+          <div className="assistant-error-head">
+            <span>Request failed</span>
+            <button
+              type="button"
+              className="icon-button"
+              aria-label="Dismiss error"
+              onClick={() => setError(null)}
+            >
+              <X size={12} aria-hidden="true" />
+            </button>
+          </div>
+          <p>{error}</p>
+        </div>
+      ) : null}
+
+      {pendingSnapshot ? (
         <details className="assistant-snapshot-preview" open>
-          <summary>Terminal context ready — {snapshotSummary(snapshotPreview)}</summary>
-          <pre>{snapshotPreview.text.slice(0, 2000)}</pre>
+          <summary>Terminal context ready — {snapshotSummary(pendingSnapshot)}</summary>
+          <pre>{pendingSnapshot.text.slice(0, 2000)}</pre>
           <div className="command-card-actions">
             <button
               type="button"
-              className="primary-button"
+              className="primary-button settings-apply"
               onClick={() => {
+                setAttachedSnapshot(pendingSnapshot);
+                setPendingSnapshot(null);
                 setComposer((current) => current.trim() || 'Explain this terminal output.');
               }}
             >
@@ -626,7 +669,7 @@ export function AssistantPanel({
             <button
               type="button"
               className="toolbar-button"
-              onClick={() => setSnapshotPreview(null)}
+              onClick={() => setPendingSnapshot(null)}
             >
               Remove
             </button>
@@ -637,6 +680,7 @@ export function AssistantPanel({
           </p>
         </details>
       ) : null}
+
       <form
         className="assistant-composer"
         onSubmit={(event) => {
@@ -644,29 +688,81 @@ export function AssistantPanel({
           send();
         }}
       >
-        <textarea
-          value={composer}
-          onChange={(event) => setComposer(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' && !event.shiftKey) {
-              event.preventDefault();
-              send();
-            }
-          }}
-          placeholder="Ask the assistant…"
-          rows={3}
-        />
-        <div className="composer-actions">
-          <button type="button" className="toolbar-button" onClick={attachSnapshot}>
-            Attach terminal
-          </button>
-          <button
-            type="submit"
-            className="primary-button"
-            disabled={streaming || !selectedId || !model}
-          >
-            Send
-          </button>
+        {attachedSnapshot ? (
+          <div className="assistant-attachment-chip">
+            <FileText size={13} aria-hidden="true" />
+            <span className="assistant-attachment-label">
+              {attachedSnapshot.source} · {sessionLabel ?? 'terminal'} ·{' '}
+              {attachedSnapshot.charCount} bytes
+            </span>
+            <button
+              type="button"
+              className="icon-button"
+              aria-label="Remove attached snapshot"
+              onClick={() => setAttachedSnapshot(null)}
+            >
+              <X size={12} aria-hidden="true" />
+            </button>
+          </div>
+        ) : null}
+        <div className="assistant-composer-row">
+          <div className="assistant-attach">
+            <button
+              type="button"
+              className="icon-button"
+              aria-label="Attach context"
+              onClick={() => setAttachMenuOpen((open) => !open)}
+            >
+              <Plus size={15} aria-hidden="true" />
+            </button>
+            {attachMenuOpen ? (
+              <>
+                <div className="assistant-menu-backdrop" onClick={() => setAttachMenuOpen(false)} />
+                <div className="assistant-picker-menu assistant-menu-bottom" role="menu">
+                  <button
+                    type="button"
+                    className="assistant-menu-item"
+                    role="menuitem"
+                    onClick={attachSnapshot}
+                  >
+                    <FileText size={13} aria-hidden="true" /> Attach terminal snapshot
+                  </button>
+                </div>
+              </>
+            ) : null}
+          </div>
+          <textarea
+            ref={composerRef}
+            value={composer}
+            onChange={(event) => setComposer(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                send();
+              }
+            }}
+            placeholder="Ask about this terminal..."
+            rows={1}
+          />
+          {streaming ? (
+            <button
+              type="button"
+              className="assistant-send-button stop"
+              aria-label="Stop"
+              onClick={stop}
+            >
+              <X size={18} aria-hidden="true" />
+            </button>
+          ) : (
+            <button
+              type="submit"
+              className="assistant-send-button"
+              aria-label="Send"
+              disabled={!composer.trim() || !selectedId || !model}
+            >
+              <ArrowUp size={18} aria-hidden="true" />
+            </button>
+          )}
         </div>
       </form>
     </aside>

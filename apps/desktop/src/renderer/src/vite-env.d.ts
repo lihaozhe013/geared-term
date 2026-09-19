@@ -118,6 +118,9 @@ declare global {
       openSettings: (category?: string) => Promise<SftpOperationResult>;
       onSettingsChanged: (listener: (settings: SettingsRecord) => void) => () => void;
       onSettingsNavigate: (listener: (category: string) => void) => () => void;
+      openHistoryWindow: () => Promise<SftpOperationResult>;
+      continueAiHistory: (id: string) => Promise<SftpOperationResult>;
+      onAiHistoryContinue: (listener: (id: string) => void) => () => void;
       listSftp: (input: SftpListRequest) => Promise<SftpListResult>;
       sftpMkdir: (input: SftpMkdirRequest) => Promise<SftpOperationResult>;
       sftpRename: (input: SftpRenameRequest) => Promise<SftpOperationResult>;

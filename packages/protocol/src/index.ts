@@ -257,6 +257,8 @@ export const AiHistorySavedSchema = z
   .object({ id: AiHistoryIdSchema, updatedAt: z.string().max(64) })
   .strict();
 
+export const AiHistoryContinueSchema = z.object({ id: AiHistoryIdSchema }).strict();
+
 export const AiChatMessageSchema = z
   .object({
     role: z.enum(['system', 'user', 'assistant']),
@@ -787,6 +789,7 @@ export type AiHistoryLoadRequest = z.infer<typeof AiHistoryLoadRequestSchema>;
 export type AiHistoryLoadResult = z.infer<typeof AiHistoryLoadResultSchema>;
 export type AiHistorySaveRequest = z.infer<typeof AiHistorySaveRequestSchema>;
 export type AiHistorySaved = z.infer<typeof AiHistorySavedSchema>;
+export type AiHistoryContinue = z.infer<typeof AiHistoryContinueSchema>;
 export type VaultStatus = z.infer<typeof VaultStatusSchema>;
 export type SessionProfileRecord = z.infer<typeof SessionProfileRecordSchema>;
 export type ProfileCredentials = z.infer<typeof ProfileCredentialsSchema>;

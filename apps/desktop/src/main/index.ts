@@ -83,6 +83,7 @@ import { SshSessionManager } from './ssh/ssh-session';
 import { buildRemoteFileCommand } from './sftp/remote-commands';
 import { TransferManager } from './sftp/transfers';
 import { buildApplicationMenu, type MenuLocale } from './menu';
+import { HistoryWindowManager } from './history-window';
 import { SettingsWindowManager, type SettingsCategory } from './settings-window';
 import { discoverWsl } from './wsl/discovery';
 import { probeEnvironment } from './environment/probe';
@@ -95,6 +96,7 @@ if (userDataOverride) app.setPath('userData', userDataOverride);
 let logger: Logger;
 let mainWindow: BrowserWindow | undefined;
 let settingsWindow: SettingsWindowManager;
+let historyWindow: HistoryWindowManager;
 let localTerminals: LocalTerminalManager;
 let storage: AppStorage;
 let sshSessions: SshSessionManager;
@@ -357,6 +359,15 @@ function registerIpc(): void {
   ipcMain.handle('app:open-settings', (_event, input: unknown) => {
     const parsed = SettingsOpenRequestSchema.parse(input ?? {});
     settingsWindow.open(parsed.category as SettingsCategory | undefined);
+    return SftpOperationResultSchema.parse({ accepted: true });
+  });
+  ipcMain.handle('app:open-history', () => {
+    historyWindow.open();
+    return SftpOperationResultSchema.parse({ accepted: true });
+  });
+  ipcMain.handle('app:continue-history', (_event, input: unknown) => {
+    const request = AiHistoryLoadRequestSchema.parse(input);
+    sendToRenderer('ai:history:continue', { id: request.id });
     return SftpOperationResultSchema.parse({ accepted: true });
   });
   ipcMain.handle('sftp:list', async (_event, input: unknown) => {
@@ -781,6 +792,7 @@ void app.whenReady().then(async () => {
   installContentSecurityPolicy();
   registerIpc();
   settingsWindow = new SettingsWindowManager(logger, isDevelopment);
+  historyWindow = new HistoryWindowManager(logger, isDevelopment);
   await rebuildApplicationMenu();
   mainWindow = createWindow();
   logger.info('app', 'Application ready', { packaged: app.isPackaged });
