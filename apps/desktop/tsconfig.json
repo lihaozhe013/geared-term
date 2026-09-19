@@ -9,5 +9,11 @@
       "@geared-term/command-parser": ["../../packages/command-parser/src/index.ts"]
     }
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "electron.vite.config.ts"]
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "e2e/**/*.ts",
+    "electron.vite.config.ts",
+    "playwright.config.ts"
+  ]
 }

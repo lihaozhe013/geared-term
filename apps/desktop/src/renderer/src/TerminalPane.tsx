@@ -278,7 +278,7 @@ export function TerminalPane({
   };
 
   return (
-    <div className="terminal-wrapper" hidden={!active}>
+    <div className="terminal-wrapper" hidden={!active} data-session-id={request.sessionId}>
       {showSearch ? (
         <div className="terminal-search" role="search">
           <input

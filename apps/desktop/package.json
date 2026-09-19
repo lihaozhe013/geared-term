@@ -17,6 +17,7 @@
     "build": "electron-vite build",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run --passWithNoTests",
+    "test:e2e": "playwright test -c playwright.config.ts",
     "postinstall": "electron-builder install-app-deps",
     "package": "pnpm run build && electron-builder --config electron-builder.yml"
   },
@@ -37,6 +38,7 @@
     "zod": "4.6.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@types/better-sqlite3": "^9.6.0",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",

@@ -85,6 +85,10 @@ import { discoverWsl } from './wsl/discovery';
 import { probeEnvironment } from './environment/probe';
 
 const isDevelopment = !app.isPackaged;
+// Keeps automated runs (E2E tests, portable scenarios) hermetic by redirecting
+// profile storage away from the machine-wide default location.
+const userDataOverride = process.env.GEARED_USER_DATA?.trim();
+if (userDataOverride) app.setPath('userData', userDataOverride);
 let logger: Logger;
 let mainWindow: BrowserWindow | undefined;
 let localTerminals: LocalTerminalManager;

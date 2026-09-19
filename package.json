@@ -13,6 +13,7 @@
     "build": "pnpm --filter @geared-term/desktop build",
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "vitest run --passWithNoTests",
+    "test:e2e": "pnpm build && pnpm --filter @geared-term/desktop test:e2e",
     "format:check": "prettier --check .",
     "format": "prettier --write .",
     "package": "pnpm --filter @geared-term/desktop package"
