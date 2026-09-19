@@ -10,12 +10,14 @@ import {
   type SettingsRecord,
   type TerminalPortMessage
 } from '@geared-term/protocol';
+import { extractSnapshot, type SnapshotTerminal, type TerminalSnapshot } from './terminal/snapshot';
 
 type TerminalRequest = LocalTerminalRequest | SshTerminalRequest | SshProfileTerminalRequest;
 type TerminalClient =
   | ReturnType<Window['geared']['createLocalTerminal']>
   | ReturnType<Window['geared']['createSshTerminal']>
   | ReturnType<Window['geared']['createSavedSshTerminal']>;
+export type SnapshotExtractor = () => TerminalSnapshot | null;
 
 type TerminalPaneProps = {
   request: TerminalRequest;
@@ -26,6 +28,7 @@ type TerminalPaneProps = {
     message: TerminalPortMessage & { kind: 'prompt' },
     client: TerminalClient
   ) => void;
+  registerSnapshot?: (extractor: SnapshotExtractor | null) => void;
 };
 
 function isSshRequest(request: TerminalRequest): request is SshTerminalRequest {
@@ -51,7 +54,8 @@ export function TerminalPane({
   settings,
   active,
   onState,
-  onHostKeyPrompt
+  onHostKeyPrompt,
+  registerSnapshot
 }: TerminalPaneProps): React.JSX.Element {
   const hostRef = useRef<HTMLDivElement>(null);
   const fitRef = useRef<FitAddon | null>(null);
@@ -60,9 +64,13 @@ export function TerminalPane({
   const activeRef = useRef(active);
   const onStateRef = useRef(onState);
   const onHostKeyPromptRef = useRef(onHostKeyPrompt);
+  const registerSnapshotRef = useRef(registerSnapshot);
+  const precedingLinesRef = useRef(settings.terminalContextPrecedingLines);
   activeRef.current = active;
   onStateRef.current = onState;
   onHostKeyPromptRef.current = onHostKeyPrompt;
+  registerSnapshotRef.current = registerSnapshot;
+  precedingLinesRef.current = settings.terminalContextPrecedingLines;
 
   useEffect(() => {
     const host = hostRef.current;
@@ -84,6 +92,13 @@ export function TerminalPane({
     fit.fit();
     fitRef.current = fit;
     terminalRef.current = terminal;
+    registerSnapshotRef.current?.(() => {
+      const current = terminalRef.current;
+      if (!current) return null;
+      return extractSnapshot(current as unknown as SnapshotTerminal, {
+        precedingLines: precedingLinesRef.current
+      });
+    });
 
     let disposed = false;
     let client: TerminalClient | undefined;
@@ -152,6 +167,7 @@ export function TerminalPane({
       resizeObserver.disconnect();
       inputSubscription?.dispose();
       resizeSubscription?.dispose();
+      registerSnapshotRef.current?.(null);
       client?.close();
       terminal.dispose();
       fitRef.current = null;

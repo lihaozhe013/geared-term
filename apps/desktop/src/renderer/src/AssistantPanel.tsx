@@ -6,6 +6,10 @@ import {
   type SupportedShell
 } from '@geared-term/command-parser';
 import type { AiConnectionRecord, AiStreamEvent, EnvironmentRecord } from '@geared-term/protocol';
+import {
+  formatSnapshotForPrompt,
+  type TerminalSnapshot
+} from './terminal/snapshot';
 
 type Message = {
   role: 'user' | 'assistant';
@@ -16,6 +20,7 @@ type AssistantPanelProps = {
   targetSessionId?: string;
   environmentTargetKey?: string;
   splitCommandPresentation?: boolean;
+  getSnapshot?: () => TerminalSnapshot | null;
 };
 
 function commandCandidates(content: string, splitPresentation: boolean): CommandCandidate[] {
@@ -137,7 +142,8 @@ function CommandCard({
 export function AssistantPanel({
   targetSessionId,
   environmentTargetKey,
-  splitCommandPresentation = false
+  splitCommandPresentation = false,
+  getSnapshot
 }: AssistantPanelProps): React.JSX.Element {
   const [connections, setConnections] = useState<AiConnectionRecord[]>([]);
   const [selectedId, setSelectedId] = useState('');
@@ -153,6 +159,7 @@ export function AssistantPanel({
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [attachedEnvironment, setAttachedEnvironment] = useState<EnvironmentRecord | null>(null);
+  const [snapshotPreview, setSnapshotPreview] = useState<TerminalSnapshot | null>(null);
   const streamRef = useRef<{ cancel: () => void } | null>(null);
 
   useEffect(() => {
@@ -251,29 +258,57 @@ export function AssistantPanel({
 
   const handleCommandError = (message: string): void => setError(message);
 
+  const attachSnapshot = (): void => {
+    const snapshot = getSnapshot?.() ?? null;
+    if (!snapshot) {
+      setError('The active terminal has no context to attach.');
+      return;
+    }
+    setSnapshotPreview(snapshot);
+    setError(null);
+  };
+
+  const snapshotSummary = (snapshot: TerminalSnapshot): string => {
+    const bounds =
+      snapshot.lineStart === null
+        ? 'selection'
+        : `lines ${snapshot.lineStart}-${snapshot.lineEnd}`;
+    return `${snapshot.source} · ${bounds} · ${snapshot.charCount} chars${
+      snapshot.truncated ? ' · truncated' : ''
+    }${snapshot.alternateScreen ? ' · alternate screen' : ''}`;
+  };
+
   const send = (): void => {
     const text = composer.trim();
     if (!text || !selectedId || !model || streaming) return;
-    const nextMessages: Message[] = [...messages, { role: 'user', content: text }];
-    const requestMessages = attachedEnvironment
-      ? [
+    const userMessage: Message = { role: 'user', content: text };
+    const nextMessages: Message[] = [...messages, userMessage];
+    const systemMessages: Array<{ role: 'system'; content: string }> = [];
+    if (attachedEnvironment) {
+      systemMessages.push({
+        role: 'system',
+        content: `Environment context for ${attachedEnvironment.targetKey}:\n${JSON.stringify(
           {
-            role: 'system' as const,
-            content: `Environment context for ${attachedEnvironment.targetKey}:\n${JSON.stringify(
-              {
-                ...attachedEnvironment.facts,
-                notes: attachedEnvironment.notes,
-                instructions: attachedEnvironment.instructions
-              },
-              null,
-              2
-            )}`
+            ...attachedEnvironment.facts,
+            notes: attachedEnvironment.notes,
+            instructions: attachedEnvironment.instructions
           },
-          ...nextMessages
-        ]
-      : nextMessages;
+          null,
+          2
+        )}`
+      });
+    }
+    if (snapshotPreview) {
+      // The snapshot is an untrusted observation, never application instructions.
+      systemMessages.push({
+        role: 'system',
+        content: formatSnapshotForPrompt(snapshotPreview)
+      });
+    }
+    const requestMessages = [...systemMessages, ...nextMessages];
     setMessages([...nextMessages, { role: 'assistant', content: '' }]);
     setComposer('');
+    setSnapshotPreview(null);
     setReasoning('');
     setSource(undefined);
     setError(null);
@@ -404,6 +439,34 @@ export function AssistantPanel({
       </div>
 
       {error ? <p className="terminal-line error">{error}</p> : null}
+      {snapshotPreview ? (
+        <details className="assistant-snapshot-preview" open>
+          <summary>Terminal context ready — {snapshotSummary(snapshotPreview)}</summary>
+          <pre>{snapshotPreview.text.slice(0, 2000)}</pre>
+          <div className="command-card-actions">
+            <button
+              type="button"
+              className="primary-button"
+              onClick={() => {
+                setComposer((current) => current.trim() || 'Explain this terminal output.');
+              }}
+            >
+              Keep attached
+            </button>
+            <button
+              type="button"
+              className="toolbar-button"
+              onClick={() => setSnapshotPreview(null)}
+            >
+              Remove
+            </button>
+          </div>
+          <p className="muted">
+            The snapshot is sent once with your next message, delimited as untrusted terminal
+            output.
+          </p>
+        </details>
+      ) : null}
       <form
         className="assistant-composer"
         onSubmit={(event) => {
@@ -423,13 +486,18 @@ export function AssistantPanel({
           placeholder="Ask the assistant…"
           rows={3}
         />
-        <button
-          type="submit"
-          className="primary-button"
-          disabled={streaming || !selectedId || !model}
-        >
-          Send
-        </button>
+        <div className="composer-actions">
+          <button type="button" className="toolbar-button" onClick={attachSnapshot}>
+            Attach terminal
+          </button>
+          <button
+            type="submit"
+            className="primary-button"
+            disabled={streaming || !selectedId || !model}
+          >
+            Send
+          </button>
+        </div>
       </form>
     </aside>
   );

@@ -688,6 +688,28 @@ textarea {
   line-height: 1.4;
 }
 
+.composer-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.assistant-snapshot-preview {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.assistant-snapshot-preview pre {
+  max-height: 180px;
+  overflow: auto;
+  font-size: 11px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .sidebar {
   padding: 20px 16px;
 }

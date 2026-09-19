@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   LocalTerminalRequest,
   SessionProfileRecord,
@@ -15,7 +15,7 @@ import { ProfileEditor } from './ProfileEditor';
 import { QuickSshDialog } from './QuickSshDialog';
 import { SettingsPanel } from './SettingsPanel';
 import { SftpPanel } from './SftpPanel';
-import { TerminalPane } from './TerminalPane';
+import { TerminalPane, type SnapshotExtractor } from './TerminalPane';
 
 type AppInfo = Awaited<ReturnType<Window['geared']['getAppInfo']>>;
 type TerminalRequest = LocalTerminalRequest | SshTerminalRequest | SshProfileTerminalRequest;
@@ -152,6 +152,7 @@ export function App(): React.JSX.Element {
   const [showProfileEditor, setShowProfileEditor] = useState(false);
   const [editingProfile, setEditingProfile] = useState<SessionProfileRecord | undefined>();
   const [showQuickSsh, setShowQuickSsh] = useState(false);
+  const snapshotExtractors = useRef(new Map<string, SnapshotExtractor>());
 
   useEffect(() => {
     void Promise.all([
@@ -628,6 +629,13 @@ export function App(): React.JSX.Element {
                 active={tab.id === activeTab?.id}
                 onState={(message) => handleState(tab.id, message)}
                 onHostKeyPrompt={handleHostKeyPrompt}
+                registerSnapshot={(extractor) => {
+                  if (extractor) {
+                    snapshotExtractors.current.set(tab.id, extractor);
+                  } else {
+                    snapshotExtractors.current.delete(tab.id);
+                  }
+                }}
               />
             ))}
             {info ? (
@@ -643,6 +651,10 @@ export function App(): React.JSX.Element {
             targetSessionId={activeTab?.id}
             environmentTargetKey={environmentTarget(activeTab?.request)?.targetKey}
             splitCommandPresentation={settings.splitCommandPresentation}
+            getSnapshot={() => {
+              const extractor = activeTab ? snapshotExtractors.current.get(activeTab.id) : null;
+              return extractor ? extractor() : null;
+            }}
           />
         ) : null}
         {uiState.rightPanel === 'sftp' && activeTab && supportsSftp(activeTab.request) ? (
