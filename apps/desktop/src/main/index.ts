@@ -56,6 +56,7 @@ import {
   UiStateRecordSchema,
   VaultPasswordRequestSchema,
   VaultRotateRequestSchema,
+  VaultStatusSchema,
   WslDistributionSchema,
   parseRemoteFileCommands
 } from '@geared-term/protocol';
@@ -295,21 +296,29 @@ function registerIpc(): void {
   ipcMain.handle('vault:initialize', async (_event, input: unknown) => {
     const request = VaultPasswordRequestSchema.parse(input);
     await storage.initializeVault(request.password);
-    return storage.vaultStatus();
+    const status = storage.vaultStatus();
+    sendToRenderer('vault:changed', VaultStatusSchema.parse(status));
+    return status;
   });
   ipcMain.handle('vault:unlock', async (_event, input: unknown) => {
     const request = VaultPasswordRequestSchema.parse(input);
     await storage.unlockVault(request.password);
-    return storage.vaultStatus();
+    const status = storage.vaultStatus();
+    sendToRenderer('vault:changed', VaultStatusSchema.parse(status));
+    return status;
   });
   ipcMain.handle('vault:lock', () => {
     storage.lockVault();
-    return storage.vaultStatus();
+    const status = storage.vaultStatus();
+    sendToRenderer('vault:changed', VaultStatusSchema.parse(status));
+    return status;
   });
   ipcMain.handle('vault:rotate', async (_event, input: unknown) => {
     const request = VaultRotateRequestSchema.parse(input);
     await storage.rotateVault(request.oldPassword, request.newPassword);
-    return storage.vaultStatus();
+    const status = storage.vaultStatus();
+    sendToRenderer('vault:changed', VaultStatusSchema.parse(status));
+    return status;
   });
   ipcMain.handle('vault:auto-unlock-status', () =>
     AutoUnlockStatusSchema.parse(storage.autoUnlockStatus())

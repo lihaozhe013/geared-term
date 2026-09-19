@@ -117,6 +117,7 @@ declare global {
       saveSettings: (input: SettingsRecord) => Promise<SettingsRecord>;
       openSettings: (category?: string) => Promise<SftpOperationResult>;
       onSettingsChanged: (listener: (settings: SettingsRecord) => void) => () => void;
+      onVaultChanged: (listener: (status: VaultStatus) => void) => () => void;
       onSettingsNavigate: (listener: (category: string) => void) => () => void;
       openHistoryWindow: () => Promise<SftpOperationResult>;
       continueAiHistory: (id: string) => Promise<SftpOperationResult>;

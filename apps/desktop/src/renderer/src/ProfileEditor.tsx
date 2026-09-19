@@ -92,6 +92,7 @@ export function ProfileEditor({
       .getAutoUnlockStatus()
       .then(setAutoUnlock)
       .catch(() => setAutoUnlock(null));
+    return window.geared.onVaultChanged(setVaultStatus);
   }, []);
 
   const update = <K extends keyof ProfileDraft>(key: K, value: ProfileDraft[K]): void => {

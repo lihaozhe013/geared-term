@@ -87,6 +87,7 @@ test('exposes exactly the documented preload surface', async () => {
       'onSettingsNavigate',
       'onSftpCd',
       'onSftpTransferEvent',
+      'onVaultChanged',
       'openAiHistoryDirectory',
       'openConfigFolder',
       'openHistoryWindow',

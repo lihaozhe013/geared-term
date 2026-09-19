@@ -26,6 +26,7 @@ export function SecurityVaultSection({ t }: { t: Translate }): React.JSX.Element
       .getAutoUnlockStatus()
       .then(setAutoUnlock)
       .catch(() => undefined);
+    return window.geared.onVaultChanged(setVault);
   }, []);
 
   const run = async (action: () => Promise<VaultStatus>): Promise<void> => {

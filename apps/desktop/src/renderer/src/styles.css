@@ -2465,3 +2465,60 @@ button:disabled {
   justify-self: start;
   margin-top: 2px;
 }
+
+/* Vault gate: full-screen lock shown before the workspace is usable */
+
+.vault-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  background: var(--gt-background, #0d1117);
+}
+
+.vault-gate-card {
+  display: flex;
+  width: min(380px, calc(100vw - 48px));
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 28px 28px 24px;
+  border: 1px solid var(--gt-border, #2a3140);
+  border-radius: var(--gt-radius-lg, 8px);
+  background: var(--gt-panel, #10161f);
+  box-shadow: var(--gt-shadow-modal, 0 18px 48px rgba(0, 0, 0, 0.45));
+  text-align: center;
+}
+
+.vault-gate-icon {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid var(--gt-border-strong, #344157);
+  border-radius: var(--gt-radius-md, 6px);
+  color: var(--gt-accent, #5c8ea5);
+}
+
+.vault-gate-title {
+  margin: 4px 0 0;
+  color: var(--gt-text, #e4eaf3);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.vault-gate-hint {
+  margin: 0;
+  color: var(--gt-text-muted, #71809a);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.vault-gate-form {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 6px;
+}

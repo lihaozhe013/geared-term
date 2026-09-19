@@ -69,6 +69,7 @@ import {
   type SessionProfileRecord,
   type SessionProfileSaveRequest,
   type VaultRotateRequest,
+  type VaultStatus,
   type SettingsRecord,
   type SftpListRequest,
   type SftpDownloadRequest,
@@ -287,6 +288,14 @@ const api = Object.freeze({
     };
     ipcRenderer.on('settings:changed', handler);
     return () => ipcRenderer.removeListener('settings:changed', handler);
+  },
+  onVaultChanged: (listener: (status: VaultStatus) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, payload: unknown): void => {
+      const result = VaultStatusSchema.safeParse(payload);
+      if (result.success) listener(result.data);
+    };
+    ipcRenderer.on('vault:changed', handler);
+    return () => ipcRenderer.removeListener('vault:changed', handler);
   },
   onSettingsNavigate: (listener: (category: string) => void): (() => void) => {
     const handler = (_event: Electron.IpcRendererEvent, payload: unknown): void => {

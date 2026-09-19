@@ -21,6 +21,7 @@ import { ProfileEditor } from './ProfileEditor';
 import { QuickSshDialog } from './QuickSshDialog';
 import { SftpPanel } from './SftpPanel';
 import { TerminalPane, type SnapshotExtractor } from './TerminalPane';
+import { VaultGate } from './VaultGate';
 
 type TerminalRequest = LocalTerminalRequest | SshTerminalRequest | SshProfileTerminalRequest;
 type TabStatus = 'starting' | 'awaiting-user' | 'running' | 'exited' | 'failed' | 'closed';
@@ -191,6 +192,8 @@ export function App(): React.JSX.Element {
       .then(setVaultStatus)
       .catch(() => undefined);
   }, []);
+
+  useEffect(() => window.geared.onVaultChanged(setVaultStatus), []);
 
   useEffect(() => {
     void window.geared
@@ -880,6 +883,14 @@ export function App(): React.JSX.Element {
           {activeTab ? statusLabel(activeTab.status) : 'Not connected'}
         </span>
       </footer>
+
+      {vaultStatus && !vaultStatus.unlocked ? (
+        <VaultGate
+          status={vaultStatus}
+          language={settings.language}
+          onStatusChange={setVaultStatus}
+        />
+      ) : null}
     </main>
   );
 }

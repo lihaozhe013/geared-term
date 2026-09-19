@@ -9,12 +9,27 @@ import { _electron as electron, type ElectronApplication, type Page } from '@pla
 const require = createRequire(import.meta.url);
 const appDirectory = join(dirname(fileURLToPath(import.meta.url)), '..');
 
+export const E2E_MASTER_PASSWORD = 'e2e-master-password';
+
 export type AppSession = {
   app: ElectronApplication;
   page: Page;
   userDataDirectory: string;
   close: () => Promise<void>;
 };
+
+/**
+ * Fresh profiles start gated behind the first-run vault setup. Create the
+ * master password through the gate so specs exercise the unlocked workspace.
+ */
+async function passVaultGate(page: Page): Promise<void> {
+  const gate = page.locator('.vault-gate');
+  await gate.waitFor({ state: 'visible', timeout: 10_000 });
+  await gate.locator('.vault-gate-password').fill(E2E_MASTER_PASSWORD);
+  await gate.locator('.vault-gate-confirm').fill(E2E_MASTER_PASSWORD);
+  await gate.locator('.vault-gate-submit').click();
+  await gate.waitFor({ state: 'detached', timeout: 10_000 });
+}
 
 export async function launchApp(): Promise<AppSession> {
   const mainEntry = join(appDirectory, 'out', 'main', 'index.js');
@@ -34,6 +49,7 @@ export async function launchApp(): Promise<AppSession> {
   });
   const page = await app.firstWindow();
   await page.waitForLoadState('domcontentloaded');
+  await passVaultGate(page);
   return {
     app,
     page,
