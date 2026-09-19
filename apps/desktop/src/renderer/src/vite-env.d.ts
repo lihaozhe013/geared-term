@@ -26,7 +26,14 @@ import type {
   VaultPasswordRequest,
   VaultRotateRequest,
   VaultStatus,
-  AutoUnlockStatus
+  AutoUnlockStatus,
+  AiDiscoverModelsRequest,
+  AiDiscoveredModels,
+  AiHistoryList,
+  AiHistoryLoadRequest,
+  AiHistoryLoadResult,
+  AiHistorySaveRequest,
+  AiHistorySaved
 } from '@geared-term/protocol';
 
 declare global {
@@ -78,6 +85,12 @@ declare global {
       listAiConnections: () => Promise<AiConnectionRecord[]>;
       saveAiConnection: (input: AiConnectionInput) => Promise<AiConnectionRecord[]>;
       deleteAiConnection: (id: string) => Promise<AiConnectionRecord[]>;
+      discoverAiModels: (input: AiDiscoverModelsRequest) => Promise<AiDiscoveredModels>;
+      listAiHistory: () => Promise<AiHistoryList>;
+      loadAiHistory: (input: AiHistoryLoadRequest) => Promise<AiHistoryLoadResult>;
+      saveAiHistory: (input: AiHistorySaveRequest) => Promise<AiHistorySaved>;
+      deleteAiHistory: (id: string) => Promise<{ deleted: boolean }>;
+      openAiHistoryDirectory: () => Promise<{ opened: boolean }>;
       streamAi: (
         input: AiStreamRequest,
         onEvent: (event: unknown) => void

@@ -710,6 +710,36 @@ textarea {
   overflow-wrap: anywhere;
 }
 
+.assistant-header-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.assistant-history {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  display: grid;
+  gap: 8px;
+  max-height: 260px;
+  overflow: auto;
+}
+
+.assistant-history-list {
+  display: grid;
+  gap: 6px;
+}
+
+.assistant-history-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.assistant-history-row .profile-button {
+  flex: 1;
+}
+
 .sidebar {
   padding: 20px 16px;
 }

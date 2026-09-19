@@ -7,6 +7,13 @@ import {
   AiStreamClientMessageSchema,
   AiStreamEventSchema,
   AiStreamRequestSchema,
+  AiDiscoverModelsRequestSchema,
+  AiDiscoveredModelsSchema,
+  AiHistoryListSchema,
+  AiHistoryLoadRequestSchema,
+  AiHistoryLoadResultSchema,
+  AiHistorySaveRequestSchema,
+  AiHistorySavedSchema,
   EnvironmentFactsSchema,
   EnvironmentProbeRequestSchema,
   EnvironmentRecordSchema,
@@ -34,6 +41,9 @@ import {
   type LocalTerminalRequest,
   type AiConnectionInput,
   type AiStreamRequest,
+  type AiDiscoverModelsRequest,
+  type AiHistoryLoadRequest,
+  type AiHistorySaveRequest,
   type EnvironmentProbeRequest,
   type EnvironmentRecord,
   type SessionProfileRecord,
@@ -164,6 +174,26 @@ const api = Object.freeze({
     const connection = AiConnectionInputSchema.parse(input);
     return AiConnectionRecordSchema.array().parse(await ipcRenderer.invoke('ai:save', connection));
   },
+  discoverAiModels: async (input: AiDiscoverModelsRequest) => {
+    const request = AiDiscoverModelsRequestSchema.parse(input);
+    return AiDiscoveredModelsSchema.parse(await ipcRenderer.invoke('ai:discover-models', request));
+  },
+  listAiHistory: async () =>
+    AiHistoryListSchema.parse(await ipcRenderer.invoke('ai:history:list')),
+  loadAiHistory: async (input: AiHistoryLoadRequest) => {
+    const request = AiHistoryLoadRequestSchema.parse(input);
+    return AiHistoryLoadResultSchema.parse(await ipcRenderer.invoke('ai:history:load', request));
+  },
+  saveAiHistory: async (input: AiHistorySaveRequest) => {
+    const request = AiHistorySaveRequestSchema.parse(input);
+    return AiHistorySavedSchema.parse(await ipcRenderer.invoke('ai:history:save', request));
+  },
+  deleteAiHistory: async (id: string) => {
+    const request = AiHistoryLoadRequestSchema.parse({ id });
+    return (await ipcRenderer.invoke('ai:history:delete', request)) as { deleted: boolean };
+  },
+  openAiHistoryDirectory: async () =>
+    (await ipcRenderer.invoke('ai:history:open-directory')) as { opened: boolean },
   deleteAiConnection: async (id: string) => {
     const request = AiConnectionDeleteRequestSchema.parse({ id });
     return AiConnectionRecordSchema.array().parse(await ipcRenderer.invoke('ai:delete', request));

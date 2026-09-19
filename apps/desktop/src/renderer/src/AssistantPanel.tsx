@@ -5,7 +5,12 @@ import {
   type CommandCandidate,
   type SupportedShell
 } from '@geared-term/command-parser';
-import type { AiConnectionRecord, AiStreamEvent, EnvironmentRecord } from '@geared-term/protocol';
+import type {
+  AiConnectionRecord,
+  AiHistorySummary,
+  AiStreamEvent,
+  EnvironmentRecord
+} from '@geared-term/protocol';
 import {
   formatSnapshotForPrompt,
   type TerminalSnapshot
@@ -160,7 +165,13 @@ export function AssistantPanel({
   const [error, setError] = useState<string | null>(null);
   const [attachedEnvironment, setAttachedEnvironment] = useState<EnvironmentRecord | null>(null);
   const [snapshotPreview, setSnapshotPreview] = useState<TerminalSnapshot | null>(null);
+  const [discoveredModels, setDiscoveredModels] = useState<string[]>([]);
+  const [discovering, setDiscovering] = useState(false);
+  const [conversationId, setConversationId] = useState<string>(() => crypto.randomUUID());
+  const [historyEntries, setHistoryEntries] = useState<AiHistorySummary[] | null>(null);
   const streamRef = useRef<{ cancel: () => void } | null>(null);
+  const messagesRef = useRef<Message[]>([]);
+  messagesRef.current = messages;
 
   useEffect(() => {
     void window.geared
@@ -253,6 +264,81 @@ export function AssistantPanel({
     } else if (event.kind === 'complete') {
       setStreaming(false);
       streamRef.current = null;
+      const turn = messagesRef.current.filter((message) => message.content.trim().length > 0);
+      if (turn.length > 0) {
+        void window.geared
+          .saveAiHistory({
+            id: conversationId,
+            title:
+              turn.find((message) => message.role === 'user')?.content.slice(0, 80) ??
+              'Conversation',
+            ...(model ? { model } : {}),
+            messages: turn.map((message) => ({ role: message.role, content: message.content }))
+          })
+          .catch(() => undefined);
+      }
+    }
+  };
+
+  const discoverModels = async (): Promise<void> => {
+    setDiscovering(true);
+    setError(null);
+    try {
+      const result = await window.geared.discoverAiModels({
+        ...(selectedId ? { connectionId: selectedId } : {}),
+        ...(selectedId ? {} : { protocol, baseUrl }),
+        ...(model ? { model } : {}),
+        ...(apiKey && !selectedId ? { apiKey } : {})
+      });
+      setDiscoveredModels(result.models);
+      if (result.models.length > 0 && !model) setModel(result.models[0] as string);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Unable to discover models');
+    } finally {
+      setDiscovering(false);
+    }
+  };
+
+  const startNewChat = (): void => {
+    streamRef.current?.cancel();
+    streamRef.current = null;
+    setMessages([]);
+    setComposer('');
+    setReasoning('');
+    setSource(undefined);
+    setSnapshotPreview(null);
+    setStreaming(false);
+    setConversationId(crypto.randomUUID());
+    setError(null);
+  };
+
+  const openHistory = (): void => {
+    if (streaming) {
+      setError('History cannot be loaded while a request is active.');
+      return;
+    }
+    void window.geared
+      .listAiHistory()
+      .then((result) => setHistoryEntries(result.entries))
+      .catch((reason: unknown) =>
+        setError(reason instanceof Error ? reason.message : 'Unable to list conversations')
+      );
+  };
+
+  const loadConversation = async (id: string): Promise<void> => {
+    if (streaming) {
+      setError('History cannot be loaded while a request is active.');
+      return;
+    }
+    try {
+      const record = await window.geared.loadAiHistory({ id });
+      setMessages(record.messages.map((message) => ({ ...message })));
+      setConversationId(record.id);
+      setReasoning('');
+      setSource(undefined);
+      setError(null);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Unable to load conversation');
     }
   };
 
@@ -342,8 +428,73 @@ export function AssistantPanel({
           >
             Stop
           </button>
-        ) : null}
+        ) : (
+          <div className="assistant-header-actions">
+            <button type="button" className="toolbar-button" onClick={openHistory}>
+              History
+            </button>
+            <button type="button" className="toolbar-button" onClick={startNewChat}>
+              New chat
+            </button>
+          </div>
+        )}
       </div>
+
+      {historyEntries ? (
+        <details className="assistant-history" open>
+          <summary>Conversations ({historyEntries.length})</summary>
+          <div className="assistant-history-list">
+            {historyEntries.length === 0 ? (
+              <p className="muted">No saved conversations yet.</p>
+            ) : null}
+            {historyEntries.map((entry) => (
+              <div className="assistant-history-row" key={entry.id}>
+                <button
+                  type="button"
+                  className="profile-button"
+                  onClick={() => void loadConversation(entry.id)}
+                  disabled={streaming}
+                >
+                  <span>{entry.title}</span>
+                  <small>
+                    {new Date(entry.updatedAt).toLocaleString()} · {entry.messageCount} messages
+                  </small>
+                </button>
+                <button
+                  type="button"
+                  className="icon-button danger"
+                  aria-label={`Delete ${entry.title}`}
+                  onClick={() => {
+                    if (!window.confirm(`Delete the conversation "${entry.title}"?`)) return;
+                    void window.geared
+                      .deleteAiHistory(entry.id)
+                      .then(openHistory)
+                      .catch(() => setError('Unable to delete conversation'));
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+          <div className="command-card-actions">
+            <button
+              type="button"
+              className="toolbar-button"
+              onClick={() => void window.geared.openAiHistoryDirectory()}
+            >
+              Open folder
+            </button>
+            <button
+              type="button"
+              className="toolbar-button"
+              onClick={() => setHistoryEntries(null)}
+            >
+              Close
+            </button>
+          </div>
+        </details>
+      ) : null}
 
       <div className="assistant-config">
         <label>
@@ -381,8 +532,22 @@ export function AssistantPanel({
             value={model}
             onChange={(event) => setModel(event.target.value)}
             placeholder="model-name"
+            list="assistant-model-options"
           />
+          <datalist id="assistant-model-options">
+            {discoveredModels.map((entry) => (
+              <option value={entry} key={entry} />
+            ))}
+          </datalist>
         </label>
+        <button
+          type="button"
+          className="toolbar-button"
+          onClick={() => void discoverModels()}
+          disabled={discovering}
+        >
+          {discovering ? 'Discovering…' : 'Discover models'}
+        </button>
         <label>
           API key <span className="muted">(optional; stored in vault)</span>
           <input

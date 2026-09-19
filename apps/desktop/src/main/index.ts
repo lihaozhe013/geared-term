@@ -1,4 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, safeStorage, screen, session, shell } from 'electron';
+import { mkdir as fsMkdir } from 'node:fs/promises';
 import { basename, join, posix } from 'node:path';
 import {
   AppInfoSchema,
@@ -8,6 +9,13 @@ import {
   AiStreamClientMessageSchema,
   AiStreamEventSchema,
   AiStreamRequestSchema,
+  AiDiscoverModelsRequestSchema,
+  AiDiscoveredModelsSchema,
+  AiHistoryListSchema,
+  AiHistoryLoadRequestSchema,
+  AiHistoryLoadResultSchema,
+  AiHistorySaveRequestSchema,
+  AiHistorySavedSchema,
   EnvironmentFactsSchema,
   EnvironmentProbeRequestSchema,
   EnvironmentRecordSchema,
@@ -30,8 +38,10 @@ import {
   WslDistributionSchema
 } from '@geared-term/protocol';
 import { createLogger, type Logger } from './logging';
-import { buildChatCompletionsPayload, buildResponsesPayload } from './ai/endpoint';
+import { buildChatCompletionsPayload, buildResponsesPayload, normalizeEndpoint } from './ai/endpoint';
 import { streamAiRequest } from './ai/provider';
+import { discoverModels } from './ai/discovery';
+import { AiHistoryStore } from './ai/history';
 import { LocalTerminalManager } from './local-terminal';
 import { commandRevision, parseCommandBlock } from '@geared-term/command-parser';
 import { AppStorage } from './persistence/app-storage';
@@ -47,6 +57,7 @@ let localTerminals: LocalTerminalManager;
 let storage: AppStorage;
 let sshSessions: SshSessionManager;
 const aiControllers = new Map<string, AbortController>();
+const aiHistory = new AiHistoryStore(isDevelopment ? process.cwd() : app.getPath('userData'));
 
 function isAllowedExternalUrl(value: string): boolean {
   try {
@@ -455,6 +466,72 @@ function registerIpc(): void {
         }
       }
     })();
+  });
+
+  ipcMain.handle('ai:discover-models', async (_event, input: unknown) => {
+    const request = AiDiscoverModelsRequestSchema.parse(input);
+    if (request.connectionId) {
+      const connection = storage.resolveAiConnection(request.connectionId, request.model ?? '');
+      const result = await discoverModels({
+        protocol: connection.protocol,
+        baseUrl: connection.endpoint,
+        apiKey: connection.apiKey
+      });
+      return AiDiscoveredModelsSchema.parse(result);
+    }
+    if (!request.protocol || !request.baseUrl) {
+      throw new Error('Model discovery requires a connection or a protocol and base URL');
+    }
+    const endpoint = normalizeEndpoint(request.baseUrl, request.protocol);
+    const result = await discoverModels({
+      protocol: request.protocol,
+      baseUrl: endpoint.baseUrl,
+      model: request.model,
+      apiKey: request.apiKey
+    });
+    return AiDiscoveredModelsSchema.parse(result);
+  });
+
+  ipcMain.handle('ai:history:list', async () => {
+    const entries = await aiHistory.list();
+    return AiHistoryListSchema.parse({
+      entries: entries.map((entry) => ({
+        id: entry.id,
+        title: entry.title,
+        model: entry.model,
+        updatedAt: entry.updatedAt,
+        messageCount: entry.messageCount
+      }))
+    });
+  });
+
+  ipcMain.handle('ai:history:load', async (_event, input: unknown) => {
+    const request = AiHistoryLoadRequestSchema.parse(input);
+    const record = await aiHistory.load(request.id);
+    if (!record) throw new Error('Conversation was not found');
+    return AiHistoryLoadResultSchema.parse({
+      id: record.id,
+      title: record.title,
+      model: record.model,
+      messages: record.messages
+    });
+  });
+
+  ipcMain.handle('ai:history:save', async (_event, input: unknown) => {
+    const request = AiHistorySaveRequestSchema.parse(input);
+    return AiHistorySavedSchema.parse(await aiHistory.save(request));
+  });
+
+  ipcMain.handle('ai:history:delete', async (_event, input: unknown) => {
+    const request = AiHistoryLoadRequestSchema.parse(input);
+    await aiHistory.remove(request.id);
+    return { deleted: true };
+  });
+
+  ipcMain.handle('ai:history:open-directory', async () => {
+    await fsMkdir(aiHistory.path, { recursive: true });
+    await shell.openPath(aiHistory.path);
+    return { opened: true };
   });
 }
 

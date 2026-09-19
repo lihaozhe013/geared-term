@@ -162,6 +162,65 @@ export const AiConnectionInputSchema = z
 
 export const AiConnectionDeleteRequestSchema = z.object({ id: IdSchema }).strict();
 
+export const AiDiscoverModelsRequestSchema = z
+  .object({
+    connectionId: IdSchema.optional(),
+    protocol: z.enum(['responses', 'chat-completions']).optional(),
+    baseUrl: z.string().min(1).max(2048).optional(),
+    model: z.string().max(256).optional(),
+    apiKey: z.string().max(4096).optional()
+  })
+  .strict();
+
+export const AiDiscoveredModelsSchema = z.object({
+  models: z.array(z.string().min(1).max(256)).max(256)
+});
+
+export const AiHistoryIdSchema = z.string().regex(/^[A-Za-z0-9._-]+$/).max(128);
+
+export const AiHistorySummarySchema = z
+  .object({
+    id: AiHistoryIdSchema,
+    title: z.string().max(200),
+    model: z.string().max(256).optional(),
+    updatedAt: z.string().max(64),
+    messageCount: z.number().int().nonnegative()
+  })
+  .strict();
+
+export const AiHistoryListSchema = z.object({ entries: z.array(AiHistorySummarySchema).max(512) });
+
+export const AiHistoryLoadRequestSchema = z.object({ id: AiHistoryIdSchema }).strict();
+
+export const AiHistoryMessageSchema = z
+  .object({
+    role: z.enum(['user', 'assistant']),
+    content: z.string().max(256 * 1024)
+  })
+  .strict();
+
+export const AiHistoryLoadResultSchema = z
+  .object({
+    id: AiHistoryIdSchema,
+    title: z.string().max(200),
+    model: z.string().max(256).optional(),
+    messages: z.array(AiHistoryMessageSchema).max(1000)
+  })
+  .strict();
+
+export const AiHistorySaveRequestSchema = z
+  .object({
+    id: AiHistoryIdSchema.optional(),
+    title: z.string().max(200),
+    model: z.string().max(256).optional(),
+    messages: z.array(AiHistoryMessageSchema).min(1).max(1000)
+  })
+  .strict();
+
+export const AiHistorySavedSchema = z
+  .object({ id: AiHistoryIdSchema, updatedAt: z.string().max(64) })
+  .strict();
+
 export const AiChatMessageSchema = z
   .object({
     role: z.enum(['system', 'user', 'assistant']),
@@ -412,6 +471,15 @@ export type EnvironmentProbeRequest = z.infer<typeof EnvironmentProbeRequestSche
 export type VaultPasswordRequest = z.infer<typeof VaultPasswordRequestSchema>;
 export type VaultRotateRequest = z.infer<typeof VaultRotateRequestSchema>;
 export type AutoUnlockStatus = z.infer<typeof AutoUnlockStatusSchema>;
+export type AiDiscoverModelsRequest = z.infer<typeof AiDiscoverModelsRequestSchema>;
+export type AiDiscoveredModels = z.infer<typeof AiDiscoveredModelsSchema>;
+export type AiHistorySummary = z.infer<typeof AiHistorySummarySchema>;
+export type AiHistoryList = z.infer<typeof AiHistoryListSchema>;
+export type AiHistoryMessage = z.infer<typeof AiHistoryMessageSchema>;
+export type AiHistoryLoadRequest = z.infer<typeof AiHistoryLoadRequestSchema>;
+export type AiHistoryLoadResult = z.infer<typeof AiHistoryLoadResultSchema>;
+export type AiHistorySaveRequest = z.infer<typeof AiHistorySaveRequestSchema>;
+export type AiHistorySaved = z.infer<typeof AiHistorySavedSchema>;
 export type VaultStatus = z.infer<typeof VaultStatusSchema>;
 export type SessionProfileRecord = z.infer<typeof SessionProfileRecordSchema>;
 export type ProfileCredentials = z.infer<typeof ProfileCredentialsSchema>;
