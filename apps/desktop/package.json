@@ -17,6 +17,7 @@
     "build": "electron-vite build",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run --passWithNoTests",
+    "postinstall": "electron-builder install-app-deps",
     "package": "pnpm run build && electron-builder --config electron-builder.yml"
   },
   "dependencies": {
