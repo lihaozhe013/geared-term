@@ -85,6 +85,13 @@ export const UiStateRecordSchema = z
   })
   .strict();
 
+export const WslDistributionSchema = z.object({
+  name: z.string().min(1).max(256),
+  isDefault: z.boolean(),
+  state: z.enum(['running', 'stopped', 'transitional', 'unknown']),
+  version: z.union([z.literal(1), z.literal(2), z.null()])
+});
+
 export const TerminalPortMessageSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('output'),
@@ -181,6 +188,15 @@ export const SshTerminalRequestSchema = z
     }
   });
 
+export const SshProfileTerminalRequestSchema = z
+  .object({
+    sessionId: IdSchema,
+    profileId: IdSchema,
+    cols: z.number().int().min(2).max(500).default(80),
+    rows: z.number().int().min(1).max(300).default(24)
+  })
+  .strict();
+
 export type AppInfo = z.infer<typeof AppInfoSchema>;
 export type ErrorCode = z.infer<typeof ErrorCodeSchema>;
 export type StructuredError = z.infer<typeof StructuredErrorSchema>;
@@ -188,7 +204,9 @@ export type TerminalPortMessage = z.infer<typeof TerminalPortMessageSchema>;
 export type LocalTerminalRequest = z.infer<typeof LocalTerminalRequestSchema>;
 export type TerminalClientMessage = z.infer<typeof TerminalClientMessageSchema>;
 export type SshTerminalRequest = z.infer<typeof SshTerminalRequestSchema>;
+export type SshProfileTerminalRequest = z.infer<typeof SshProfileTerminalRequestSchema>;
 export type VaultPasswordRequest = z.infer<typeof VaultPasswordRequestSchema>;
 export type VaultStatus = z.infer<typeof VaultStatusSchema>;
 export type SessionProfileRecord = z.infer<typeof SessionProfileRecordSchema>;
 export type UiStateRecord = z.infer<typeof UiStateRecordSchema>;
+export type WslDistribution = z.infer<typeof WslDistributionSchema>;

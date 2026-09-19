@@ -5,14 +5,16 @@ import { Terminal } from '@xterm/xterm';
 import {
   TerminalPortMessageSchema,
   type LocalTerminalRequest,
+  type SshProfileTerminalRequest,
   type SshTerminalRequest,
   type TerminalPortMessage
 } from '@geared-term/protocol';
 
-type TerminalRequest = LocalTerminalRequest | SshTerminalRequest;
+type TerminalRequest = LocalTerminalRequest | SshTerminalRequest | SshProfileTerminalRequest;
 type TerminalClient =
   | ReturnType<Window['geared']['createLocalTerminal']>
-  | ReturnType<Window['geared']['createSshTerminal']>;
+  | ReturnType<Window['geared']['createSshTerminal']>
+  | ReturnType<Window['geared']['createSavedSshTerminal']>;
 
 type TerminalPaneProps = {
   request: TerminalRequest;
@@ -25,7 +27,11 @@ type TerminalPaneProps = {
 };
 
 function isSshRequest(request: TerminalRequest): request is SshTerminalRequest {
-  return 'host' in request;
+  return 'host' in request || 'profileId' in request;
+}
+
+function isSavedSshRequest(request: TerminalRequest): request is SshProfileTerminalRequest {
+  return 'profileId' in request;
 }
 
 export function TerminalPane({
@@ -75,7 +81,9 @@ export function TerminalPane({
 
     terminal.writeln(
       isSshRequest(request)
-        ? `Connecting to ${request.username}@${request.host}...`
+        ? isSavedSshRequest(request)
+          ? 'Connecting to saved SSH profile...'
+          : `Connecting to ${request.username}@${request.host}...`
         : 'Starting local terminal...'
     );
     const onMessage = (rawMessage: unknown): void => {
@@ -98,9 +106,11 @@ export function TerminalPane({
     };
 
     try {
-      client = isSshRequest(request)
-        ? window.geared.createSshTerminal(request, onMessage)
-        : window.geared.createLocalTerminal(request, onMessage);
+      client = isSavedSshRequest(request)
+        ? window.geared.createSavedSshTerminal(request, onMessage)
+        : isSshRequest(request)
+          ? window.geared.createSshTerminal(request, onMessage)
+          : window.geared.createLocalTerminal(request, onMessage);
       clientRef.current = client;
       if (!disposed) {
         inputSubscription = terminal.onData((data) => client?.sendInput(data));
@@ -153,7 +163,13 @@ export function TerminalPane({
     <div
       ref={hostRef}
       className="terminal-host"
-      aria-label={isSshRequest(request) ? `SSH terminal ${request.host}` : 'Local terminal'}
+      aria-label={
+        isSshRequest(request)
+          ? isSavedSshRequest(request)
+            ? 'Saved SSH terminal'
+            : `SSH terminal ${request.host}`
+          : 'Local terminal'
+      }
       hidden={!active}
     />
   );

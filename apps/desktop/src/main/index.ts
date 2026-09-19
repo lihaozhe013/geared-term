@@ -5,14 +5,17 @@ import {
   EmptyRequestSchema,
   ProfileIdRequestSchema,
   SessionProfileRecordSchema,
+  SshProfileTerminalRequestSchema,
   UiStateRecordSchema,
-  VaultPasswordRequestSchema
+  VaultPasswordRequestSchema,
+  WslDistributionSchema
 } from '@geared-term/protocol';
 import { createLogger, type Logger } from './logging';
 import { LocalTerminalManager } from './local-terminal';
 import { AppStorage } from './persistence/app-storage';
 import { KnownHostsStore } from './ssh/known-hosts';
 import { SshSessionManager } from './ssh/ssh-session';
+import { discoverWsl } from './wsl/discovery';
 
 const isDevelopment = !app.isPackaged;
 let logger: Logger;
@@ -174,6 +177,7 @@ function registerIpc(): void {
     const nextState = UiStateRecordSchema.parse(input);
     return UiStateRecordSchema.parse(await storage.saveUiState(nextState));
   });
+  ipcMain.handle('wsl:list', async () => WslDistributionSchema.array().parse(await discoverWsl()));
 
   ipcMain.on('terminal:create-local', (event, input: unknown) => {
     const port = event.ports[0];
@@ -208,6 +212,26 @@ function registerIpc(): void {
       sshSessions.create(input, port);
     } catch (error) {
       logger.error('ssh', 'SSH terminal creation failed', {
+        error: error instanceof Error ? error.message : String(error)
+      });
+      port.close();
+    }
+  });
+
+  ipcMain.on('terminal:create-saved-ssh', (event, input: unknown) => {
+    const port = event.ports[0];
+    if (!port) {
+      logger.warn('ssh', 'Saved SSH terminal request did not include a MessagePort');
+      return;
+    }
+    try {
+      const request = SshProfileTerminalRequestSchema.parse(input);
+      sshSessions.create(
+        storage.resolveSshProfile(request.profileId, request.sessionId, request.cols, request.rows),
+        port
+      );
+    } catch (error) {
+      logger.error('ssh', 'Saved SSH terminal creation failed', {
         error: error instanceof Error ? error.message : String(error)
       });
       port.close();

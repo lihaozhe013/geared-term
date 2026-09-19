@@ -1,4 +1,6 @@
+import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
+import { SshTerminalRequestSchema, type SshTerminalRequest } from '@geared-term/protocol';
 import type { Logger } from '../logging';
 import { createVaultMetadata, Vault, type VaultMetadata } from '../vault/vault';
 import { VersionedJsonStore } from './json-store';
@@ -153,5 +155,59 @@ export class AppStorage {
     this.uiStateValue = UiStateSchema.parse(value);
     await this.uiState.save(this.uiStateValue);
     return this.uiStateSnapshot();
+  }
+
+  public async saveSecret(purpose: string, value: string): Promise<string> {
+    if (!this.vault.isUnlocked) throw new Error('Vault is locked');
+    const id = randomUUID();
+    const secret = this.vault.encrypt(purpose, value);
+    this.profileValue = ProfileSchema.parse({
+      ...this.profileValue,
+      secrets: { ...this.profileValue.secrets, [id]: secret }
+    });
+    await this.profile.save(this.profileValue);
+    return id;
+  }
+
+  public async deleteSecret(id: string): Promise<void> {
+    if (!Object.hasOwn(this.profileValue.secrets, id)) return;
+    const secrets = { ...this.profileValue.secrets };
+    delete secrets[id];
+    this.profileValue = ProfileSchema.parse({ ...this.profileValue, secrets });
+    await this.profile.save(this.profileValue);
+  }
+
+  public resolveSshProfile(
+    profileId: string,
+    sessionId: string,
+    cols: number,
+    rows: number
+  ): SshTerminalRequest {
+    const profile = this.profileValue.sessions.find((item) => item.id === profileId);
+    if (!profile || profile.kind !== 'ssh' || !profile.host || !profile.user) {
+      throw new Error('SSH profile is missing its connection target');
+    }
+    const refs = profile.secretRefs;
+    const password = refs?.password ? this.decryptSecret(refs.password) : undefined;
+    const privateKey = refs?.privateKey ? this.decryptSecret(refs.privateKey) : undefined;
+    const passphrase = refs?.passphrase ? this.decryptSecret(refs.passphrase) : undefined;
+    return SshTerminalRequestSchema.parse({
+      sessionId,
+      host: profile.host,
+      port: profile.port ?? 22,
+      username: profile.user,
+      term: profile.term,
+      cols,
+      rows,
+      password,
+      privateKey,
+      passphrase
+    });
+  }
+
+  private decryptSecret(id: string): string {
+    const secret = this.profileValue.secrets[id];
+    if (!secret) throw new Error('SSH profile references a missing secret');
+    return this.vault.decrypt(secret);
   }
 }

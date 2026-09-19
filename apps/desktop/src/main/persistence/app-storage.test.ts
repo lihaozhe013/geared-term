@@ -45,4 +45,31 @@ describe('application storage', () => {
     await reloaded.deleteProfile('local-dev');
     expect(reloaded.profileSnapshot()).toEqual([]);
   });
+
+  it('keeps SSH credentials encrypted and resolves them only in the main process', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'geared-term-app-storage-secrets-'));
+    const storage = new AppStorage(directory, testLogger());
+    await storage.load();
+    await storage.initializeVault('correct horse battery staple');
+    const passwordRef = await storage.saveSecret('ssh-password', 'remote-password');
+    await storage.saveProfile({
+      id: 'remote-prod',
+      kind: 'ssh',
+      name: 'Production',
+      term: 'xterm-256color',
+      host: 'server.example.test',
+      port: 22,
+      user: 'deploy',
+      secretRefs: { password: passwordRef }
+    });
+
+    const request = storage.resolveSshProfile('remote-prod', 'session-1', 80, 24);
+    expect(request.password).toBe('remote-password');
+    expect(JSON.stringify(storage.profileSnapshot())).not.toContain('remote-password');
+
+    storage.lockVault();
+    expect(() => storage.resolveSshProfile('remote-prod', 'session-2', 80, 24)).toThrow(
+      'Vault is locked'
+    );
+  });
 });

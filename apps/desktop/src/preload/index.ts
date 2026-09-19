@@ -4,17 +4,21 @@ import {
   LocalTerminalRequestSchema,
   ProfileIdRequestSchema,
   SessionProfileRecordSchema,
+  SshProfileTerminalRequestSchema,
   SshTerminalRequestSchema,
   VaultPasswordRequestSchema,
   VaultStatusSchema,
   TerminalClientMessageSchema,
   TerminalPortMessageSchema,
   UiStateRecordSchema,
+  WslDistributionSchema,
   type LocalTerminalRequest,
   type SessionProfileRecord,
+  type SshProfileTerminalRequest,
   type SshTerminalRequest,
   type UiStateRecord,
-  type VaultPasswordRequest
+  type VaultPasswordRequest,
+  type WslDistribution
 } from '@geared-term/protocol';
 
 const api = Object.freeze({
@@ -73,6 +77,37 @@ const api = Object.freeze({
       }
     });
   },
+  createSavedSshTerminal: (
+    input: SshProfileTerminalRequest,
+    onMessage: (message: unknown) => void
+  ) => {
+    const request = SshProfileTerminalRequestSchema.parse(input);
+    const channel = new MessageChannel();
+    channel.port1.onmessage = (event) => {
+      const result = TerminalPortMessageSchema.safeParse(event.data);
+      if (result.success) onMessage(result.data);
+    };
+    channel.port1.start();
+    ipcRenderer.postMessage('terminal:create-saved-ssh', request, [channel.port2]);
+    return Object.freeze({
+      sendInput: (data: string) =>
+        channel.port1.postMessage(TerminalClientMessageSchema.parse({ kind: 'input', data })),
+      resize: (cols: number, rows: number) =>
+        channel.port1.postMessage(
+          TerminalClientMessageSchema.parse({ kind: 'resize', cols, rows })
+        ),
+      acknowledge: (bytes: number) =>
+        channel.port1.postMessage(TerminalClientMessageSchema.parse({ kind: 'ack', bytes })),
+      decideHostKey: (decision: 'approve' | 'reject') =>
+        channel.port1.postMessage(
+          TerminalClientMessageSchema.parse({ kind: 'host-key-decision', decision })
+        ),
+      close: () => {
+        channel.port1.postMessage({ kind: 'close' });
+        channel.port1.close();
+      }
+    });
+  },
   getVaultStatus: async () => VaultStatusSchema.parse(await ipcRenderer.invoke('vault:get-status')),
   initializeVault: async (input: VaultPasswordRequest) => {
     const request = VaultPasswordRequestSchema.parse(input);
@@ -101,7 +136,9 @@ const api = Object.freeze({
   saveUiState: async (input: UiStateRecord) => {
     const state = UiStateRecordSchema.parse(input);
     return UiStateRecordSchema.parse(await ipcRenderer.invoke('ui:save-state', state));
-  }
+  },
+  discoverWsl: async (): Promise<WslDistribution[]> =>
+    WslDistributionSchema.array().parse(await ipcRenderer.invoke('wsl:list'))
 });
 
 contextBridge.exposeInMainWorld('geared', api);

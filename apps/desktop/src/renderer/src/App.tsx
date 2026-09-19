@@ -2,14 +2,16 @@ import { useCallback, useEffect, useState } from 'react';
 import type {
   LocalTerminalRequest,
   SessionProfileRecord,
+  SshProfileTerminalRequest,
   SshTerminalRequest,
   TerminalPortMessage,
-  UiStateRecord
+  UiStateRecord,
+  WslDistribution
 } from '@geared-term/protocol';
 import { TerminalPane } from './TerminalPane';
 
 type AppInfo = Awaited<ReturnType<Window['geared']['getAppInfo']>>;
-type TerminalRequest = LocalTerminalRequest | SshTerminalRequest;
+type TerminalRequest = LocalTerminalRequest | SshTerminalRequest | SshProfileTerminalRequest;
 type TabStatus = 'starting' | 'awaiting-user' | 'running' | 'exited' | 'failed' | 'closed';
 
 type TerminalTab = {
@@ -57,6 +59,27 @@ function profileToRequest(profile: SessionProfileRecord): TerminalRequest | unde
       term: profile.term
     };
   }
+  if (profile.kind === 'wsl' && profile.distribution) {
+    const args = ['--distribution', profile.distribution];
+    if (profile.user?.trim()) args.push('--user', profile.user.trim());
+    args.push('--cd', profile.cwd?.trim() || '~');
+    return {
+      sessionId,
+      shell: 'wsl.exe',
+      args,
+      cols: 80,
+      rows: 24,
+      term: profile.term
+    };
+  }
+  if (profile.kind === 'ssh' && profile.host && profile.user && profile.secretRefs) {
+    return {
+      sessionId,
+      profileId: profile.id,
+      cols: 80,
+      rows: 24
+    };
+  }
   return undefined;
 }
 
@@ -81,6 +104,8 @@ export function App(): React.JSX.Element {
   const [info, setInfo] = useState<AppInfo | null>(null);
   const [profiles, setProfiles] = useState<SessionProfileRecord[]>([]);
   const [uiState, setUiState] = useState<UiStateRecord>(defaultUiState);
+  const [wslDistributions, setWslDistributions] = useState<WslDistribution[]>([]);
+  const [wslLoading, setWslLoading] = useState(false);
   const [tabs, setTabs] = useState<TerminalTab[]>(() => [createLocalTab()]);
   const [activeTabId, setActiveTabId] = useState<string | null>(() => tabs[0]?.id ?? null);
   const [error, setError] = useState<string | null>(null);
@@ -100,6 +125,22 @@ export function App(): React.JSX.Element {
         setError(reason instanceof Error ? reason.message : 'Unable to read application state')
       );
   }, []);
+
+  const discoverWsl = useCallback(async (): Promise<void> => {
+    setWslLoading(true);
+    try {
+      setWslDistributions(await window.geared.discoverWsl());
+      setError(null);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Unable to discover WSL distributions');
+    } finally {
+      setWslLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (info?.platform === 'win32') void discoverWsl();
+  }, [discoverWsl, info?.platform]);
 
   const addLocalTab = useCallback((): void => {
     const tab = createLocalTab();
@@ -144,7 +185,7 @@ export function App(): React.JSX.Element {
 
   const saveActiveProfile = useCallback(async (): Promise<void> => {
     const active = tabs.find((tab) => tab.id === activeTabId);
-    if (!active || 'host' in active.request) {
+    if (!active || 'host' in active.request || 'profileId' in active.request) {
       setError('Only local sessions can be saved until vault-backed SSH credentials are wired in.');
       return;
     }
@@ -267,6 +308,57 @@ export function App(): React.JSX.Element {
                 </div>
               ))}
             </div>
+            {info?.platform === 'win32' ? (
+              <section className="wsl-section" aria-label="WSL distributions">
+                <div className="sidebar-heading wsl-heading">
+                  <p className="section-label">WSL distributions</p>
+                  <button
+                    type="button"
+                    className="icon-button"
+                    onClick={() => void discoverWsl()}
+                    aria-label="Refresh WSL distributions"
+                  >
+                    {wslLoading ? '…' : '↻'}
+                  </button>
+                </div>
+                {wslDistributions.map((distribution) => (
+                  <button
+                    type="button"
+                    className="profile-button wsl-button"
+                    key={distribution.name}
+                    onDoubleClick={() => {
+                      const request: LocalTerminalRequest = {
+                        sessionId: crypto.randomUUID(),
+                        shell: 'wsl.exe',
+                        args: ['--distribution', distribution.name, '--cd', '~'],
+                        cols: 80,
+                        rows: 24,
+                        term: 'xterm-256color'
+                      };
+                      const tab: TerminalTab = {
+                        id: request.sessionId,
+                        name: distribution.name,
+                        request,
+                        status: 'starting'
+                      };
+                      setTabs((current) => [...current, tab]);
+                      setActiveTabId(tab.id);
+                    }}
+                  >
+                    <span>
+                      {distribution.isDefault ? '★ ' : ''}
+                      {distribution.name}
+                    </span>
+                    <small>
+                      {distribution.state} · WSL {distribution.version ?? '?'}
+                    </small>
+                  </button>
+                ))}
+                {wslDistributions.length === 0 && !wslLoading ? (
+                  <small className="muted">No distributions discovered.</small>
+                ) : null}
+              </section>
+            ) : null}
             {profiles.length === 0 ? (
               <div className="empty-state">
                 <span className="empty-icon" aria-hidden="true">

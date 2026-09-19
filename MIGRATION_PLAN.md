@@ -23,7 +23,8 @@ bounded flow control, SSH host-key verification, SFTP primitives, WSL discovery,
 storage, atomic JSON persistence, provider-neutral AI streaming, diagnostic logging, and a minimal
 React/xterm renderer. The second checkpoint adds persisted window bounds, saved local profile CRUD,
 sidebar collapse state, and multiple independent terminal tabs. The remaining phases below are still
-required for parity and release.
+required for parity and release. The third checkpoint adds validated WSL discovery/launch tabs and
+main-process-only resolution of vault-backed SSH profile credentials.
 
 ## 2. Delivery rules
 

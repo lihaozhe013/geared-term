@@ -171,6 +171,20 @@ textarea {
   margin-top: 16px;
 }
 
+.wsl-section {
+  display: grid;
+  gap: 4px;
+  margin-top: 24px;
+}
+
+.wsl-heading {
+  margin-bottom: 4px;
+}
+
+.wsl-button {
+  width: 100%;
+}
+
 .profile-row {
   display: flex;
   gap: 4px;

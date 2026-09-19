@@ -5,8 +5,10 @@ declare module '*.css';
 import type {
   LocalTerminalRequest,
   SessionProfileRecord,
+  SshProfileTerminalRequest,
   SshTerminalRequest,
   UiStateRecord,
+  WslDistribution,
   VaultPasswordRequest,
   VaultStatus
 } from '@geared-term/protocol';
@@ -39,6 +41,16 @@ declare global {
         decideHostKey: (decision: 'approve' | 'reject') => void;
         close: () => void;
       };
+      createSavedSshTerminal: (
+        input: SshProfileTerminalRequest,
+        onMessage: (message: unknown) => void
+      ) => {
+        sendInput: (data: string) => void;
+        resize: (cols: number, rows: number) => void;
+        acknowledge: (bytes: number) => void;
+        decideHostKey: (decision: 'approve' | 'reject') => void;
+        close: () => void;
+      };
       getVaultStatus: () => Promise<VaultStatus>;
       initializeVault: (input: VaultPasswordRequest) => Promise<VaultStatus>;
       unlockVault: (input: VaultPasswordRequest) => Promise<VaultStatus>;
@@ -48,6 +60,7 @@ declare global {
       deleteProfile: (id: string) => Promise<SessionProfileRecord[]>;
       getUiState: () => Promise<UiStateRecord>;
       saveUiState: (input: UiStateRecord) => Promise<UiStateRecord>;
+      discoverWsl: () => Promise<WslDistribution[]>;
     };
   }
 }
