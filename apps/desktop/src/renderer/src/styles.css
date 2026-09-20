@@ -670,8 +670,14 @@ body.panel-resizing {
 }
 
 .profile-editor-section {
-  padding-top: 2px;
+  display: grid;
+  gap: 10px;
+  padding-top: 14px;
   border-top: 1px solid var(--gt-divider, #202a39);
+}
+
+.profile-editor-section .section-label {
+  margin: 0;
 }
 
 .profile-editor-wide {
@@ -696,6 +702,12 @@ body.panel-resizing {
   padding: 5px 7px;
 }
 
+.profile-editor .settings-checkbox input[type='checkbox'] {
+  width: auto;
+  min-height: 0;
+  padding: 0;
+}
+
 .profile-editor textarea {
   padding: 7px;
   resize: vertical;
@@ -710,33 +722,6 @@ body.panel-resizing {
 
 .profile-editor .settings-grid {
   align-items: start;
-}
-
-.vault-box {
-  display: grid;
-  gap: 12px;
-  margin-top: 14px;
-  padding: 12px;
-  border: 1px solid var(--gt-border-strong, #344157);
-  border-radius: var(--gt-radius-md);
-  background: var(--gt-panel-alt, #161e2a);
-}
-
-.vault-header,
-.vault-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.vault-header p {
-  margin: 0;
-}
-
-.vault-actions input {
-  min-width: 0;
-  flex: 1;
 }
 
 .settings-error {

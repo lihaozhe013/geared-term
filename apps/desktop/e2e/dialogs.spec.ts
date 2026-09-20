@@ -40,15 +40,19 @@ test('opens and cancels the temporary SSH dialog', async () => {
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 
-test('opens the profile editor and reveals the vault box for SSH profiles', async () => {
+test('opens the profile editor with credential fields but no vault management for SSH profiles', async () => {
   const { page } = session;
   await page.getByRole('button', { name: 'New session profile' }).click();
   const dialog = page.locator('.profile-editor');
   await expect(dialog).toBeVisible();
-  await expect(dialog.locator('.vault-box')).toHaveCount(0);
   await dialog.getByLabel('Kind').selectOption('ssh');
-  await expect(dialog.locator('.vault-box')).toHaveCount(1);
-  await expect(dialog.locator('.vault-box')).toContainText('Credential vault');
+  await expect(dialog.getByLabel('Host')).toBeVisible();
+  await expect(dialog.getByLabel('Private key (optional)')).toBeVisible();
+  await expect(dialog.locator('.vault-box')).toHaveCount(0);
+  await expect(dialog.getByText('Credential vault')).toHaveCount(0);
+  await expect(
+    dialog.getByRole('button', { name: /^(Lock|Unlock|Initialize|Change password)$/ })
+  ).toHaveCount(0);
   await dialog.getByRole('button', { name: 'Cancel' }).click();
   await expect(page.locator('.profile-editor')).toHaveCount(0);
 });

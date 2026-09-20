@@ -33,8 +33,9 @@ export function SecurityVaultSection({ t }: { t: Translate }): React.JSX.Element
     setBusy(true);
     setError(null);
     try {
-      setVault(await action());
-      setStatus(t('vaultUnlocked'));
+      const next = await action();
+      setVault(next);
+      setStatus(next.unlocked ? t('vaultUnlocked') : t('vaultLocked'));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Vault operation failed');
     } finally {

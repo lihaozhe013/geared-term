@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useModalFocus } from './useModalFocus';
-import type { SessionProfileRecord, VaultStatus, AutoUnlockStatus } from '@geared-term/protocol';
+import type { SessionProfileRecord } from '@geared-term/protocol';
 
 type ProfileEditorProps = {
   profile?: SessionProfileRecord;
@@ -65,12 +65,6 @@ export function ProfileEditor({
   onError
 }: ProfileEditorProps): React.JSX.Element {
   const [draft, setDraft] = useState<ProfileDraft>(() => createDraft(profile, defaultTerm));
-  const [vaultStatus, setVaultStatus] = useState<VaultStatus | null>(null);
-  const [vaultPassword, setVaultPassword] = useState('');
-  const [vaultBusy, setVaultBusy] = useState(false);
-  const [rotateOld, setRotateOld] = useState('');
-  const [rotateNew, setRotateNew] = useState('');
-  const [autoUnlock, setAutoUnlock] = useState<AutoUnlockStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { containerRef } = useModalFocus<HTMLFormElement>();
@@ -83,69 +77,8 @@ export function ProfileEditor({
       .map(([key]) => key);
   }, [profile?.secretRefs]);
 
-  useEffect(() => {
-    void window.geared
-      .getVaultStatus()
-      .then(setVaultStatus)
-      .catch((reason: unknown) => setError(asError(reason, 'Unable to read vault status')));
-    void window.geared
-      .getAutoUnlockStatus()
-      .then(setAutoUnlock)
-      .catch(() => setAutoUnlock(null));
-    return window.geared.onVaultChanged(setVaultStatus);
-  }, []);
-
   const update = <K extends keyof ProfileDraft>(key: K, value: ProfileDraft[K]): void => {
     setDraft((current) => ({ ...current, [key]: value }));
-  };
-
-  const runVaultAction = async (action: 'initialize' | 'unlock' | 'lock'): Promise<void> => {
-    setVaultBusy(true);
-    setError(null);
-    try {
-      const next =
-        action === 'initialize'
-          ? await window.geared.initializeVault({ password: vaultPassword })
-          : action === 'unlock'
-            ? await window.geared.unlockVault({ password: vaultPassword })
-            : await window.geared.lockVault();
-      setVaultStatus(next);
-      setVaultPassword('');
-    } catch (reason) {
-      setError(asError(reason, 'Unable to update vault state'));
-    } finally {
-      setVaultBusy(false);
-    }
-  };
-
-  const rotatePassword = async (): Promise<void> => {
-    setVaultBusy(true);
-    setError(null);
-    try {
-      const next = await window.geared.rotateVault({
-        oldPassword: rotateOld,
-        newPassword: rotateNew
-      });
-      setVaultStatus(next);
-      setRotateOld('');
-      setRotateNew('');
-    } catch (reason) {
-      setError(asError(reason, 'Unable to change the master password'));
-    } finally {
-      setVaultBusy(false);
-    }
-  };
-
-  const toggleAutoUnlock = async (): Promise<void> => {
-    setError(null);
-    try {
-      const next = autoUnlock?.enabled
-        ? await window.geared.disableAutoUnlock()
-        : await window.geared.enableAutoUnlock();
-      setAutoUnlock(next);
-    } catch (reason) {
-      setError(asError(reason, 'Unable to update password-free unlock'));
-    }
   };
 
   const save = async (event: React.FormEvent<HTMLFormElement>): Promise<void> => {
@@ -294,176 +227,106 @@ export function ProfileEditor({
           </div>
 
           {draft.kind === 'local' ? (
-            <div className="settings-grid profile-editor-section">
-              <label>
-                Shell executable (optional)
-                <input
-                  value={draft.shell}
-                  onChange={(event) => update('shell', event.target.value)}
-                  placeholder="pwsh.exe"
-                />
-              </label>
-              <label>
-                Working directory (optional)
-                <input value={draft.cwd} onChange={(event) => update('cwd', event.target.value)} />
-              </label>
-              <label className="profile-editor-wide">
-                Arguments (one per line)
-                <textarea
-                  value={draft.args}
-                  onChange={(event) => update('args', event.target.value)}
-                  rows={4}
-                />
-              </label>
+            <div className="profile-editor-section">
+              <p className="section-label">Startup</p>
+              <div className="settings-grid">
+                <label>
+                  Shell executable (optional)
+                  <input
+                    value={draft.shell}
+                    onChange={(event) => update('shell', event.target.value)}
+                    placeholder="pwsh.exe"
+                  />
+                </label>
+                <label>
+                  Working directory (optional)
+                  <input
+                    value={draft.cwd}
+                    onChange={(event) => update('cwd', event.target.value)}
+                  />
+                </label>
+                <label className="profile-editor-wide">
+                  Arguments (one per line)
+                  <textarea
+                    value={draft.args}
+                    onChange={(event) => update('args', event.target.value)}
+                    rows={4}
+                  />
+                </label>
+              </div>
             </div>
           ) : null}
 
           {draft.kind === 'wsl' ? (
-            <div className="settings-grid profile-editor-section">
-              <label>
-                Distribution
-                <input
-                  value={draft.distribution}
-                  onChange={(event) => update('distribution', event.target.value)}
-                  placeholder="Ubuntu"
-                />
-              </label>
-              <label>
-                User (optional)
-                <input
-                  value={draft.user}
-                  onChange={(event) => update('user', event.target.value)}
-                />
-              </label>
-              <label className="profile-editor-wide">
-                Working directory (optional)
-                <input
-                  value={draft.cwd}
-                  onChange={(event) => update('cwd', event.target.value)}
-                  placeholder="~"
-                />
-              </label>
-            </div>
-          ) : null}
-
-          {isSsh ? (
             <div className="profile-editor-section">
+              <p className="section-label">WSL</p>
               <div className="settings-grid">
                 <label>
-                  Host
+                  Distribution
                   <input
-                    value={draft.host}
-                    onChange={(event) => update('host', event.target.value)}
-                    placeholder="server.example.com"
+                    value={draft.distribution}
+                    onChange={(event) => update('distribution', event.target.value)}
+                    placeholder="Ubuntu"
                   />
                 </label>
                 <label>
-                  Port
-                  <input
-                    type="number"
-                    min="1"
-                    max="65535"
-                    value={draft.port}
-                    onChange={(event) => update('port', event.target.value)}
-                  />
-                </label>
-                <label>
-                  User
+                  User (optional)
                   <input
                     value={draft.user}
                     onChange={(event) => update('user', event.target.value)}
                   />
                 </label>
+                <label className="profile-editor-wide">
+                  Working directory (optional)
+                  <input
+                    value={draft.cwd}
+                    onChange={(event) => update('cwd', event.target.value)}
+                    placeholder="~"
+                  />
+                </label>
               </div>
-              <div className="vault-box">
-                <div className="vault-header">
-                  <div>
-                    <p className="section-label">Credential vault</p>
-                    <p className="muted">
-                      {vaultStatus?.unlocked ? 'Unlocked for this session' : 'Locked'}
-                      {savedCredentialLabels.length > 0
-                        ? ` · saved: ${savedCredentialLabels.join(', ')}`
-                        : ''}
-                    </p>
-                  </div>
-                  {vaultStatus?.unlocked ? (
-                    <button
-                      type="button"
-                      className="toolbar-button"
-                      onClick={() => void runVaultAction('lock')}
-                      disabled={vaultBusy}
-                    >
-                      Lock
-                    </button>
-                  ) : null}
-                </div>
-                {!vaultStatus?.unlocked ? (
-                  <div className="vault-actions">
+            </div>
+          ) : null}
+
+          {isSsh ? (
+            <>
+              <div className="profile-editor-section">
+                <p className="section-label">Connection</p>
+                <div className="settings-grid">
+                  <label>
+                    Host
                     <input
-                      type="password"
-                      value={vaultPassword}
-                      onChange={(event) => setVaultPassword(event.target.value)}
-                      placeholder="Vault password"
-                      minLength={1}
+                      value={draft.host}
+                      onChange={(event) => update('host', event.target.value)}
+                      placeholder="server.example.com"
                     />
-                    <button
-                      type="button"
-                      className="toolbar-button"
-                      onClick={() =>
-                        void runVaultAction(vaultStatus?.initialized ? 'unlock' : 'initialize')
-                      }
-                      disabled={vaultBusy || !vaultPassword}
-                    >
-                      {vaultStatus?.initialized ? 'Unlock' : 'Initialize'}
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    <div className="vault-actions">
-                      <input
-                        type="password"
-                        value={rotateOld}
-                        onChange={(event) => setRotateOld(event.target.value)}
-                        placeholder="Current password"
-                        minLength={1}
-                      />
-                      <input
-                        type="password"
-                        value={rotateNew}
-                        onChange={(event) => setRotateNew(event.target.value)}
-                        placeholder="New password"
-                        minLength={1}
-                      />
-                      <button
-                        type="button"
-                        className="toolbar-button"
-                        onClick={() => void rotatePassword()}
-                        disabled={vaultBusy || !rotateOld || !rotateNew}
-                      >
-                        Change password
-                      </button>
-                    </div>
-                    <label className="settings-checkbox profile-editor-wide">
-                      <input
-                        type="checkbox"
-                        checked={autoUnlock?.enabled ?? false}
-                        onChange={() => void toggleAutoUnlock()}
-                        disabled={autoUnlock !== null && !autoUnlock.supported}
-                      />
-                      <span>
-                        Unlock without a password on this device
-                        <span className="muted">
-                          {' '}
-                          — the vault key is protected by this OS account only; anyone with access
-                          to this user profile can read saved secrets.
-                        </span>
-                        {autoUnlock && !autoUnlock.supported && autoUnlock.reason
-                          ? ` (${autoUnlock.reason})`
-                          : ''}
-                      </span>
-                    </label>
-                  </>
-                )}
+                  </label>
+                  <label>
+                    Port
+                    <input
+                      type="number"
+                      min="1"
+                      max="65535"
+                      value={draft.port}
+                      onChange={(event) => update('port', event.target.value)}
+                    />
+                  </label>
+                  <label className="profile-editor-wide">
+                    User
+                    <input
+                      value={draft.user}
+                      onChange={(event) => update('user', event.target.value)}
+                    />
+                  </label>
+                </div>
+              </div>
+              <div className="profile-editor-section">
+                <p className="section-label">Credentials</p>
+                <p className="settings-hint">
+                  {savedCredentialLabels.length > 0
+                    ? `Saved in the vault: ${savedCredentialLabels.join(', ')}. Leave fields blank to keep them.`
+                    : 'Stored encrypted in the vault. All fields are optional.'}
+                </p>
                 <div className="settings-grid">
                   <label>
                     Password (optional)
@@ -472,6 +335,7 @@ export function ProfileEditor({
                       value={draft.password}
                       onChange={(event) => update('password', event.target.value)}
                       placeholder="Leave blank to keep saved"
+                      autoComplete="new-password"
                     />
                   </label>
                   <label>
@@ -481,6 +345,7 @@ export function ProfileEditor({
                       value={draft.passphrase}
                       onChange={(event) => update('passphrase', event.target.value)}
                       placeholder="For private key"
+                      autoComplete="new-password"
                     />
                   </label>
                   <label className="profile-editor-wide">
@@ -504,7 +369,7 @@ export function ProfileEditor({
                   ) : null}
                 </div>
               </div>
-            </div>
+            </>
           ) : null}
 
           {error ? <p className="settings-error error">{error}</p> : null}
@@ -520,11 +385,7 @@ export function ProfileEditor({
           >
             Cancel
           </button>
-          <button
-            type="submit"
-            className="primary-button profile-save"
-            disabled={busy || (isSsh && !vaultStatus?.unlocked && !profile?.secretRefs)}
-          >
+          <button type="submit" className="primary-button profile-save" disabled={busy}>
             {busy ? 'Saving…' : 'Save profile'}
           </button>
         </div>

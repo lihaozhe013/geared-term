@@ -1,4 +1,4 @@
-import { expect, test, type Locator } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { E2E_MASTER_PASSWORD, launchApp, type AppSession } from './fixtures';
 
 let session: AppSession;
@@ -11,25 +11,20 @@ test.afterEach(async () => {
   await session?.close();
 });
 
-async function openSshProfileEditor(page: AppSession['page']): Promise<Locator> {
-  await page.getByRole('button', { name: 'New session profile' }).click();
-  const dialog = page.locator('.profile-editor');
-  await expect(dialog).toBeVisible();
-  await dialog.getByLabel('Kind').selectOption('ssh');
-  await expect(dialog.locator('.vault-box')).toBeVisible();
-  return dialog;
+async function openSecurityTab({ page, app }: AppSession): Promise<Page> {
+  await page.getByRole('button', { name: 'Settings' }).click();
+  const settingsWindow = await app.waitForEvent('window');
+  await settingsWindow.waitForLoadState('domcontentloaded');
+  await settingsWindow.getByRole('button', { name: 'Security & Vault' }).click();
+  return settingsWindow;
 }
 
-test('gates the workspace, rejects wrong passwords, and unlocks with the master password', async () => {
+test('locking from settings gates the workspace and the master password unlocks it', async () => {
   const { page } = session;
-  const dialog = await openSshProfileEditor(page);
-  const vault = dialog.locator('.vault-box');
-  await expect(vault).toContainText('Unlocked for this session');
-
-  await vault.getByRole('button', { name: 'Lock' }).click();
+  const settingsWindow = await openSecurityTab(session);
+  await settingsWindow.getByRole('button', { name: 'Lock vault' }).click();
   const gate = page.locator('.vault-gate');
   await expect(gate).toBeVisible();
-  await expect(vault).toContainText('Locked');
 
   await gate.locator('.vault-gate-password').fill('definitely-wrong');
   await gate.locator('.vault-gate-submit').click();
@@ -38,20 +33,23 @@ test('gates the workspace, rejects wrong passwords, and unlocks with the master 
   await gate.locator('.vault-gate-password').fill(E2E_MASTER_PASSWORD);
   await gate.locator('.vault-gate-submit').click();
   await expect(gate).toHaveCount(0);
-  await expect(vault).toContainText('Unlocked for this session');
 });
 
 test('rotates the vault password and the gate accepts only the new one', async () => {
   const { page } = session;
-  const dialog = await openSshProfileEditor(page);
-  const vault = dialog.locator('.vault-box');
+  const settingsWindow = await openSecurityTab(session);
+  await settingsWindow
+    .locator('.settings-row', { hasText: 'Current password' })
+    .locator('input')
+    .fill(E2E_MASTER_PASSWORD);
+  await settingsWindow
+    .locator('.settings-row', { hasText: 'New password' })
+    .locator('input')
+    .fill('second-password');
+  await settingsWindow.getByRole('button', { name: 'Change master password' }).click();
+  await expect(settingsWindow.locator('.status-ok')).toBeVisible();
 
-  await vault.getByPlaceholder('Current password').fill(E2E_MASTER_PASSWORD);
-  await vault.getByPlaceholder('New password').fill('second-password');
-  await vault.getByRole('button', { name: 'Change password' }).click();
-  await expect(vault).toContainText('Unlocked for this session');
-
-  await vault.getByRole('button', { name: 'Lock' }).click();
+  await settingsWindow.getByRole('button', { name: 'Lock vault' }).click();
   const gate = page.locator('.vault-gate');
   await expect(gate).toBeVisible();
 
@@ -62,5 +60,4 @@ test('rotates the vault password and the gate accepts only the new one', async (
   await gate.locator('.vault-gate-password').fill('second-password');
   await gate.locator('.vault-gate-submit').click();
   await expect(gate).toHaveCount(0);
-  await expect(vault).toContainText('Unlocked for this session');
 });
