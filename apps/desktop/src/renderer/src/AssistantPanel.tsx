@@ -1023,20 +1023,6 @@ export function AssistantPanel({
               </div>
               {index === messages.length - 1 && activities.length > 0 ? (
                 <div className="assistant-activity">
-                  {streaming && headlineStep ? (
-                    <div className="assistant-activity-head">
-                      <span className="activity-spinner">
-                        <Loader2 size={14} aria-hidden="true" />
-                      </span>
-                      <span className="assistant-activity-label">
-                        {activityStepText(language, headlineStep)}
-                        <TypingDots />
-                      </span>
-                      <span className="assistant-activity-elapsed">
-                        {formatElapsed(streamStartedAt ? Date.now() - streamStartedAt : 0)}
-                      </span>
-                    </div>
-                  ) : null}
                   {showTimeline ? (
                     <div className="assistant-activity-timeline">
                       {activities.map((step) => (
@@ -1051,7 +1037,10 @@ export function AssistantPanel({
                             )}
                           </span>
                           <span className="assistant-activity-label">
-                            {activityStepText(language, step)}
+                            {activityStepText(
+                              language,
+                              step.state === 'running' && headlineStep ? headlineStep : step
+                            )}
                             {step.state === 'running' ? <TypingDots /> : null}
                           </span>
                           <span className="assistant-activity-elapsed">

@@ -2556,12 +2556,6 @@ button:disabled {
   margin: 6px 0 2px;
 }
 
-.assistant-activity-head {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
 .assistant-activity-label {
   display: inline-flex;
   align-items: center;
