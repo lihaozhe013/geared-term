@@ -38,7 +38,8 @@ describe('protocol schemas', () => {
   it('bounds SFTP requests and validates remote entries', () => {
     expect(SftpListRequestSchema.parse({ sessionId: 'ssh-1' })).toEqual({
       sessionId: 'ssh-1',
-      directory: '.'
+      directory: '.',
+      reanchor: false
     });
     expect(
       SftpRemoteEntrySchema.safeParse({
@@ -52,7 +53,8 @@ describe('protocol schemas', () => {
     ).toBe(true);
     expect(SftpUploadRequestSchema.parse({ sessionId: 'ssh-1', remoteDirectory: '/tmp' })).toEqual({
       sessionId: 'ssh-1',
-      remoteDirectory: '/tmp'
+      remoteDirectory: '/tmp',
+      choose: 'both'
     });
     expect(
       SftpDownloadRequestSchema.safeParse({

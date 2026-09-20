@@ -32,6 +32,8 @@ import {
   SftpListRequestSchema,
   SftpListResultSchema,
   SftpMkdirRequestSchema,
+  SftpSendCdRequestSchema,
+  SftpSessionRequestSchema,
   SftpRenameRequestSchema,
   SftpDeleteRequestSchema,
   SftpUploadPathsRequestSchema,
@@ -85,7 +87,7 @@ import {
 } from './files/local-files';
 import { KnownHostsStore } from './ssh/known-hosts';
 import { SshSessionManager } from './ssh/ssh-session';
-import { buildRemoteFileCommand } from './sftp/remote-commands';
+import { buildRemoteFileCommand, quoteRemotePath } from './sftp/remote-commands';
 import { TransferManager } from './sftp/transfers';
 import { buildApplicationMenu, executeApplicationMenuAction, type MenuLocale } from './menu';
 import { HistoryWindowManager } from './history-window';
@@ -459,8 +461,20 @@ function registerIpc(): void {
   ipcMain.handle('sftp:list', async (_event, input: unknown) => {
     const request = SftpListRequestSchema.parse(input);
     return SftpListResultSchema.parse(
-      await sshSessions.listSftp(request.sessionId, request.directory)
+      await sshSessions.listSftp(request.sessionId, request.directory, request.reanchor)
     );
+  });
+  ipcMain.handle('sftp:send-cd', async (_event, input: unknown) => {
+    const request = SftpSendCdRequestSchema.parse(input);
+    sshSessions.sendInput(request.sessionId, `cd ${quoteRemotePath(request.directory)}\r`);
+    return SftpOperationResultSchema.parse({ accepted: true });
+  });
+  ipcMain.handle('sftp:tracked-directory', async (_event, input: unknown) => {
+    const request = SftpSessionRequestSchema.parse(input);
+    return SftpCdEventSchema.parse({
+      sessionId: request.sessionId,
+      directory: sshSessions.trackedDirectory(request.sessionId)
+    });
   });
   ipcMain.handle('sftp:mkdir', async (_event, input: unknown) => {
     const request = SftpMkdirRequestSchema.parse(input);
@@ -502,9 +516,17 @@ function registerIpc(): void {
   ipcMain.handle('sftp:upload', async (_event, input: unknown) => {
     const request = SftpUploadRequestSchema.parse(input);
     if (!mainWindow) throw new Error('Application window is not available');
+    const properties: ('openFile' | 'openDirectory' | 'multiSelections')[] = ['multiSelections'];
+    if (request.choose === 'files' || request.choose === 'both') properties.push('openFile');
+    if (request.choose === 'folders' || request.choose === 'both') properties.push('openDirectory');
     const selection = await dialog.showOpenDialog(mainWindow, {
-      properties: ['openFile', 'openDirectory', 'multiSelections'],
-      title: 'Select files or folders to upload'
+      properties,
+      title:
+        request.choose === 'folders'
+          ? 'Select folders to upload'
+          : request.choose === 'files'
+            ? 'Select files to upload'
+            : 'Select files or folders to upload'
     });
     if (selection.canceled || selection.filePaths.length === 0) {
       return SftpOperationResultSchema.parse({ accepted: false });
@@ -582,6 +604,7 @@ function registerIpc(): void {
     if (result) throw new Error(result);
     return SftpOperationResultSchema.parse({ accepted: true });
   });
+  ipcMain.handle('app:downloads-dir', () => app.getPath('downloads'));
   ipcMain.handle('app:open-config-folder', async () => {
     const result = await shell.openPath(app.getPath('userData'));
     if (result) throw new Error(result);

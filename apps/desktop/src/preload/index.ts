@@ -29,6 +29,8 @@ import {
   SftpListRequestSchema,
   SftpListResultSchema,
   SftpMkdirRequestSchema,
+  SftpSendCdRequestSchema,
+  SftpSessionRequestSchema,
   SftpRenameRequestSchema,
   SftpDeleteRequestSchema,
   SftpUploadPathsRequestSchema,
@@ -75,6 +77,7 @@ import {
   type VaultStatus,
   type SettingsRecord,
   type SftpListRequest,
+  type SftpSendCdRequest,
   type SftpDownloadRequest,
   type SftpUploadRequest,
   type SftpMkdirRequest,
@@ -112,6 +115,8 @@ const api = Object.freeze({
     return Object.freeze({
       sendInput: (data: string) =>
         channel.port1.postMessage(TerminalClientMessageSchema.parse({ kind: 'input', data })),
+      sendCdLine: (line: string) =>
+        channel.port1.postMessage(TerminalClientMessageSchema.parse({ kind: 'cd-line', line })),
       resize: (cols: number, rows: number) =>
         channel.port1.postMessage(
           TerminalClientMessageSchema.parse({ kind: 'resize', cols, rows })
@@ -136,6 +141,8 @@ const api = Object.freeze({
     return Object.freeze({
       sendInput: (data: string) =>
         channel.port1.postMessage(TerminalClientMessageSchema.parse({ kind: 'input', data })),
+      sendCdLine: (line: string) =>
+        channel.port1.postMessage(TerminalClientMessageSchema.parse({ kind: 'cd-line', line })),
       resize: (cols: number, rows: number) =>
         channel.port1.postMessage(
           TerminalClientMessageSchema.parse({ kind: 'resize', cols, rows })
@@ -167,6 +174,8 @@ const api = Object.freeze({
     return Object.freeze({
       sendInput: (data: string) =>
         channel.port1.postMessage(TerminalClientMessageSchema.parse({ kind: 'input', data })),
+      sendCdLine: (line: string) =>
+        channel.port1.postMessage(TerminalClientMessageSchema.parse({ kind: 'cd-line', line })),
       resize: (cols: number, rows: number) =>
         channel.port1.postMessage(
           TerminalClientMessageSchema.parse({ kind: 'resize', cols, rows })
@@ -370,6 +379,18 @@ const api = Object.freeze({
       await ipcRenderer.invoke('sftp:remote-command', request)
     );
   },
+  sftpSendCd: async (input: SftpSendCdRequest) => {
+    const request = SftpSendCdRequestSchema.parse(input);
+    return SftpOperationResultSchema.parse(await ipcRenderer.invoke('sftp:send-cd', request));
+  },
+  sftpTrackedDirectory: async (sessionId: string) => {
+    const request = SftpSessionRequestSchema.parse({ sessionId });
+    const result = SftpCdEventSchema.parse(
+      await ipcRenderer.invoke('sftp:tracked-directory', request)
+    );
+    return result.directory;
+  },
+  getDownloadsDirectory: async () => (await ipcRenderer.invoke('app:downloads-dir')) as string,
   listLocalFiles: async (directory: string | null) => {
     const request = LocalListRequestSchema.parse({ directory });
     return LocalEntrySchema.array().parse(await ipcRenderer.invoke('local:list', request));

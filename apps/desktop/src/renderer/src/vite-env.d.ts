@@ -15,6 +15,7 @@ import type {
   SftpListResult,
   SftpMkdirRequest,
   SftpRenameRequest,
+  SftpSendCdRequest,
   SftpDeleteRequest,
   SftpUploadPathsRequest,
   SftpDownloadPathsRequest,
@@ -61,6 +62,7 @@ declare global {
         onMessage: (message: unknown) => void
       ) => {
         sendInput: (data: string) => void;
+        sendCdLine: (line: string) => void;
         resize: (cols: number, rows: number) => void;
         acknowledge: (bytes: number) => void;
         close: () => void;
@@ -70,6 +72,7 @@ declare global {
         onMessage: (message: unknown) => void
       ) => {
         sendInput: (data: string) => void;
+        sendCdLine: (line: string) => void;
         resize: (cols: number, rows: number) => void;
         acknowledge: (bytes: number) => void;
         decideHostKey: (decision: 'approve' | 'reject') => void;
@@ -80,6 +83,7 @@ declare global {
         onMessage: (message: unknown) => void
       ) => {
         sendInput: (data: string) => void;
+        sendCdLine: (line: string) => void;
         resize: (cols: number, rows: number) => void;
         acknowledge: (bytes: number) => void;
         decideHostKey: (decision: 'approve' | 'reject') => void;
@@ -136,6 +140,9 @@ declare global {
       listSftpTransfers: (sessionId?: string) => Promise<SftpTransfer[]>;
       cancelSftpTransfer: (transferId: string) => Promise<SftpOperationResult>;
       runRemoteFileCommand: (input: SftpRemoteCommandRequest) => Promise<SftpOperationResult>;
+      sftpSendCd: (input: SftpSendCdRequest) => Promise<SftpOperationResult>;
+      sftpTrackedDirectory: (sessionId: string) => Promise<string | null>;
+      getDownloadsDirectory: () => Promise<string>;
       listLocalFiles: (directory: string | null) => Promise<LocalEntry[]>;
       makeLocalDirectory: (input: LocalMkdirRequest) => Promise<SftpOperationResult>;
       renameLocalPath: (input: LocalRenameRequest) => Promise<SftpOperationResult>;

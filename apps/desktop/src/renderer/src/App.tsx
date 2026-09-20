@@ -27,7 +27,7 @@ import { EnvironmentPanel } from './EnvironmentPanel';
 import { ProfileEditor } from './ProfileEditor';
 import { QuickSshDialog } from './QuickSshDialog';
 import { SftpPanel } from './SftpPanel';
-import { TerminalPane, type SnapshotExtractor } from './TerminalPane';
+import { TerminalPane, type SnapshotExtractor, type SftpTerminalControl } from './TerminalPane';
 import { VaultGate } from './VaultGate';
 import { WindowTitleBar } from './WindowTitleBar';
 
@@ -227,6 +227,7 @@ export function App(): React.JSX.Element {
   const [pendingHistoryId, setPendingHistoryId] = useState<string | null>(null);
   const [vaultStatus, setVaultStatus] = useState<VaultStatus | null>(null);
   const snapshotExtractors = useRef(new Map<string, SnapshotExtractor>());
+  const sftpControls = useRef(new Map<string, SftpTerminalControl>());
 
   useEffect(() => {
     void Promise.all([
@@ -818,6 +819,13 @@ export function App(): React.JSX.Element {
                 onAlternateScreen={(value) =>
                   setAlternateScreens((current) => ({ ...current, [tab.id]: value }))
                 }
+                registerSftpControl={(control) => {
+                  if (control) {
+                    sftpControls.current.set(tab.id, control);
+                  } else {
+                    sftpControls.current.delete(tab.id);
+                  }
+                }}
               />
             ))}
             {info ? (
@@ -912,8 +920,12 @@ export function App(): React.JSX.Element {
             {uiState.rightPanel === 'sftp' && activeTab && supportsSftp(activeTab.request) ? (
               <SftpPanel
                 sessionId={activeTab.id}
+                language={settings.language}
                 remoteFileCommands={parseRemoteFileCommands(settings.remoteFileCommands)}
                 alternateScreen={Boolean(alternateScreens[activeTab.id])}
+                probeDirectory={async () =>
+                  (await sftpControls.current.get(activeTab.id)?.probeWorkingDirectory()) ?? null
+                }
                 onClose={toggleSftp}
               />
             ) : null}

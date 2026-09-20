@@ -18,6 +18,13 @@ import {
   defaultLigatureSequences,
   loadLigatureSequences
 } from './terminal/ligatures';
+import {
+  createLineTracker,
+  extractCdFromScreenLine,
+  observeKeystrokes,
+  readAlternateScreenPath,
+  readEchoedCommandLine
+} from './terminal/line-tracker';
 
 type TerminalRequest = LocalTerminalRequest | SshTerminalRequest | SshProfileTerminalRequest;
 type TerminalClient =
@@ -25,6 +32,13 @@ type TerminalClient =
   | ReturnType<Window['geared']['createSshTerminal']>
   | ReturnType<Window['geared']['createSavedSshTerminal']>;
 export type SnapshotExtractor = () => TerminalSnapshot | null;
+
+/** Imperative hooks the SFTP panel needs from the owning terminal. */
+export type SftpTerminalControl = {
+  /** Runs the quiet `stty -echo` + hidden `pwd` recovery and resolves with
+   *  the shell's real working directory, or null when it could not be learned. */
+  probeWorkingDirectory: () => Promise<string | null>;
+};
 
 type TerminalPaneProps = {
   request: TerminalRequest;
@@ -38,6 +52,7 @@ type TerminalPaneProps = {
   ) => void;
   registerSnapshot?: (extractor: SnapshotExtractor | null) => void;
   onAlternateScreen?: (active: boolean) => void;
+  registerSftpControl?: (control: SftpTerminalControl | null) => void;
 };
 
 function isSshRequest(request: TerminalRequest): request is SshTerminalRequest {
@@ -66,7 +81,8 @@ export function TerminalPane({
   onState,
   onHostKeyPrompt,
   registerSnapshot,
-  onAlternateScreen
+  onAlternateScreen,
+  registerSftpControl
 }: TerminalPaneProps): React.JSX.Element {
   const hostRef = useRef<HTMLDivElement>(null);
   const fitRef = useRef<FitAddon | null>(null);
@@ -82,6 +98,7 @@ export function TerminalPane({
   const registerSnapshotRef = useRef(registerSnapshot);
   const precedingLinesRef = useRef(settings.terminalContextPrecedingLines);
   const onAlternateScreenRef = useRef(onAlternateScreen);
+  const registerSftpControlRef = useRef(registerSftpControl);
   const paletteRef = useRef(palette);
   activeRef.current = active;
   onStateRef.current = onState;
@@ -89,6 +106,7 @@ export function TerminalPane({
   registerSnapshotRef.current = registerSnapshot;
   precedingLinesRef.current = settings.terminalContextPrecedingLines;
   onAlternateScreenRef.current = onAlternateScreen;
+  registerSftpControlRef.current = registerSftpControl;
   paletteRef.current = palette;
 
   useEffect(() => {
@@ -153,6 +171,48 @@ export function TerminalPane({
     let client: TerminalClient | undefined;
     let inputSubscription: { dispose: () => void } | undefined;
     let resizeSubscription: { dispose: () => void } | undefined;
+    let lineTracker = createLineTracker();
+    let alternateActive = false;
+    let probing = false;
+    const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+    // Quiet cwd recovery (mirrors the shell-side protocol used by the panel
+    // re-sync): suppress echo, run `pwd` hidden on the alternate screen, read
+    // the learned path, then restore the screen and echo in all cases.
+    const probeWorkingDirectory = async (): Promise<string | null> => {
+      const current = clientRef.current;
+      if (!current || !isSshRequest(request) || probing || alternateActive) return null;
+      probing = true;
+      lineTracker = createLineTracker();
+      try {
+        try {
+          current.sendInput('stty -echo\r');
+          await delay(150);
+          if (disposed || alternateActive) return null;
+          current.sendInput("printf '\\033[1A\\033[K\\033[1B\\r\\033[?1049h'; pwd\r");
+        } catch {
+          return null; // the port or session vanished mid-probe
+        }
+        const deadline = Date.now() + 4_000;
+        for (;;) {
+          await delay(80);
+          const path = readAlternateScreenPath(terminal, alternateActive);
+          if (path) return path;
+          if (disposed || Date.now() >= deadline) return null;
+        }
+      } finally {
+        // Restore echo (and leave the probe's alternate screen when it is
+        // still active) in every outcome; ignore failures from a dead port.
+        const restore = alternateActive ? "printf '\\033[?1049l'; stty echo\r" : 'stty echo\r';
+        try {
+          clientRef.current?.sendInput(restore);
+        } catch {
+          // nothing left to restore on
+        }
+        probing = false;
+      }
+    };
+    registerSftpControlRef.current?.({ probeWorkingDirectory });
 
     const sendResize = (): void => {
       if (client && activeRef.current) client.resize(terminal.cols, terminal.rows);
@@ -192,7 +252,28 @@ export function TerminalPane({
           : window.geared.createLocalTerminal(request, onMessage);
       clientRef.current = client;
       if (!disposed) {
-        inputSubscription = terminal.onData((data) => client?.sendInput(data));
+        inputSubscription = terminal.onData((data) => {
+          client?.sendInput(data);
+          // Forward submitted command lines for cd following; while the SFTP
+          // panel is detached or a full-screen program owns the terminal the
+          // lines are not shell commands and must not be tracked.
+          if (!client || !isSshRequest(request)) return;
+          if (alternateActive) {
+            lineTracker = createLineTracker();
+            return;
+          }
+          const observed = observeKeystrokes(lineTracker, data);
+          lineTracker = observed.tracker;
+          for (const line of observed.lines) {
+            let text = line.text;
+            if (line.edited) {
+              const echoed = readEchoedCommandLine(terminal);
+              const extracted = echoed ? extractCdFromScreenLine(echoed) : null;
+              if (extracted) text = extracted;
+            }
+            if (text.trim()) client.sendCdLine(text.slice(0, 1024));
+          }
+        });
         resizeSubscription = terminal.onResize(sendResize);
         sendResize();
         terminal.focus();
@@ -209,7 +290,11 @@ export function TerminalPane({
       const mode = Array.isArray(first[0]) ? (first[0] as number[])[0] : first[0];
       return alternateScreenModes.has(Number(mode));
     };
-    const setAlternate = (value: boolean): void => onAlternateScreenRef.current?.(value);
+    const setAlternate = (value: boolean): void => {
+      if (value !== alternateActive) lineTracker = createLineTracker();
+      alternateActive = value;
+      onAlternateScreenRef.current?.(value);
+    };
     const handlerEnter = terminal.parser.registerCsiHandler(
       { prefix: '?', final: 'h' },
       (params) => {
@@ -241,6 +326,7 @@ export function TerminalPane({
       handlerEnter.dispose();
       handlerLeave.dispose();
       setAlternate(false);
+      registerSftpControlRef.current?.(null);
       registerSnapshotRef.current?.(null);
       client?.close();
       terminal.dispose();
@@ -369,7 +455,9 @@ export function TerminalPane({
       ) : null}
       <div
         ref={hostRef}
-        className={settings.terminalFontLigatures ? 'terminal-host terminal-ligatures' : 'terminal-host'}
+        className={
+          settings.terminalFontLigatures ? 'terminal-host terminal-ligatures' : 'terminal-host'
+        }
         aria-label={
           isSshRequest(request)
             ? isSavedSshRequest(request)

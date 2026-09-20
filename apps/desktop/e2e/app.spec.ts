@@ -67,6 +67,7 @@ test('exposes exactly the documented preload surface', async () => {
       'executeCommandAction',
       'getAppInfo',
       'getAutoUnlockStatus',
+      'getDownloadsDirectory',
       'getRuntimeInfo',
       'getSettings',
       'getTerminalLigatureSequences',
@@ -116,6 +117,8 @@ test('exposes exactly the documented preload surface', async () => {
       'sftpDelete',
       'sftpMkdir',
       'sftpRename',
+      'sftpSendCd',
+      'sftpTrackedDirectory',
       'unlockVault',
       'uploadPathsSftp',
       'uploadSftp'

@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PassThrough, Writable } from 'node:stream';
@@ -142,5 +142,46 @@ describe('TransferManager', () => {
     });
     const localPath = join(root, transfer.name);
     expect(await readFile(localPath, 'utf8')).toBe('hello');
+  });
+
+  it('aggregates a directory tree into one grouped transfer', async () => {
+    const root = await tempDirectory();
+    const source = join(root, 'bundle');
+    await mkdir(join(source, 'nested'), { recursive: true });
+    await writeFile(join(source, 'a.txt'), 'a'.repeat(300));
+    await writeFile(join(source, 'nested', 'b.txt'), 'b'.repeat(700));
+    const events: SftpTransferEvent[] = [];
+    const { service, writeBuffers, directories } = createFakeSftp([], []);
+    const manager = new TransferManager(
+      async () => service,
+      (event) => events.push(event)
+    );
+
+    const transfers = await manager.uploadPaths({
+      sessionId: 'session-1',
+      localPaths: [source],
+      remoteDirectory: '/srv'
+    });
+    expect(transfers).toHaveLength(1);
+    const group = transfers[0] as SftpTransfer;
+    expect(group.name).toBe('bundle');
+    expect(group.fileCount).toBe(2);
+    expect(group.totalBytes).toBe(1000);
+
+    await vi.waitFor(() => {
+      expect(manager.transfers('session-1')[0]?.status).toBe('completed');
+    });
+    expect(group.remotePath).toBe('/srv/bundle');
+    expect(directories.has('/srv/bundle/nested')).toBe(true);
+    const writtenBytes =
+      (writeBuffers.get('/srv/bundle/a.txt')?.chunks.reduce((sum, c) => sum + c.length, 0) ?? 0) +
+      (writeBuffers.get('/srv/bundle/nested/b.txt')?.chunks.reduce((sum, c) => sum + c.length, 0) ??
+        0);
+    expect(writtenBytes).toBe(1000);
+    const finalEvents = events.filter(
+      (event) => event.kind === 'state' && event.transfer.status === 'completed'
+    );
+    expect(finalEvents).toHaveLength(1);
+    expect(manager.transfers('session-1')[0]?.transferredBytes).toBe(1000);
   });
 });

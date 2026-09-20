@@ -307,7 +307,10 @@ export const AiHistoryLoadRequestSchema = z.object({ id: AiHistoryIdSchema }).st
 
 export const AiSourceReferenceSchema = z
   .object({
-    url: z.string().url().regex(/^https?:\/\//iu),
+    url: z
+      .string()
+      .url()
+      .regex(/^https?:\/\//iu),
     title: z.string().max(512).optional()
   })
   .strict();
@@ -324,7 +327,10 @@ export const AiHistoryMessageSchema = z
   .object({
     role: z.enum(['user', 'assistant']),
     content: z.string().max(256 * 1024),
-    reasoning: z.string().max(256 * 1024).optional(),
+    reasoning: z
+      .string()
+      .max(256 * 1024)
+      .optional(),
     usage: z
       .object({
         inputTokens: z.number().int().nonnegative().optional(),
@@ -404,7 +410,10 @@ export const AiStreamRequestSchema = z
     model: z.string().min(1).max(256),
     targetKey: z.string().min(1).max(512).optional(),
     messages: z.array(AiChatMessageSchema).max(100),
-    prompt: z.string().min(1).max(256 * 1024),
+    prompt: z
+      .string()
+      .min(1)
+      .max(256 * 1024),
     snapshot: AiSnapshotAttachmentSchema.optional(),
     responseOptions: AiStreamResponseOptionsSchema.optional()
   })
@@ -441,7 +450,10 @@ export const AiStreamEventSchema = z.discriminatedUnion('kind', [
   }),
   z.object({
     kind: z.literal('source'),
-    url: z.string().url().regex(/^https?:\/\//iu),
+    url: z
+      .string()
+      .url()
+      .regex(/^https?:\/\//iu),
     title: z.string().max(512).optional()
   }),
   z.object({
@@ -537,7 +549,10 @@ export const TerminalClientMessageSchema = z.discriminatedUnion('kind', [
       .max(4 * 1024 * 1024)
   }),
   z.object({ kind: z.literal('close') }),
-  z.object({ kind: z.literal('host-key-decision'), decision: z.enum(['approve', 'reject']) })
+  z.object({ kind: z.literal('host-key-decision'), decision: z.enum(['approve', 'reject']) }),
+  // A shell line reconstructed by the renderer after Enter (raw buffer, or the
+  // screen echo when completion/history made the buffer unreliable).
+  z.object({ kind: z.literal('cd-line'), line: z.string().min(1).max(1024) })
 ]);
 
 export const SshTerminalRequestSchema = z
@@ -578,14 +593,31 @@ export const SshProfileTerminalRequestSchema = z
 export const SftpListRequestSchema = z
   .object({
     sessionId: IdSchema,
-    directory: z.string().min(1).max(4096).default('.')
+    directory: z.string().min(1).max(4096).default('.'),
+    // Panel listings that mirror the shell (cd-followed or cd-injected) may
+    // re-anchor the tracked directory; standalone panel browsing must not.
+    reanchor: z.boolean().default(false)
+  })
+  .strict();
+
+export const SftpSendCdRequestSchema = z
+  .object({
+    sessionId: IdSchema,
+    directory: z.string().min(1).max(4096)
+  })
+  .strict();
+
+export const SftpSessionRequestSchema = z
+  .object({
+    sessionId: IdSchema
   })
   .strict();
 
 export const SftpUploadRequestSchema = z
   .object({
     sessionId: IdSchema,
-    remoteDirectory: z.string().min(1).max(4096).default('.')
+    remoteDirectory: z.string().min(1).max(4096).default('.'),
+    choose: z.enum(['files', 'folders', 'both']).default('both')
   })
   .strict();
 
@@ -675,6 +707,8 @@ export const SftpTransferSchema = z
     localPath: z.string().min(1).max(4096),
     totalBytes: z.number().int().nonnegative().nullable(),
     transferredBytes: z.number().int().nonnegative(),
+    // Tree transfers report one aggregated entry per selected top-level item.
+    fileCount: z.number().int().positive().optional(),
     status: SftpTransferStatusSchema,
     error: z.string().max(512).optional()
   })
@@ -883,6 +917,8 @@ export type TerminalClientMessage = z.infer<typeof TerminalClientMessageSchema>;
 export type SshTerminalRequest = z.infer<typeof SshTerminalRequestSchema>;
 export type SshProfileTerminalRequest = z.infer<typeof SshProfileTerminalRequestSchema>;
 export type SftpListRequest = z.infer<typeof SftpListRequestSchema>;
+export type SftpSendCdRequest = z.infer<typeof SftpSendCdRequestSchema>;
+export type SftpSessionRequest = z.infer<typeof SftpSessionRequestSchema>;
 export type SftpUploadRequest = z.infer<typeof SftpUploadRequestSchema>;
 export type SftpDownloadRequest = z.infer<typeof SftpDownloadRequestSchema>;
 export type SftpOperationResult = z.infer<typeof SftpOperationResultSchema>;

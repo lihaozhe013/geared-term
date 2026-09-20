@@ -1,38 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { applyCdSubmission, noteListed, observeInput, parseCdCommand } from './cd-tracking';
+import { applyCdSubmission, noteListed, parseCdCommand } from './cd-tracking';
 
 const anchored = {
   home: '/home/dev',
   directory: '/home/dev/projects',
   previous: '/home/dev'
 };
-
-describe('observeInput', () => {
-  it('reconstructs lines split across chunks', () => {
-    const first = observeInput('', false, 'cd /tm');
-    const second = observeInput(first.buffer, first.invalid, 'p\r');
-    expect(second.lines).toEqual(['cd /tmp']);
-  });
-
-  it('applies backspaces', () => {
-    const result = observeInput('', false, 'cd /tmpx\u007f/x\r');
-    expect(result.lines).toEqual(['cd /tmp/x']);
-  });
-
-  it('disqualifies lines containing escape sequences', () => {
-    const result = observeInput('', false, 'cd /tmp\u001b[A\r');
-    expect(result.lines).toEqual([]);
-  });
-
-  it('discards a disqualified line but recovers on the next one', () => {
-    const first = observeInput('', false, 'cd /tmp' + String.fromCharCode(27) + '[Al');
-    expect(first.lines).toEqual([]);
-    const second = observeInput(first.buffer, first.invalid, 's\r');
-    expect(second.lines).toEqual([]);
-    const third = observeInput(second.buffer, second.invalid, 'ls\r');
-    expect(third.lines).toEqual(['ls']);
-  });
-});
 
 describe('parseCdCommand', () => {
   it('detects plain cd with no argument', () => {

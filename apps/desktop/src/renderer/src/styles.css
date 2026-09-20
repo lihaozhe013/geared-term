@@ -2889,3 +2889,69 @@ button:disabled {
   gap: 10px;
   margin-top: 6px;
 }
+
+.sftp-menu-row {
+  position: relative;
+  display: grid;
+}
+
+.sftp-context-menu button.sftp-menu-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sftp-menu-separator {
+  height: 1px;
+  margin: 3px 4px;
+  background: var(--gt-border-strong, #344157);
+}
+
+.sftp-menu-caret {
+  margin-left: 8px;
+  color: var(--gt-text-dim, #8a93a6);
+}
+
+.sftp-context-menu-submenu {
+  position: absolute;
+  top: -5px;
+  width: 210px;
+}
+
+.sftp-context-menu button:disabled,
+.sftp-context-menu button[aria-disabled] {
+  color: var(--gt-text-dim, #66708a);
+  cursor: default;
+  background: transparent;
+  opacity: 0.55;
+}
+
+.sftp-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 2px 2px;
+  font-size: 10px;
+  color: var(--gt-text-dim, #8a93a6);
+}
+
+.sftp-entry-name > svg,
+.sftp-transfer-name > svg {
+  flex: 0 0 auto;
+  color: var(--gt-text-dim, #8a93a6);
+}
+
+.sftp-transfer-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sftp-entry-label,
+.sftp-transfer-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

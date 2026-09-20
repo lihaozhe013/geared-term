@@ -15,40 +15,6 @@ export type CdFollowState = {
 export type CdEffect =
   { kind: 'unchanged' } | { kind: 'move'; directory: string } | { kind: 'unsynced' };
 
-const MAX_LINE_LENGTH = 1024;
-
-/**
- * Reconstructs submitted shell lines from the raw input stream. Backspaces are
- * applied; any escape sequence disqualifies the pending line because the real
- * command text cannot then be reconstructed safely.
- */
-export function observeInput(
-  buffer: string,
-  invalid: boolean,
-  data: string
-): { buffer: string; invalid: boolean; lines: string[] } {
-  let line = buffer;
-  let disqualified = invalid;
-  const lines: string[] = [];
-  for (const character of data) {
-    const code = character.codePointAt(0) ?? 0;
-    if (code === 0x1b) {
-      disqualified = true;
-      line = '';
-    } else if (character === '\r' || character === '\n') {
-      if (!disqualified && line.trim()) lines.push(line);
-      line = '';
-      disqualified = false;
-    } else if (code === 0x7f || code === 0x08) {
-      line = line.slice(0, -1);
-    } else if (code >= 0x20) {
-      if (line.length < MAX_LINE_LENGTH) line += character;
-      else disqualified = true;
-    }
-  }
-  return { buffer: line, invalid: disqualified, lines };
-}
-
 type Operator = ';' | '&&' | '||' | '|' | '&';
 
 type Segment = { tokens: string[]; operator: Operator | null };

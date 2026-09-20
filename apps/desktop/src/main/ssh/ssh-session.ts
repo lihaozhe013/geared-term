@@ -8,12 +8,7 @@ import {
   type SshTerminalRequest
 } from '@geared-term/protocol';
 import type { Logger } from '../logging';
-import {
-  applyCdSubmission,
-  noteListed,
-  observeInput,
-  type CdFollowState
-} from '../sftp/cd-tracking';
+import { applyCdSubmission, noteListed, type CdFollowState } from '../sftp/cd-tracking';
 import { SftpService } from '../sftp/sftp-service';
 import { KnownHostsStore } from './known-hosts';
 import { probeScript } from '../environment/probe';
@@ -39,7 +34,6 @@ type SshSession = {
   sequence: number;
   closed: boolean;
   pendingHostKey?: PendingHostKey;
-  input: { buffer: string; invalid: boolean };
   follow: CdFollowState | null;
 };
 
@@ -86,9 +80,16 @@ export class SshSessionManager {
       rejectSftp,
       sequence: 0,
       closed: false,
-      input: { buffer: '', invalid: false },
       follow: null
     };
+    // Seed the directory tracker with the real home as soon as SFTP is up so
+    // `cd` typed before the panel ever opens is still followed.
+    void sftpReady
+      .then((service) => service.canonicalize('.'))
+      .then((home) => {
+        if (!session.closed) session.follow = { home, directory: home, previous: null };
+      })
+      .catch(() => undefined);
     this.sessions.set(session.id, session);
     port.start();
     port.on('message', (event) => this.onClientMessage(session, event.data));
@@ -154,18 +155,30 @@ export class SshSessionManager {
     for (const session of [...this.sessions.values()]) this.close(session, 'application-shutdown');
   }
 
-  public async listSftp(sessionId: string, directory: string): Promise<SftpListResult> {
+  public async listSftp(
+    sessionId: string,
+    directory: string,
+    reanchor = false
+  ): Promise<SftpListResult> {
     const session = this.sessions.get(sessionId);
     if (!session || session.closed) throw new Error('SSH session is not available for SFTP');
     const service = await session.sftpReady;
     if (session.closed) throw new Error('SSH session is no longer available for SFTP');
     const canonical = await service.canonicalize(directory);
     const entries = await service.list(canonical);
-    session.follow = noteListed(
-      session.follow ?? { home: null, directory: '.', previous: null },
-      canonical
-    );
+    // Only listings that mirror the shell's real directory may re-anchor the
+    // tracker; standalone panel browsing must not poison the relative-cd base.
+    if (reanchor) {
+      session.follow = noteListed(
+        session.follow ?? { home: null, directory: canonical, previous: null },
+        canonical
+      );
+    }
     return { directory: canonical, entries };
+  }
+
+  public trackedDirectory(sessionId: string): string | null {
+    return this.sessions.get(sessionId)?.follow?.directory ?? null;
   }
 
   public async runSftp<T>(
@@ -195,11 +208,7 @@ export class SshSessionManager {
     session.channel.write(data);
   }
 
-  public exec(
-    sessionId: string,
-    command = probeScript,
-    signal?: AbortSignal
-  ): Promise<string> {
+  public exec(sessionId: string, command = probeScript, signal?: AbortSignal): Promise<string> {
     const session = this.sessions.get(sessionId);
     if (!session || session.closed) throw new Error('SSH terminal is not available');
     return new Promise<string>((resolve, reject) => {
@@ -313,16 +322,14 @@ export class SshSessionManager {
     const message = result.data;
     if (message.kind === 'input') {
       session.channel?.write(message.data);
-      const observed = observeInput(session.input.buffer, session.input.invalid, message.data);
-      session.input = { buffer: observed.buffer, invalid: observed.invalid };
-      for (const line of observed.lines) {
-        if (!session.follow) continue;
-        const result = applyCdSubmission(session.follow, line);
-        session.follow = result.state;
-        if (result.effect.kind === 'move')
-          this.hooks.onSftpCd?.(session.id, result.effect.directory);
-        else if (result.effect.kind === 'unsynced') this.hooks.onSftpCd?.(session.id, null);
-      }
+    } else if (message.kind === 'cd-line') {
+      // Submitted command lines are reconstructed (and screen-echo recovered)
+      // by the renderer; the main process only owns the tracking state.
+      if (!session.follow) return;
+      const result = applyCdSubmission(session.follow, message.line);
+      session.follow = result.state;
+      if (result.effect.kind === 'move') this.hooks.onSftpCd?.(session.id, result.effect.directory);
+      else if (result.effect.kind === 'unsynced') this.hooks.onSftpCd?.(session.id, null);
     } else if (message.kind === 'resize')
       session.channel?.setWindow(message.rows, message.cols, 0, 0);
     else if (message.kind === 'host-key-decision')
