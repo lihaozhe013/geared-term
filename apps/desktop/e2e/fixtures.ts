@@ -85,7 +85,6 @@ export async function launchApp(chromiumArgs: readonly string[] = []): Promise<A
   const page = await app.firstWindow();
   await app.evaluate(({ BrowserWindow }) => {
     for (const window of BrowserWindow.getAllWindows()) {
-      window.show();
       window.moveTop();
       window.focus();
     }

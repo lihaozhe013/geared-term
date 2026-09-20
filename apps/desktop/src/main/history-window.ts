@@ -1,7 +1,7 @@
 import { BrowserWindow } from 'electron';
 import { join } from 'node:path';
 import type { Logger } from './logging';
-import { hideNativeMenuBar, windowChromeOptions } from './window-chrome';
+import { hideNativeMenuBar, showWindowWhenReady, windowChromeOptions } from './window-chrome';
 
 /**
  * Single-instance chat-history window. Continuing a conversation broadcasts the
@@ -39,7 +39,7 @@ export class HistoryWindowManager {
       }
     });
     hideNativeMenuBar(window);
-    window.once('ready-to-show', () => window.show());
+    showWindowWhenReady(window, this.logger, 'history');
     window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     window.webContents.on('will-navigate', (event, url) => {
       const rendererUrl = process.env.ELECTRON_RENDERER_URL;

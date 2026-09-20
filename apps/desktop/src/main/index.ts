@@ -92,7 +92,7 @@ import { TransferManager } from './sftp/transfers';
 import { buildApplicationMenu, executeApplicationMenuAction, type MenuLocale } from './menu';
 import { HistoryWindowManager } from './history-window';
 import { SettingsWindowManager, type SettingsCategory } from './settings-window';
-import { hideNativeMenuBar, windowChromeOptions } from './window-chrome';
+import { hideNativeMenuBar, showWindowWhenReady, windowChromeOptions } from './window-chrome';
 import { discoverWsl } from './wsl/discovery';
 import { probeEnvironment } from './environment/probe';
 import { EnvironmentManager } from './environment/manager';
@@ -273,9 +273,12 @@ function createWindow(): BrowserWindow {
   hideNativeMenuBar(window);
   let persistingWindowState = false;
 
+  showWindowWhenReady(window, logger, 'main');
   window.once('ready-to-show', () => {
     if (storage.uiStateSnapshot().maximized) window.maximize();
-    window.show();
+  });
+  window.webContents.once('did-finish-load', () => {
+    if (storage.uiStateSnapshot().maximized && !window.isMaximized()) window.maximize();
   });
   window.on('close', (event) => {
     if (persistingWindowState) return;
