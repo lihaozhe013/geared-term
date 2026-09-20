@@ -1,6 +1,7 @@
 import { BrowserWindow } from 'electron';
 import { join } from 'node:path';
 import type { Logger } from './logging';
+import { hideNativeMenuBar, windowChromeOptions } from './window-chrome';
 
 export type SettingsCategory =
   | 'general'
@@ -38,7 +39,7 @@ export class SettingsWindowManager {
       minHeight: 520,
       title: 'Geared Term Settings',
       show: false,
-      autoHideMenuBar: true,
+      ...windowChromeOptions(),
       backgroundColor: '#0d1117',
       webPreferences: {
         preload: join(__dirname, '../preload/index.js'),
@@ -48,6 +49,7 @@ export class SettingsWindowManager {
         spellcheck: false
       }
     });
+    hideNativeMenuBar(window);
     window.once('ready-to-show', () => window.show());
     window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     window.webContents.on('will-navigate', (event, url) => {

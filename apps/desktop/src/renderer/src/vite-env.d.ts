@@ -54,6 +54,7 @@ import type {
 declare global {
   interface Window {
     geared: {
+      readonly platform: NodeJS.Platform;
       getAppInfo: () => Promise<AppInfo>;
       createLocalTerminal: (
         input: LocalTerminalRequest,
@@ -95,7 +96,10 @@ declare global {
       listAiConnections: () => Promise<AiConnectionRecord[]>;
       saveAiConnection: (input: AiConnectionInput) => Promise<AiConnectionRecord[]>;
       deleteAiConnection: (id: string) => Promise<AiConnectionRecord[]>;
-      acceptAiEndpoint: (input: { connectionId: string; identity: string }) => Promise<AiConnectionRecord[]>;
+      acceptAiEndpoint: (input: {
+        connectionId: string;
+        identity: string;
+      }) => Promise<AiConnectionRecord[]>;
       discoverAiModels: (input: AiDiscoverModelsRequest) => Promise<AiDiscoveredModels>;
       listAiHistory: () => Promise<AiHistoryList>;
       loadAiHistory: (input: AiHistoryLoadRequest) => Promise<AiHistoryLoadResult>;
@@ -141,6 +145,11 @@ declare global {
       onSftpTransferEvent: (listener: (event: SftpTransferEvent) => void) => () => void;
       onSftpCd: (listener: (event: SftpCdEvent) => void) => () => void;
       onMenuCommand: (listener: (command: string) => void) => () => void;
+      executeMenuAction: (action: string) => Promise<SftpOperationResult>;
+      setTitleBarOverlay: (input: {
+        color: string;
+        symbolColor: string;
+      }) => Promise<SftpOperationResult>;
       listUserThemes: () => Promise<UserThemeList>;
       openThemesFolder: () => Promise<SftpOperationResult>;
       getRuntimeInfo: () => Promise<RuntimeInfo>;

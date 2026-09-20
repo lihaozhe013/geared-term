@@ -63,6 +63,7 @@ test('exposes exactly the documented preload surface', async () => {
       'downloadPathsSftp',
       'downloadSftp',
       'enableAutoUnlock',
+      'executeMenuAction',
       'executeCommandAction',
       'getAppInfo',
       'getAutoUnlockStatus',
@@ -97,6 +98,7 @@ test('exposes exactly the documented preload surface', async () => {
       'openLocalPath',
       'openSettings',
       'openThemesFolder',
+      'platform',
       'probeEnvironment',
       'renameLocalPath',
       'rotateVault',
@@ -108,6 +110,7 @@ test('exposes exactly the documented preload surface', async () => {
       'saveProfileWithCredentials',
       'saveSettings',
       'saveUiState',
+      'setTitleBarOverlay',
       'streamAi',
       'revealLocalPath',
       'sftpDelete',
@@ -140,4 +143,33 @@ test('reports application information from the main process', async () => {
   expect(info.platform).toBe(process.platform);
   expect(info.isPackaged).toBe(false);
   expect(info.version).toMatch(/^\d+\.\d+\.\d+/);
+});
+
+test('renders and executes the virtual menu on non-macOS platforms', async () => {
+  test.skip(process.platform === 'darwin', 'macOS uses the native application menu');
+  const { page } = session;
+  await expect(page.locator('.desktop-menu')).toBeVisible();
+  await page.locator('.desktop-menu-button').first().click();
+  await expect(page.locator('.desktop-menu-popover').first()).toBeVisible();
+  await page.getByRole('menuitem', { name: 'New local terminal' }).click();
+  await expect(page.locator('.terminal-tab')).toHaveCount(2);
+});
+
+test('keeps the macOS application menu separate from File', async () => {
+  test.skip(process.platform !== 'darwin', 'Windows and Linux use the virtual renderer menu');
+  const structure = await session.app.evaluate(({ Menu }) => {
+    const menu = Menu.getApplicationMenu();
+    return {
+      topLevel: menu?.items.map((item) => item.label) ?? [],
+      application: menu?.items[0]?.submenu?.items.map((item) => item.label) ?? [],
+      file:
+        menu?.items
+          .find((item) => item.label === 'File')
+          ?.submenu?.items.map((item) => item.label) ?? []
+    };
+  });
+  expect(structure.topLevel[0]).toBe('Geared Term');
+  expect(structure.application).toContain('About Geared Term');
+  expect(structure.file).toContain('New local terminal');
+  expect(structure.file).not.toContain('About Geared Term');
 });

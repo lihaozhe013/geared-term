@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { parseRemoteFileCommands } from '@geared-term/protocol';
+import { BUILTIN_THEME_NAMES, parseRemoteFileCommands } from '@geared-term/protocol';
 import type {
   AppInfo,
   LocalTerminalRequest,
@@ -19,7 +19,6 @@ import {
   Lock,
   PanelRightClose,
   PanelRightOpen,
-  Settings,
   SquareTerminal
 } from 'lucide-react';
 import { applyPalette, resolvePalette } from './themes';
@@ -30,6 +29,7 @@ import { QuickSshDialog } from './QuickSshDialog';
 import { SftpPanel } from './SftpPanel';
 import { TerminalPane, type SnapshotExtractor } from './TerminalPane';
 import { VaultGate } from './VaultGate';
+import { WindowTitleBar } from './WindowTitleBar';
 
 type TerminalRequest = LocalTerminalRequest | SshTerminalRequest | SshProfileTerminalRequest;
 type TabStatus = 'starting' | 'awaiting-user' | 'running' | 'exited' | 'failed' | 'closed';
@@ -154,14 +154,16 @@ function supportsSftp(request: TerminalRequest | undefined): boolean {
 function environmentTarget(
   request: TerminalRequest | undefined,
   profiles: SessionProfileRecord[]
-): {
-  kind: 'local' | 'wsl' | 'ssh';
-  targetKey: string;
-  distribution?: string;
-  shell?: string;
-  cwd?: string;
-  legacyTargetKeys?: string[];
-} | undefined {
+):
+  | {
+      kind: 'local' | 'wsl' | 'ssh';
+      targetKey: string;
+      distribution?: string;
+      shell?: string;
+      cwd?: string;
+      legacyTargetKeys?: string[];
+    }
+  | undefined {
   if (!request) return undefined;
   if ('host' in request) {
     return {
@@ -179,7 +181,8 @@ function environmentTarget(
   }
   if (request.shell?.toLowerCase().endsWith('wsl.exe')) {
     const distribution = request.args.find(
-      (arg, index) => request.args[index - 1] === '--distribution' || request.args[index - 1] === '-d'
+      (arg, index) =>
+        request.args[index - 1] === '--distribution' || request.args[index - 1] === '-d'
     );
     if (distribution) {
       return {
@@ -278,9 +281,16 @@ export function App(): React.JSX.Element {
     () => resolvePalette(settings.theme, userThemes),
     [settings.theme, userThemes]
   );
+  const themeNames = useMemo(
+    () => [...new Set([...BUILTIN_THEME_NAMES, ...userThemes.map((theme) => theme.name)])],
+    [settings.theme, userThemes]
+  );
 
   useEffect(() => {
     applyPalette(palette);
+    void window.geared
+      .setTitleBarOverlay({ color: palette.background, symbolColor: palette.text })
+      .catch(() => undefined);
     const style = document.documentElement.style;
     style.setProperty('--gt-ui-font-size', `${settings.uiFontSize}px`);
     if (settings.uiFontFamily.trim()) {
@@ -610,19 +620,16 @@ export function App(): React.JSX.Element {
 
   return (
     <main className="app-shell">
-      <header className="titlebar">
-        <span className="titlebar-app">Geared Term</span>
-        <span className="titlebar-session">{activeTab?.name ?? ''}</span>
-        <button
-          type="button"
-          className="icon-button"
-          aria-label="Settings"
-          title="Settings"
-          onClick={() => void window.geared.openSettings()}
-        >
-          <Settings size={14} aria-hidden="true" />
-        </button>
-      </header>
+      <WindowTitleBar
+        title="Geared Term"
+        sessionLabel={activeTab?.name}
+        platform={info?.platform}
+        language={settings.language}
+        theme={settings.theme}
+        themeNames={themeNames}
+        isDevelopment={!info?.isPackaged}
+        onOpenSettings={() => void window.geared.openSettings()}
+      />
 
       <section
         className={`workspace ${uiState.sidebarCollapsed ? 'sidebar-collapsed' : ''}`}
@@ -988,9 +995,7 @@ export function App(): React.JSX.Element {
                 .deleteProfile(profileMenu.profile.id)
                 .then(setProfiles)
                 .catch((reason: unknown) =>
-                  setError(
-                    reason instanceof Error ? reason.message : 'Unable to delete session'
-                  )
+                  setError(reason instanceof Error ? reason.message : 'Unable to delete session')
                 );
               setProfileMenu(null);
             }}

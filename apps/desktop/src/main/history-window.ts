@@ -1,6 +1,7 @@
 import { BrowserWindow } from 'electron';
 import { join } from 'node:path';
 import type { Logger } from './logging';
+import { hideNativeMenuBar, windowChromeOptions } from './window-chrome';
 
 /**
  * Single-instance chat-history window. Continuing a conversation broadcasts the
@@ -27,7 +28,7 @@ export class HistoryWindowManager {
       minHeight: 480,
       title: 'Chat History',
       show: false,
-      autoHideMenuBar: true,
+      ...windowChromeOptions(),
       backgroundColor: '#0d1117',
       webPreferences: {
         preload: join(__dirname, '../preload/index.js'),
@@ -37,6 +38,7 @@ export class HistoryWindowManager {
         spellcheck: false
       }
     });
+    hideNativeMenuBar(window);
     window.once('ready-to-show', () => window.show());
     window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     window.webContents.on('will-navigate', (event, url) => {

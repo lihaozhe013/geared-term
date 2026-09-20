@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { AiHistoryLoadResult, AiHistorySummary } from '@geared-term/protocol';
 import { FolderOpen, RefreshCw, Send, Trash2, X } from 'lucide-react';
 import { MarkdownView } from '../assistant/MarkdownView';
+import { WindowTitleBar } from '../WindowTitleBar';
 
 function previewMarkdown(record: AiHistoryLoadResult): string {
   const lines: string[] = [`# ${record.title}`];
@@ -70,101 +71,104 @@ export function HistoryWindow(): React.JSX.Element {
   };
 
   return (
-    <div className="history-window">
-      <aside className="history-list" aria-label="Chat history">
-        <div className="history-list-toolbar">
-          <div>
-            <p className="history-title">Chat History</p>
-            <p className="history-count">{entries.length} conversations</p>
-          </div>
-          <div className="history-toolbar-actions">
-            <button
-              type="button"
-              className="icon-button"
-              aria-label="Open folder"
-              onClick={() => void window.geared.openAiHistoryDirectory()}
-            >
-              <FolderOpen size={14} aria-hidden="true" />
-            </button>
-            <button type="button" className="icon-button" aria-label="Refresh" onClick={refresh}>
-              <RefreshCw size={14} aria-hidden="true" />
-            </button>
-          </div>
-        </div>
-        <div className="history-entries">
-          {entries.length === 0 ? (
-            <p className="settings-hint">No saved conversations yet.</p>
-          ) : null}
-          {entries.map((entry) => (
-            <div className="history-entry" key={entry.id}>
-              {confirmingDelete === entry.id ? (
-                <>
-                  <button
-                    type="button"
-                    className="history-entry-danger"
-                    onClick={() => void remove(entry.id)}
-                  >
-                    Delete
-                  </button>
-                  <button
-                    type="button"
-                    className="icon-button"
-                    aria-label="Cancel delete"
-                    onClick={() => setConfirmingDelete(null)}
-                  >
-                    <X size={13} aria-hidden="true" />
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    className={`history-entry-button ${selected?.id === entry.id ? 'active' : ''}`}
-                    onClick={() => openEntry(entry.id)}
-                  >
-                    <span>{entry.title}</span>
-                    <small>
-                      {new Date(entry.updatedAt).toLocaleString()} · {entry.messageCount} messages
-                    </small>
-                  </button>
-                  <button
-                    type="button"
-                    className="icon-button danger"
-                    aria-label={`Delete ${entry.title}`}
-                    onClick={() => setConfirmingDelete(entry.id)}
-                  >
-                    <Trash2 size={13} aria-hidden="true" />
-                  </button>
-                </>
-              )}
+    <div className="history-window-shell">
+      <WindowTitleBar title="Chat History" platform={window.geared.platform} showMenu={false} />
+      <div className="history-window">
+        <aside className="history-list" aria-label="Chat history">
+          <div className="history-list-toolbar">
+            <div>
+              <p className="history-title">Chat History</p>
+              <p className="history-count">{entries.length} conversations</p>
             </div>
-          ))}
-        </div>
-      </aside>
-      <section className="history-preview">
-        {selected ? (
-          <>
-            <div className="history-preview-body">
-              <MarkdownView source={previewMarkdown(selected)} />
-            </div>
-            <div className="history-footer">
-              <span className="history-footer-status">{error ?? status ?? ''}</span>
+            <div className="history-toolbar-actions">
               <button
                 type="button"
-                className="primary-button settings-apply"
-                onClick={() => void continueInAssistant()}
+                className="icon-button"
+                aria-label="Open folder"
+                onClick={() => void window.geared.openAiHistoryDirectory()}
               >
-                <Send size={13} aria-hidden="true" /> Continue in assistant
+                <FolderOpen size={14} aria-hidden="true" />
+              </button>
+              <button type="button" className="icon-button" aria-label="Refresh" onClick={refresh}>
+                <RefreshCw size={14} aria-hidden="true" />
               </button>
             </div>
-          </>
-        ) : (
-          <div className="history-preview-empty">
-            <p className="muted">Select a conversation to preview it.</p>
-            {error ? <p className="settings-status status-error">{error}</p> : null}
           </div>
-        )}
-      </section>
+          <div className="history-entries">
+            {entries.length === 0 ? (
+              <p className="settings-hint">No saved conversations yet.</p>
+            ) : null}
+            {entries.map((entry) => (
+              <div className="history-entry" key={entry.id}>
+                {confirmingDelete === entry.id ? (
+                  <>
+                    <button
+                      type="button"
+                      className="history-entry-danger"
+                      onClick={() => void remove(entry.id)}
+                    >
+                      Delete
+                    </button>
+                    <button
+                      type="button"
+                      className="icon-button"
+                      aria-label="Cancel delete"
+                      onClick={() => setConfirmingDelete(null)}
+                    >
+                      <X size={13} aria-hidden="true" />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      className={`history-entry-button ${selected?.id === entry.id ? 'active' : ''}`}
+                      onClick={() => openEntry(entry.id)}
+                    >
+                      <span>{entry.title}</span>
+                      <small>
+                        {new Date(entry.updatedAt).toLocaleString()} · {entry.messageCount} messages
+                      </small>
+                    </button>
+                    <button
+                      type="button"
+                      className="icon-button danger"
+                      aria-label={`Delete ${entry.title}`}
+                      onClick={() => setConfirmingDelete(entry.id)}
+                    >
+                      <Trash2 size={13} aria-hidden="true" />
+                    </button>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        </aside>
+        <section className="history-preview">
+          {selected ? (
+            <>
+              <div className="history-preview-body">
+                <MarkdownView source={previewMarkdown(selected)} />
+              </div>
+              <div className="history-footer">
+                <span className="history-footer-status">{error ?? status ?? ''}</span>
+                <button
+                  type="button"
+                  className="primary-button settings-apply"
+                  onClick={() => void continueInAssistant()}
+                >
+                  <Send size={13} aria-hidden="true" /> Continue in assistant
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="history-preview-empty">
+              <p className="muted">Select a conversation to preview it.</p>
+              {error ? <p className="settings-status status-error">{error}</p> : null}
+            </div>
+          )}
+        </section>
+      </div>
     </div>
   );
 }

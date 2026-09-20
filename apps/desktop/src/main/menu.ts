@@ -1,4 +1,4 @@
-import { Menu, type MenuItemConstructorOptions } from 'electron';
+import { app, BrowserWindow, Menu, type MenuItemConstructorOptions } from 'electron';
 
 export type MenuLocale = 'en-US' | 'zh-CN';
 
@@ -16,6 +16,107 @@ export type MenuState = {
   themeNames: string[];
   isDevelopment: boolean;
 };
+
+let activeMenuState: MenuState | undefined;
+let activeMenuCommands: MenuCommands | undefined;
+
+/**
+ * Executes the allowlisted actions exposed to the renderer menu. Keeping this
+ * mapping in the main process prevents renderer input from becoming an
+ * arbitrary Electron command or role.
+ */
+export function executeApplicationMenuAction(action: string, window: BrowserWindow): void {
+  const state = activeMenuState;
+  const commands = activeMenuCommands;
+  if (!state || !commands) throw new Error('Application menu is unavailable');
+
+  switch (action) {
+    case 'new-local':
+    case 'quick-ssh':
+    case 'toggle-sftp':
+    case 'toggle-assistant':
+    case 'toggle-environment':
+    case 'cycle-panels':
+      commands.onCommand(action);
+      return;
+    case 'open-settings':
+      commands.onOpenSettings();
+      return;
+    case 'open-config-folder':
+      commands.onOpenConfigFolder();
+      return;
+    case 'quit':
+      app.quit();
+      return;
+    case 'undo':
+      window.webContents.undo();
+      return;
+    case 'redo':
+      window.webContents.redo();
+      return;
+    case 'cut':
+      window.webContents.cut();
+      return;
+    case 'copy':
+      window.webContents.copy();
+      return;
+    case 'paste':
+      window.webContents.paste();
+      return;
+    case 'select-all':
+      window.webContents.selectAll();
+      return;
+    case 'reload':
+      window.webContents.reload();
+      return;
+    case 'toggle-dev-tools':
+      if (!state.isDevelopment) throw new Error('Developer tools are unavailable');
+      window.webContents.toggleDevTools();
+      return;
+    case 'reset-zoom':
+      window.webContents.setZoomFactor(1);
+      return;
+    case 'zoom-in':
+      window.webContents.setZoomFactor(Math.min(3, window.webContents.getZoomFactor() + 0.1));
+      return;
+    case 'zoom-out':
+      window.webContents.setZoomFactor(Math.max(0.5, window.webContents.getZoomFactor() - 0.1));
+      return;
+    case 'toggle-fullscreen':
+      window.setFullScreen(!window.isFullScreen());
+      return;
+    case 'window-minimize':
+      window.minimize();
+      return;
+    case 'window-zoom':
+      if (window.isMaximized()) window.unmaximize();
+      else window.maximize();
+      return;
+    case 'window-close':
+      window.close();
+      return;
+    case 'about':
+      commands.onAbout();
+      return;
+  }
+
+  if (action.startsWith('theme:')) {
+    const name = action.slice('theme:'.length);
+    if (!state.themeNames.includes(name)) throw new Error('Unknown theme');
+    commands.onCommand(action);
+    return;
+  }
+  if (action.startsWith('language:')) {
+    const language = action.slice('language:'.length);
+    if (language !== 'system' && language !== 'en-US' && language !== 'zh-CN') {
+      throw new Error('Unknown language');
+    }
+    commands.onCommand(action);
+    return;
+  }
+
+  throw new Error('Unknown application menu action');
+}
 
 const labels = {
   'en-US': {
@@ -51,7 +152,11 @@ const labels = {
     minimize: 'Minimize',
     close: 'Close window',
     help: 'Help',
-    about: 'About Geared Term'
+    about: 'About Geared Term',
+    services: 'Services',
+    hide: 'Hide Geared Term',
+    hideOthers: 'Hide Others',
+    unhide: 'Show All'
   },
   'zh-CN': {
     file: '文件',
@@ -86,13 +191,39 @@ const labels = {
     minimize: '最小化',
     close: '关闭窗口',
     help: '帮助',
-    about: '关于 Geared Term'
+    about: '关于 Geared Term',
+    services: '服务',
+    hide: '隐藏 Geared Term',
+    hideOthers: '隐藏其他',
+    unhide: '显示全部'
   }
 } as const;
 
 export function buildApplicationMenu(state: MenuState, commands: MenuCommands): void {
+  activeMenuState = state;
+  activeMenuCommands = commands;
   const t = labels[state.locale];
+  const applicationMenu: MenuItemConstructorOptions[] =
+    process.platform === 'darwin'
+      ? [
+          {
+            label: 'Geared Term',
+            submenu: [
+              { label: t.about, click: commands.onAbout },
+              { type: 'separator' },
+              { role: 'services', label: t.services },
+              { type: 'separator' },
+              { role: 'hide', label: t.hide },
+              { role: 'hideOthers', label: t.hideOthers },
+              { role: 'unhide', label: t.unhide },
+              { type: 'separator' },
+              { role: 'quit', label: t.quit }
+            ]
+          }
+        ]
+      : [];
   const template: MenuItemConstructorOptions[] = [
+    ...applicationMenu,
     {
       label: t.file,
       submenu: [
@@ -106,8 +237,9 @@ export function buildApplicationMenu(state: MenuState, commands: MenuCommands): 
         { type: 'separator' },
         { label: t.settings, accelerator: 'CmdOrCtrl+,', click: commands.onOpenSettings },
         { label: t.openConfigFolder, click: commands.onOpenConfigFolder },
-        { type: 'separator' },
-        { role: 'quit', label: t.quit }
+        ...(process.platform === 'darwin'
+          ? []
+          : [{ type: 'separator' as const }, { role: 'quit' as const, label: t.quit }])
       ]
     },
     {
@@ -192,10 +324,9 @@ export function buildApplicationMenu(state: MenuState, commands: MenuCommands): 
         { role: 'close', label: t.close }
       ]
     },
-    {
-      label: t.help,
-      submenu: [{ label: t.about, click: commands.onAbout }]
-    }
+    ...(process.platform === 'darwin'
+      ? []
+      : [{ label: t.help, submenu: [{ label: t.about, click: commands.onAbout }] }])
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }

@@ -96,6 +96,7 @@ import {
 } from '@geared-term/protocol';
 
 const api = Object.freeze({
+  platform: process.platform,
   getAppInfo: async () => AppInfoSchema.parse(await ipcRenderer.invoke('app:get-info', {})),
   createLocalTerminal: (input: LocalTerminalRequest, onMessage: (message: unknown) => void) => {
     const request = LocalTerminalRequestSchema.parse(input);
@@ -415,6 +416,20 @@ const api = Object.freeze({
     };
     ipcRenderer.on('menu-command', handler);
     return () => ipcRenderer.removeListener('menu-command', handler);
+  },
+  executeMenuAction: async (action: string) => {
+    if (typeof action !== 'string' || action.length > 160) {
+      throw new Error('Invalid application menu action');
+    }
+    return SftpOperationResultSchema.parse(await ipcRenderer.invoke('menu:execute', action));
+  },
+  setTitleBarOverlay: async (input: { color: string; symbolColor: string }) => {
+    if (!/^#[0-9a-fA-F]{6}$/u.test(input.color) || !/^#[0-9a-fA-F]{6}$/u.test(input.symbolColor)) {
+      throw new Error('Invalid title bar overlay colors');
+    }
+    return SftpOperationResultSchema.parse(
+      await ipcRenderer.invoke('window:set-titlebar-overlay', input)
+    );
   },
   listUserThemes: async () => UserThemeListSchema.parse(await ipcRenderer.invoke('themes:list')),
   openThemesFolder: async () =>

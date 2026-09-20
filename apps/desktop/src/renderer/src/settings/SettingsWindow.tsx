@@ -28,6 +28,7 @@ import {
 } from './sections';
 import { AiConnectionsSection } from './AiConnections';
 import { SecurityVaultSection } from './SecurityVault';
+import { WindowTitleBar } from '../WindowTitleBar';
 
 type Category =
   | 'general'
@@ -92,6 +93,9 @@ export function SettingsWindow(): React.JSX.Element {
   useEffect(() => {
     if (!palette || !settings) return;
     applyPalette(palette);
+    void window.geared
+      .setTitleBarOverlay({ color: palette.background, symbolColor: palette.text })
+      .catch(() => undefined);
     const style = document.documentElement.style;
     style.setProperty('--gt-ui-font-size', `${settings.uiFontSize}px`);
     if (settings.uiFontFamily.trim()) {
@@ -110,109 +114,130 @@ export function SettingsWindow(): React.JSX.Element {
     }
   };
 
+  const platform = info?.platform ?? window.geared.platform;
+  const themeNames = [
+    ...new Set([...BUILTIN_THEME_NAMES, ...userThemes.map((theme) => theme.name)])
+  ];
+
   if (loadError) {
-    return <div className="settings-loading">{loadError}</div>;
+    return (
+      <div className="settings-window-shell">
+        <WindowTitleBar title="Geared Term Settings" platform={platform} showMenu={false} />
+        <div className="settings-loading">{loadError}</div>
+      </div>
+    );
   }
   if (!settings) {
     return (
-      <div className="settings-loading" aria-busy="true">
-        Loading…
+      <div className="settings-window-shell">
+        <WindowTitleBar title="Geared Term Settings" platform={platform} showMenu={false} />
+        <div className="settings-loading" aria-busy="true">
+          Loading…
+        </div>
       </div>
     );
   }
 
   const t = makeTranslate(settings.language);
-  const themeNames = [
-    ...new Set([...BUILTIN_THEME_NAMES, ...userThemes.map((theme) => theme.name)])
-  ];
 
   return (
-    <div className="settings-window">
-      <nav className="settings-nav" aria-label={t('settings')}>
-        <button
-          type="button"
-          className={`settings-nav-item ${category === 'general' ? 'active' : ''}`}
-          onClick={() => setCategory('general')}
-        >
-          <SettingsIcon size={15} aria-hidden="true" /> {t('groupGeneral')}
-        </button>
-        <button
-          type="button"
-          className={`settings-nav-item ${category === 'appearance' ? 'active' : ''}`}
-          onClick={() => setCategory('appearance')}
-        >
-          <Palette size={15} aria-hidden="true" /> {t('groupAppearance')}
-        </button>
-        <button
-          type="button"
-          className={`settings-nav-item ${category === 'terminal' ? 'active' : ''}`}
-          onClick={() => setCategory('terminal')}
-        >
-          <SquareTerminal size={15} aria-hidden="true" /> {t('groupTerminal')}
-        </button>
-        <button
-          type="button"
-          className={`settings-nav-item ${category === 'sftp' ? 'active' : ''}`}
-          onClick={() => setCategory('sftp')}
-        >
-          <FolderSync size={15} aria-hidden="true" /> {t('groupSftp')}
-        </button>
-        <button
-          type="button"
-          className={`settings-nav-item ${category === 'ai-connections' ? 'active' : ''}`}
-          onClick={() => setCategory('ai-connections')}
-        >
-          <Bot size={15} aria-hidden="true" /> {t('groupAiConnections')}
-        </button>
-        <button
-          type="button"
-          className={`settings-nav-item ${category === 'ai-assistant' ? 'active' : ''}`}
-          onClick={() => setCategory('ai-assistant')}
-        >
-          <Bot size={15} aria-hidden="true" /> {t('groupAssistant')}
-        </button>
-        <button
-          type="button"
-          className={`settings-nav-item ${category === 'security' ? 'active' : ''}`}
-          onClick={() => setCategory('security')}
-        >
-          <Lock size={15} aria-hidden="true" /> {t('groupSecurity')}
-        </button>
-        <span className="settings-nav-spacer" />
-        <button
-          type="button"
-          className={`settings-nav-item ${category === 'about' ? 'active' : ''}`}
-          onClick={() => setCategory('about')}
-        >
-          <Info size={15} aria-hidden="true" /> {t('groupAbout')}
-        </button>
-      </nav>
-      <section className="settings-content">
-        <div className="settings-content-inner">
-          {category === 'general' ? (
-            <GeneralSection settings={settings} onSave={save} t={t} />
-          ) : null}
-          {category === 'appearance' ? (
-            <AppearanceSection
-              settings={settings}
-              themeNames={themeNames}
-              invalidThemes={invalidThemes}
-              onSave={save}
-              t={t}
-            />
-          ) : null}
-          {category === 'terminal' ? (
-            <TerminalSection settings={settings} onSave={save} t={t} />
-          ) : null}
-          {category === 'sftp' ? <SftpSection settings={settings} onSave={save} t={t} /> : null}
-          {category === 'ai-connections' ? <AiConnectionsSection t={t} /> : null}
-          {category === 'ai-assistant' ? (
-            <AiAssistantSection settings={settings} onSave={save} t={t} />
-          ) : null}
-          {category === 'security' ? <SecurityVaultSection t={t} /> : null}
-          {category === 'about' ? <AboutSection info={info} runtime={runtime} t={t} /> : null}
-        </div>
-      </section>
+    <div className="settings-window-shell">
+      <WindowTitleBar
+        title="Geared Term Settings"
+        platform={platform}
+        showMenu={false}
+        language={settings.language}
+        theme={settings.theme}
+        themeNames={themeNames}
+        isDevelopment={!info?.isPackaged}
+      />
+      <div className="settings-window">
+        <nav className="settings-nav" aria-label={t('settings')}>
+          <button
+            type="button"
+            className={`settings-nav-item ${category === 'general' ? 'active' : ''}`}
+            onClick={() => setCategory('general')}
+          >
+            <SettingsIcon size={15} aria-hidden="true" /> {t('groupGeneral')}
+          </button>
+          <button
+            type="button"
+            className={`settings-nav-item ${category === 'appearance' ? 'active' : ''}`}
+            onClick={() => setCategory('appearance')}
+          >
+            <Palette size={15} aria-hidden="true" /> {t('groupAppearance')}
+          </button>
+          <button
+            type="button"
+            className={`settings-nav-item ${category === 'terminal' ? 'active' : ''}`}
+            onClick={() => setCategory('terminal')}
+          >
+            <SquareTerminal size={15} aria-hidden="true" /> {t('groupTerminal')}
+          </button>
+          <button
+            type="button"
+            className={`settings-nav-item ${category === 'sftp' ? 'active' : ''}`}
+            onClick={() => setCategory('sftp')}
+          >
+            <FolderSync size={15} aria-hidden="true" /> {t('groupSftp')}
+          </button>
+          <button
+            type="button"
+            className={`settings-nav-item ${category === 'ai-connections' ? 'active' : ''}`}
+            onClick={() => setCategory('ai-connections')}
+          >
+            <Bot size={15} aria-hidden="true" /> {t('groupAiConnections')}
+          </button>
+          <button
+            type="button"
+            className={`settings-nav-item ${category === 'ai-assistant' ? 'active' : ''}`}
+            onClick={() => setCategory('ai-assistant')}
+          >
+            <Bot size={15} aria-hidden="true" /> {t('groupAssistant')}
+          </button>
+          <button
+            type="button"
+            className={`settings-nav-item ${category === 'security' ? 'active' : ''}`}
+            onClick={() => setCategory('security')}
+          >
+            <Lock size={15} aria-hidden="true" /> {t('groupSecurity')}
+          </button>
+          <span className="settings-nav-spacer" />
+          <button
+            type="button"
+            className={`settings-nav-item ${category === 'about' ? 'active' : ''}`}
+            onClick={() => setCategory('about')}
+          >
+            <Info size={15} aria-hidden="true" /> {t('groupAbout')}
+          </button>
+        </nav>
+        <section className="settings-content">
+          <div className="settings-content-inner">
+            {category === 'general' ? (
+              <GeneralSection settings={settings} onSave={save} t={t} />
+            ) : null}
+            {category === 'appearance' ? (
+              <AppearanceSection
+                settings={settings}
+                themeNames={themeNames}
+                invalidThemes={invalidThemes}
+                onSave={save}
+                t={t}
+              />
+            ) : null}
+            {category === 'terminal' ? (
+              <TerminalSection settings={settings} onSave={save} t={t} />
+            ) : null}
+            {category === 'sftp' ? <SftpSection settings={settings} onSave={save} t={t} /> : null}
+            {category === 'ai-connections' ? <AiConnectionsSection t={t} /> : null}
+            {category === 'ai-assistant' ? (
+              <AiAssistantSection settings={settings} onSave={save} t={t} />
+            ) : null}
+            {category === 'security' ? <SecurityVaultSection t={t} /> : null}
+            {category === 'about' ? <AboutSection info={info} runtime={runtime} t={t} /> : null}
+          </div>
+        </section>
+      </div>
     </div>
   );
 }

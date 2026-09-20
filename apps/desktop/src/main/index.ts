@@ -87,9 +87,10 @@ import { KnownHostsStore } from './ssh/known-hosts';
 import { SshSessionManager } from './ssh/ssh-session';
 import { buildRemoteFileCommand } from './sftp/remote-commands';
 import { TransferManager } from './sftp/transfers';
-import { buildApplicationMenu, type MenuLocale } from './menu';
+import { buildApplicationMenu, executeApplicationMenuAction, type MenuLocale } from './menu';
 import { HistoryWindowManager } from './history-window';
 import { SettingsWindowManager, type SettingsCategory } from './settings-window';
+import { hideNativeMenuBar, windowChromeOptions } from './window-chrome';
 import { discoverWsl } from './wsl/discovery';
 import { probeEnvironment } from './environment/probe';
 import { EnvironmentManager } from './environment/manager';
@@ -257,6 +258,7 @@ function createWindow(): BrowserWindow {
     minWidth: 900,
     minHeight: 600,
     show: false,
+    ...windowChromeOptions(),
     backgroundColor: '#111318',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -266,6 +268,7 @@ function createWindow(): BrowserWindow {
       spellcheck: false
     }
   });
+  hideNativeMenuBar(window);
   let persistingWindowState = false;
 
   window.once('ready-to-show', () => {
@@ -333,6 +336,37 @@ function registerIpc(): void {
       isPackaged: app.isPackaged,
       platform: process.platform
     });
+  });
+
+  ipcMain.handle('menu:execute', (event, action: unknown) => {
+    if (typeof action !== 'string' || action.length > 160) {
+      throw new Error('Invalid application menu action');
+    }
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (!window) throw new Error('Application window is unavailable');
+    executeApplicationMenuAction(action, window);
+    return SftpOperationResultSchema.parse({ accepted: true });
+  });
+
+  ipcMain.handle('window:set-titlebar-overlay', (event, input: unknown) => {
+    if (
+      !input ||
+      typeof input !== 'object' ||
+      !('color' in input) ||
+      !('symbolColor' in input) ||
+      typeof input.color !== 'string' ||
+      typeof input.symbolColor !== 'string' ||
+      !/^#[0-9a-fA-F]{6}$/u.test(input.color) ||
+      !/^#[0-9a-fA-F]{6}$/u.test(input.symbolColor)
+    ) {
+      throw new Error('Invalid title bar overlay colors');
+    }
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (!window) throw new Error('Application window is unavailable');
+    if (process.platform !== 'darwin') {
+      window.setTitleBarOverlay({ color: input.color, symbolColor: input.symbolColor });
+    }
+    return SftpOperationResultSchema.parse({ accepted: true });
   });
 
   ipcMain.handle('vault:get-status', () => storage.vaultStatus());
