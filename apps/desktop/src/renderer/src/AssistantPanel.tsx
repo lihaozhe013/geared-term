@@ -1099,7 +1099,7 @@ export function AssistantPanel({
                     </Fragment>
                   );
                 })
-              ) : streaming ? (
+              ) : streaming && !activities.some((step) => step.state === 'running') ? (
                 <TypingDots />
               ) : null}
               {sources.length > 0 && index === messages.length - 1 ? (
