@@ -101,14 +101,14 @@ textarea {
 .workspace {
   position: relative;
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
+  grid-template-columns: 240px minmax(0, 1fr) 40px;
   gap: 1px;
   min-height: 0;
   background: var(--gt-border, #2a3140);
 }
 
 .workspace.sidebar-collapsed {
-  grid-template-columns: 40px minmax(0, 1fr);
+  grid-template-columns: 40px minmax(0, 1fr) 40px;
 }
 
 .workspace.with-panel {
@@ -166,43 +166,12 @@ textarea {
   flex: 1;
 }
 
-.right-panel-expand {
-  position: absolute;
-  top: 0;
-  right: 0;
-  z-index: 5;
+.right-rail {
   display: flex;
-  height: 100%;
-  align-items: center;
-  pointer-events: none;
-}
-
-.right-panel-expand-button {
-  display: grid;
-  width: 28px;
-  height: 56px;
-  place-items: center;
-  padding: 0;
-  border: 0;
-  border-top: 1px solid var(--gt-border, #2a3140);
-  border-right: 0;
-  border-bottom: 1px solid var(--gt-border, #2a3140);
-  border-left: 1px solid var(--gt-border, #2a3140);
-  border-radius: var(--gt-radius-md) 0 0 var(--gt-radius-md);
-  color: var(--gt-text-muted, #a9b8cf);
-  background: var(--gt-panel-alt, #161e2a);
-  box-shadow: -6px 0 12px rgba(0, 0, 0, 0.35);
-  cursor: pointer;
-  pointer-events: auto;
-}
-
-.right-panel-expand-button:hover {
-  color: var(--gt-background, #0d1117);
-  background: var(--gt-accent, #5c8ea5);
-}
-
-.right-panel-expand-button:active {
-  opacity: 0.8;
+  min-width: 0;
+  justify-content: center;
+  padding: 12px 6px;
+  background: var(--gt-background, #0d1117);
 }
 
 .sidebar,

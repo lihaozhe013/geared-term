@@ -896,22 +896,26 @@ export function App(): React.JSX.Element {
             ) : null}
           </div>
         ) : null}
-        {uiState.rightPanel && uiState.rightPanelCollapsed ? (
-          <div className="right-panel-expand">
+        {!uiState.rightPanel || uiState.rightPanelCollapsed ? (
+          <aside className="right-rail">
             <button
               type="button"
-              className="right-panel-expand-button"
+              className="icon-button"
               aria-label="Expand panel"
               title="Expand panel"
               onClick={() => {
-                const next: UiStateRecord = { ...uiState, rightPanelCollapsed: false };
+                const next: UiStateRecord = {
+                  ...uiState,
+                  rightPanel: uiState.rightPanel ?? 'assistant',
+                  rightPanelCollapsed: false
+                };
                 setUiState(next);
                 void window.geared.saveUiState(next).catch(() => undefined);
               }}
             >
-              <PanelRightOpen size={16} aria-hidden="true" />
+              <PanelRightOpen size={14} aria-hidden="true" />
             </button>
-          </div>
+          </aside>
         ) : null}
       </section>
 
