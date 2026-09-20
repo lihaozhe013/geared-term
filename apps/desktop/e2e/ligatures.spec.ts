@@ -1,10 +1,12 @@
 import { expect, test } from '@playwright/test';
-import { launchApp, openLocalTab, type AppSession } from './fixtures';
+import { DOM_RENDERER_ARGS, launchApp, openLocalTab, type AppSession } from './fixtures';
 
 let session: AppSession;
 
 test.beforeEach(async () => {
-  session = await launchApp();
+  // The letter-spacing hack this spec verifies only applies to xterm's DOM
+  // renderer, which is the WebGL renderer's fallback; force that path.
+  session = await launchApp(DOM_RENDERER_ARGS);
 });
 
 test.afterEach(async () => {
@@ -23,15 +25,9 @@ test('keeps xterm letter-spacing neutralized while font ligatures are enabled', 
   await openLocalTab(session.app);
   await expect(page.locator('.statusbar-state')).toHaveText('Running', { timeout: 30_000 });
 
-  const spacingBefore = await rowsLetterSpacing(page);
-  expect(spacingBefore).not.toBe('normal');
-
-  await page.evaluate(async () => {
-    const settings = await window.geared.getSettings();
-    await window.geared.saveSettings({ ...settings, terminalFontLigatures: true });
-  });
-
   const host = page.locator('.terminal-wrapper:not([hidden]) .terminal-host');
+
+  // Ligatures are enabled by default, so the neutralization applies from startup.
   await expect(host).toHaveClass(/terminal-ligatures/);
   await expect.poll(() => rowsLetterSpacing(page), { timeout: 10_000 }).toBe('normal');
 
@@ -41,4 +37,11 @@ test('keeps xterm letter-spacing neutralized while font ligatures are enabled', 
   });
   await expect(host).not.toHaveClass(/terminal-ligatures/);
   await expect.poll(() => rowsLetterSpacing(page), { timeout: 10_000 }).not.toBe('normal');
+
+  await page.evaluate(async () => {
+    const settings = await window.geared.getSettings();
+    await window.geared.saveSettings({ ...settings, terminalFontLigatures: true });
+  });
+  await expect(host).toHaveClass(/terminal-ligatures/);
+  await expect.poll(() => rowsLetterSpacing(page), { timeout: 10_000 }).toBe('normal');
 });
