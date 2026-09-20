@@ -110,7 +110,10 @@ textarea {
   display: flex;
   align-items: center;
   margin-left: auto;
-  padding-right: env(titlebar-area-width, 132px);
+  padding-right: 132px;
+  /* Electron's titlebar-area-* vars describe the draggable region left of the
+     overlay controls, so the controls occupy whatever the viewport has left. */
+  padding-right: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width));
   -webkit-app-region: no-drag;
 }
 
