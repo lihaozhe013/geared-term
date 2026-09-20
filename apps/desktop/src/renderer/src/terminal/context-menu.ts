@@ -1,4 +1,5 @@
 import type { ContextMenuItem } from '../sftp/context-menu';
+import { normalizeTerminalLineEndings } from '@geared-term/protocol';
 
 export type TerminalMenuLabels = {
   copy: string;
@@ -40,7 +41,7 @@ export function terminalShortcutsFor(platform: string): TerminalMenuShortcuts {
 /** Shells treat CR as accept-line; pasting LF-terminated text verbatim breaks
  *  multi-line input, so line endings are normalized like mainstream terminals. */
 export function toTerminalPasteText(text: string): string {
-  return text.replace(/\r?\n/g, '\r');
+  return normalizeTerminalLineEndings(text);
 }
 
 export function buildTerminalContextMenu(input: {

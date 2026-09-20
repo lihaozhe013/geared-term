@@ -3,6 +3,7 @@ import {
   AppInfoSchema,
   DEFAULT_TERMINAL_LIGATURE_SEQUENCES,
   normalizeLigatureSequences,
+  normalizeTerminalLineEndings,
   SftpDownloadRequestSchema,
   SftpListRequestSchema,
   SftpOperationResultSchema,
@@ -147,5 +148,29 @@ describe('protocol schemas', () => {
         (sequence) => sequence.length >= 2 && sequence.length <= 8
       )
     ).toBe(true);
+  });
+});
+
+describe('normalizeTerminalLineEndings', () => {
+  it('converts LF and CRLF line breaks into accept-line CR', () => {
+    expect(normalizeTerminalLineEndings('$paths = @(\n  "a",\n  "b"\n)')).toBe(
+      '$paths = @(\r  "a",\r  "b"\r)'
+    );
+    expect(normalizeTerminalLineEndings('one\r\ntwo')).toBe('one\rtwo');
+    expect(normalizeTerminalLineEndings('lf\n crlf\r\n cr')).toBe('lf\r crlf\r cr');
+  });
+
+  it('leaves text without line breaks and lone CR characters untouched', () => {
+    expect(normalizeTerminalLineEndings('single line')).toBe('single line');
+    expect(normalizeTerminalLineEndings('')).toBe('');
+    expect(normalizeTerminalLineEndings('carriage\rreturn')).toBe('carriage\rreturn');
+  });
+
+  it('is idempotent and preserves multibyte characters', () => {
+    const text = 'echo "héllo 🌟"\r\nsecond\nthird';
+    expect(normalizeTerminalLineEndings(normalizeTerminalLineEndings(text))).toBe(
+      normalizeTerminalLineEndings(text)
+    );
+    expect(normalizeTerminalLineEndings(text)).toBe('echo "héllo 🌟"\rsecond\rthird');
   });
 });

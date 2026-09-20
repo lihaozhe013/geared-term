@@ -63,6 +63,7 @@ import {
   VaultRotateRequestSchema,
   VaultStatusSchema,
   WslDistributionSchema,
+  normalizeTerminalLineEndings,
   parseRemoteFileCommands
 } from '@geared-term/protocol';
 import { createLogger, type Logger } from './logging';
@@ -675,7 +676,12 @@ function registerIpc(): void {
         throw new Error('The command is not safe to run');
       }
     }
-    const data = request.action === 'run' ? `${request.payload}\r` : request.payload;
+    // Validation (revision, run re-parse) compares against the raw payload;
+    // only the bytes handed to the PTY are reworked. LF must become CR here
+    // because ConPTY does not treat LF as Enter and PSReadLine garbles the
+    // multi-line echo otherwise.
+    const terminalInput = normalizeTerminalLineEndings(request.payload);
+    const data = request.action === 'run' ? `${terminalInput}\r` : terminalInput;
     try {
       localTerminals.sendInput(request.sessionId, data);
       return { accepted: true };

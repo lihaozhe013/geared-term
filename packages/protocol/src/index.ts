@@ -851,6 +851,16 @@ export const TerminalCommandActionSchema = z
   })
   .strict();
 
+/**
+ * Shells treat CR as accept-line, but on Windows ConPTY an LF in the input
+ * stream is not a proper Enter and derails PSReadLine's multi-line rendering.
+ * Every line break written to a terminal must therefore become CR, matching
+ * what a keyboard Enter (or a mainstream terminal paste) sends.
+ */
+export function normalizeTerminalLineEndings(text: string): string {
+  return text.replace(/\r?\n/g, '\r');
+}
+
 export const EnvironmentFactsSchema = z
   .object({
     os: z.string().max(160).optional(),
