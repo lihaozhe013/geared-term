@@ -1095,6 +1095,18 @@ button:disabled {
   min-width: 0;
 }
 
+/*
+ * xterm's DOM renderer applies a sub-pixel letter-spacing to keep the
+ * character grid aligned across device pixel ratios. Chromium disables
+ * ligature shaping for any non-zero letter-spacing, which would silently
+ * turn off font ligatures; neutralize it while ligature mode is active.
+ * The residual drift is far below a visible threshold (<0.005px per cell).
+ */
+.terminal-host.terminal-ligatures .xterm-rows,
+.terminal-host.terminal-ligatures .xterm-rows span {
+  letter-spacing: normal !important;
+}
+
 .terminal-line {
   margin: 0;
 }

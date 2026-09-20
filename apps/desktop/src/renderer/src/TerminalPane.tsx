@@ -260,7 +260,7 @@ export function TerminalPane({
       .catch(() => null)
       .then((sequences) => {
         if (cancelled) return;
-        const table = sequences ?? defaultLigatureSequences();
+        const table = sequences && sequences.length > 0 ? sequences : defaultLigatureSequences();
         if (table.length === 0) return;
         joinerId = terminal.registerCharacterJoiner(buildLigatureJoiner(table));
       });
@@ -369,7 +369,7 @@ export function TerminalPane({
       ) : null}
       <div
         ref={hostRef}
-        className="terminal-host"
+        className={settings.terminalFontLigatures ? 'terminal-host terminal-ligatures' : 'terminal-host'}
         aria-label={
           isSshRequest(request)
             ? isSavedSshRequest(request)
