@@ -12,6 +12,7 @@ import {
   type TerminalPortMessage
 } from '@geared-term/protocol';
 import { buildSearchDecorations, buildXtermTheme, type Palette } from './themes';
+import { attachWebglRenderer } from './terminal/renderer';
 import { extractSnapshot, type SnapshotTerminal, type TerminalSnapshot } from './terminal/snapshot';
 import {
   buildLigatureJoiner,
@@ -119,6 +120,7 @@ export function TerminalPane({
       fontSize: settings.terminalFontSize,
       lineHeight: settings.terminalLineHeight,
       cursorStyle: settings.terminalCursor,
+      customGlyphs: true,
       scrollback: 10_000,
       theme: buildXtermTheme(paletteRef.current)
     });
@@ -128,6 +130,7 @@ export function TerminalPane({
     searchRef.current = search;
     terminal.loadAddon(search);
     terminal.open(host);
+    const renderer = attachWebglRenderer(terminal);
     terminal.attachCustomKeyEventHandler((event) => {
       if (event.type !== 'keydown' || (!event.ctrlKey && !event.metaKey)) return true;
       const isMacCopyPaste = event.metaKey && !event.shiftKey && process.platform === 'darwin';
@@ -329,6 +332,7 @@ export function TerminalPane({
       registerSftpControlRef.current?.(null);
       registerSnapshotRef.current?.(null);
       client?.close();
+      renderer.dispose();
       terminal.dispose();
       fitRef.current = null;
       searchRef.current = null;

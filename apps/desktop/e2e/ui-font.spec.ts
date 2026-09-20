@@ -1,10 +1,12 @@
 import { expect, test } from '@playwright/test';
-import { launchApp, openLocalTab, type AppSession } from './fixtures';
+import { DOM_RENDERER_ARGS, launchApp, openLocalTab, type AppSession } from './fixtures';
 
 let session: AppSession;
 
 test.beforeAll(async () => {
-  session = await launchApp();
+  // The spec reads the terminal font off the DOM renderer's .xterm-rows, the
+  // only place xterm exposes it as CSS; force the DOM fallback renderer.
+  session = await launchApp(DOM_RENDERER_ARGS);
   await openLocalTab(session.app);
   await expect(session.page.locator('.statusbar-state')).toHaveText('Running', {
     timeout: 30_000

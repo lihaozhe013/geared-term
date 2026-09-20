@@ -1,11 +1,13 @@
 import { expect, test } from '@playwright/test';
 import { commandRevision } from '@geared-term/command-parser';
-import { launchApp, openLocalTab, type AppSession } from './fixtures';
+import { DOM_RENDERER_ARGS, launchApp, openLocalTab, type AppSession } from './fixtures';
 
 let session: AppSession;
 
 test.beforeEach(async () => {
-  session = await launchApp();
+  // This spec reads terminal output from the DOM renderer's .xterm-rows text;
+  // the WebGL renderer paints to a canvas, so force the fallback for it.
+  session = await launchApp(DOM_RENDERER_ARGS);
   await openLocalTab(session.app);
 });
 

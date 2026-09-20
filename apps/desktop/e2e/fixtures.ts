@@ -11,6 +11,14 @@ const appDirectory = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 export const E2E_MASTER_PASSWORD = 'e2e-master-password';
 
+/**
+ * Electron ignores --disable-webgl, so forcing xterm's DOM-renderer fallback
+ * requires removing both hardware and software GL. Specs that read terminal
+ * text off `.xterm-rows` (which only the DOM renderer creates) launch with
+ * this; the WebGL path is covered by webgl-renderer.spec.ts.
+ */
+export const DOM_RENDERER_ARGS = ['--disable-gpu', '--disable-software-rasterizer'] as const;
+
 export type AppSession = {
   app: ElectronApplication;
   page: Page;
@@ -41,7 +49,7 @@ export async function openLocalTab(app: ElectronApplication): Promise<void> {
   });
 }
 
-export async function launchApp(): Promise<AppSession> {
+export async function launchApp(chromiumArgs: readonly string[] = []): Promise<AppSession> {
   const mainEntry = join(appDirectory, 'out', 'main', 'index.js');
   if (!existsSync(mainEntry)) {
     throw new Error('Built output is missing; run "pnpm build" before the E2E suite');
@@ -58,7 +66,8 @@ export async function launchApp(): Promise<AppSession> {
       '--disable-features=CalculateNativeWinOcclusion',
       '--disable-backgrounding-occluded-windows',
       '--disable-renderer-backgrounding',
-      '--disable-background-timer-throttling'
+      '--disable-background-timer-throttling',
+      ...chromiumArgs
     ],
     executablePath: electronBinary,
     cwd: userDataDirectory,
