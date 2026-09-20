@@ -16,7 +16,9 @@ const MARKER = 'geared-kbd-marker';
 test('copies and pastes with terminal keyboard shortcuts', async () => {
   const { page, app } = session;
   await openLocalTab(app);
-  await expect(page.locator('.statusbar-state')).toHaveText('Running', { timeout: 30_000 });
+  await expect(page.locator('.terminal-surface')).toHaveAttribute('data-active-status', 'running', {
+    timeout: 30_000
+  });
   const host = page.locator('.terminal-wrapper:not([hidden]) .terminal-host');
   await host.click();
   await page.keyboard.type(`echo ${MARKER}`);
@@ -47,7 +49,9 @@ test('copies and pastes with terminal keyboard shortcuts', async () => {
 test('pastes exactly once per paste shortcut', async () => {
   const { page, app } = session;
   await openLocalTab(app);
-  await expect(page.locator('.statusbar-state')).toHaveText('Running', { timeout: 30_000 });
+  await expect(page.locator('.terminal-surface')).toHaveAttribute('data-active-status', 'running', {
+    timeout: 30_000
+  });
   const host = page.locator('.terminal-wrapper:not([hidden]) .terminal-host');
   await host.click();
   await app.evaluate(({ clipboard }, marker) => clipboard.writeText(marker), 'geared-single-paste');

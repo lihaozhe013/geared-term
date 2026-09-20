@@ -10,9 +10,13 @@ test.afterEach(async () => {
 async function openRunningTerminal(args?: readonly string[]): Promise<AppSession> {
   session = await launchApp(args);
   await openLocalTab(session.app);
-  await expect(session.page.locator('.statusbar-state')).toHaveText('Running', {
-    timeout: 30_000
-  });
+  await expect(session.page.locator('.terminal-surface')).toHaveAttribute(
+    'data-active-status',
+    'running',
+    {
+      timeout: 30_000
+    }
+  );
   return session;
 }
 

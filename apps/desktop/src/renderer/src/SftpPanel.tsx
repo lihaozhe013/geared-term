@@ -6,7 +6,16 @@ import type {
   SftpRemoteEntry,
   SftpTransfer
 } from '@geared-term/protocol';
-import { ArrowUp, X } from 'lucide-react';
+import {
+  ArrowDownUp,
+  ArrowRight,
+  ArrowUp,
+  Download,
+  FolderPlus,
+  RefreshCw,
+  Upload,
+  X
+} from 'lucide-react';
 import { translate, type MessageKey } from './i18n';
 import { ContextMenu, type ContextMenuItem } from './sftp/context-menu';
 import { SftpEntryRow, localMeta, remoteMeta } from './sftp/entry-row';
@@ -779,28 +788,39 @@ export function SftpPanel({
           <div className="sftp-actions">
             <button
               type="button"
-              className="toolbar-button"
+              className="icon-button"
               onClick={() => void refreshRemote(remote.directory, false).catch(() => undefined)}
+              title={t('refresh')}
+              aria-label={t('refresh')}
             >
-              {t('refresh')}
-            </button>
-            <button type="button" className="toolbar-button" onClick={() => startCreate('remote')}>
-              {t('sftpNewFolder')}
+              <RefreshCw size={14} aria-hidden="true" />
             </button>
             <button
               type="button"
-              className="toolbar-button"
+              className="icon-button"
+              onClick={() => startCreate('remote')}
+              title={t('sftpNewFolder')}
+              aria-label={t('sftpNewFolder')}
+            >
+              <FolderPlus size={14} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              className="icon-button"
               onClick={() => void uploadLocal([])}
               title={t('sftpUploadHint')}
+              aria-label={t('sftpUpload')}
             >
-              {t('sftpUpload')}
+              <Upload size={14} aria-hidden="true" />
             </button>
             <button
               type="button"
-              className="toolbar-button"
+              className="icon-button"
               onClick={() => void downloadRemote([...remoteSelected])}
+              title={t('sftpDownload')}
+              aria-label={t('sftpDownload')}
             >
-              {t('sftpDownload')}
+              <Download size={14} aria-hidden="true" />
             </button>
             <button
               type="button"
@@ -825,8 +845,13 @@ export function SftpPanel({
             aria-label="Remote directory"
             spellCheck={false}
           />
-          <button type="submit" className="toolbar-button">
-            {t('sftpGo')}
+          <button
+            type="submit"
+            className="icon-button"
+            title={t('sftpGo')}
+            aria-label={t('sftpGo')}
+          >
+            <ArrowRight size={14} aria-hidden="true" />
           </button>
           <button
             type="button"
@@ -893,38 +918,53 @@ export function SftpPanel({
         </div>
       </section>
 
+      <div className="sftp-divider" role="separator" aria-orientation="horizontal">
+        <ArrowDownUp size={12} aria-hidden="true" />
+      </div>
+
       <section className="sftp-pane" aria-label="Local files">
         <div className="sftp-pane-header">
           <span className="section-label">{t('sftpLocal')}</span>
           <div className="sftp-actions">
             <button
               type="button"
-              className="toolbar-button"
+              className="icon-button"
               onClick={() => void refreshLocal(localDirectory)}
+              title={t('refresh')}
+              aria-label={t('refresh')}
             >
-              {t('refresh')}
-            </button>
-            <button type="button" className="toolbar-button" onClick={() => startCreate('local')}>
-              {t('sftpNewFolder')}
+              <RefreshCw size={14} aria-hidden="true" />
             </button>
             <button
               type="button"
-              className="toolbar-button"
+              className="icon-button"
+              onClick={() => startCreate('local')}
+              title={t('sftpNewFolder')}
+              aria-label={t('sftpNewFolder')}
+            >
+              <FolderPlus size={14} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              className="icon-button"
               onClick={() => void uploadLocal([...localSelected])}
               disabled={localSelected.size === 0}
+              title={t('sftpUpload')}
+              aria-label={t('sftpUpload')}
             >
-              {t('sftpUpload')}
+              <Upload size={14} aria-hidden="true" />
             </button>
             <button
               type="button"
-              className="toolbar-button"
+              className="icon-button"
               onClick={() =>
                 void refreshLocal(localDirectory ? localDirname(localDirectory) : null)
               }
               disabled={!localDirectory}
               title={localDirectory ? t('sftpParent') : t('sftpOpenFolderFirst')}
+              aria-label={localDirectory ? t('sftpParent') : t('sftpOpenFolderFirst')}
             >
-              {t('sftpParent')}
+              <ArrowUp size={14} aria-hidden="true" />
             </button>
             <button
               type="button"

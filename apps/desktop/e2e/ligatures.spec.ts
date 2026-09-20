@@ -23,7 +23,9 @@ async function rowsLetterSpacing(page: AppSession['page']): Promise<string> {
 test('keeps xterm letter-spacing neutralized while font ligatures are enabled', async () => {
   const { page } = session;
   await openLocalTab(session.app);
-  await expect(page.locator('.statusbar-state')).toHaveText('Running', { timeout: 30_000 });
+  await expect(page.locator('.terminal-surface')).toHaveAttribute('data-active-status', 'running', {
+    timeout: 30_000
+  });
 
   const host = page.locator('.terminal-wrapper:not([hidden]) .terminal-host');
 

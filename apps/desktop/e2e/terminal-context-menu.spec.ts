@@ -26,7 +26,9 @@ function activeTerminalHost(session: AppSession) {
 test('offers clipboard actions in the terminal context menu', async () => {
   const { page, app } = session;
   await openLocalTab(app);
-  await expect(page.locator('.statusbar-state')).toHaveText('Running', { timeout: 30_000 });
+  await expect(page.locator('.terminal-surface')).toHaveAttribute('data-active-status', 'running', {
+    timeout: 30_000
+  });
   const host = activeTerminalHost(session);
   await host.click();
 
@@ -57,7 +59,9 @@ test('offers clipboard actions in the terminal context menu', async () => {
 test('pastes the system clipboard into the shell from the context menu', async () => {
   const { page, app } = session;
   await openLocalTab(app);
-  await expect(page.locator('.statusbar-state')).toHaveText('Running', { timeout: 30_000 });
+  await expect(page.locator('.terminal-surface')).toHaveAttribute('data-active-status', 'running', {
+    timeout: 30_000
+  });
   await app.evaluate(({ clipboard }) => clipboard.writeText('echo geared-context-paste'));
   const host = activeTerminalHost(session);
   await host.click();

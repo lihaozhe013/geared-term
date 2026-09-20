@@ -16,8 +16,6 @@ import type {
 import {
   Bot,
   FolderSync,
-  Lock,
-  PanelLeftClose,
   PanelLeftOpen,
   PanelRightClose,
   PanelRightOpen,
@@ -28,6 +26,7 @@ import { AssistantPanel } from './AssistantPanel';
 import { EnvironmentPanel } from './EnvironmentPanel';
 import { ProfileEditor } from './ProfileEditor';
 import { QuickSshDialog } from './QuickSshDialog';
+import { Sidebar } from './Sidebar';
 import { SftpPanel } from './SftpPanel';
 import { TerminalPane, type SftpTerminalControl } from './TerminalPane';
 import { VaultGate } from './VaultGate';
@@ -128,23 +127,6 @@ function profileToRequest(profile: SessionProfileRecord): TerminalRequest | unde
   return undefined;
 }
 
-function statusLabel(status: TabStatus): string {
-  switch (status) {
-    case 'awaiting-user':
-      return 'Needs approval';
-    case 'running':
-      return 'Running';
-    case 'exited':
-      return 'Exited';
-    case 'failed':
-      return 'Failed';
-    case 'closed':
-      return 'Closed';
-    default:
-      return 'Starting';
-  }
-}
-
 function clampWidth(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, Math.round(value)));
 }
@@ -221,11 +203,6 @@ export function App(): React.JSX.Element {
   const [showProfileEditor, setShowProfileEditor] = useState(false);
   const [editingProfile, setEditingProfile] = useState<SessionProfileRecord | undefined>();
   const [showQuickSsh, setShowQuickSsh] = useState(false);
-  const [profileMenu, setProfileMenu] = useState<{
-    x: number;
-    y: number;
-    profile: SessionProfileRecord;
-  } | null>(null);
   const [pendingHistoryId, setPendingHistoryId] = useState<string | null>(null);
   const [vaultStatus, setVaultStatus] = useState<VaultStatus | null>(null);
   const sftpControls = useRef(new Map<string, SftpTerminalControl>());
@@ -427,15 +404,6 @@ export function App(): React.JSX.Element {
   }, [uiState.rightPanel, uiState.rightPanelCollapsed]);
 
   const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? tabs[0];
-  const profileGroups = Array.from(
-    profiles.reduce((groups, profile) => {
-      const key = profile.group?.trim() || 'Ungrouped';
-      const group = groups.get(key) ?? [];
-      group.push(profile);
-      groups.set(key, group);
-      return groups;
-    }, new Map<string, SessionProfileRecord[]>())
-  );
 
   const openNewProfile = useCallback((): void => {
     setEditingProfile(undefined);
@@ -449,18 +417,37 @@ export function App(): React.JSX.Element {
     setError(null);
   }, []);
 
-  useEffect(() => {
-    if (!profileMenu) return;
-    const close = (): void => setProfileMenu(null);
-    window.addEventListener('click', close);
-    window.addEventListener('keydown', close);
-    window.addEventListener('resize', close);
-    return () => {
-      window.removeEventListener('click', close);
-      window.removeEventListener('keydown', close);
-      window.removeEventListener('resize', close);
-    };
-  }, [profileMenu]);
+  const deleteProfileRecord = useCallback((profile: SessionProfileRecord): void => {
+    void window.geared
+      .deleteProfile(profile.id)
+      .then(setProfiles)
+      .catch((reason: unknown) =>
+        setError(reason instanceof Error ? reason.message : 'Unable to delete session')
+      );
+  }, []);
+
+  const openWslDistribution = useCallback(
+    (name: string): void => {
+      if (!window.confirm(`Open the WSL distribution "${name}" in a new terminal?`)) return;
+      const request: LocalTerminalRequest = {
+        sessionId: crypto.randomUUID(),
+        shell: 'wsl.exe',
+        args: ['--distribution', name, '--cd', '~'],
+        cols: 80,
+        rows: 24,
+        term: settings.defaultTerm
+      };
+      const tab: TerminalTab = {
+        id: request.sessionId,
+        name,
+        request,
+        status: 'starting'
+      };
+      setTabs((current) => [...current, tab]);
+      setActiveTabId(tab.id);
+    },
+    [settings.defaultTerm]
+  );
 
   const openQuickSsh = useCallback((request: SshTerminalRequest, name: string): void => {
     const tab: TerminalTab = { id: request.sessionId, name, request, status: 'starting' };
@@ -644,123 +631,19 @@ export function App(): React.JSX.Element {
         aria-label="Workspace"
       >
         {!uiState.sidebarCollapsed ? (
-          <aside className="sidebar">
-            <div className="sidebar-heading">
-              <p className="section-label">Sessions</p>
-              <div className="sidebar-tools">
-                <button
-                  type="button"
-                  className="icon-button"
-                  onClick={openNewProfile}
-                  aria-label="New session profile"
-                >
-                  +
-                </button>
-                <button
-                  type="button"
-                  className="icon-button"
-                  onClick={toggleSidebar}
-                  aria-label="Collapse sessions sidebar"
-                  title="Collapse sessions sidebar"
-                >
-                  <PanelLeftClose size={14} aria-hidden="true" />
-                </button>
-              </div>
-            </div>
-            <div className="profile-list" aria-label="Saved sessions">
-              {profileGroups.map(([groupName, groupProfiles]) => (
-                <section className="profile-group" key={groupName} aria-label={groupName}>
-                  <p className="section-label">{groupName}</p>
-                  {groupProfiles.map((profile) => (
-                    <button
-                      type="button"
-                      className="profile-button"
-                      key={profile.id}
-                      onClick={() => openProfile(profile)}
-                      onContextMenu={(event) => {
-                        event.preventDefault();
-                        setProfileMenu({
-                          x: event.clientX,
-                          y: event.clientY,
-                          profile
-                        });
-                      }}
-                    >
-                      <small className="profile-kind">{profile.kind}</small>
-                      <span>{profile.name}</span>
-                    </button>
-                  ))}
-                </section>
-              ))}
-            </div>
-            {info?.platform === 'win32' ? (
-              <section className="wsl-section" aria-label="WSL distributions">
-                <div className="sidebar-heading wsl-heading">
-                  <p className="section-label">WSL distributions</p>
-                  <button
-                    type="button"
-                    className="icon-button"
-                    onClick={() => void discoverWsl()}
-                    aria-label="Refresh WSL distributions"
-                  >
-                    {wslLoading ? '…' : '↻'}
-                  </button>
-                </div>
-                {wslDistributions.map((distribution) => (
-                  <button
-                    type="button"
-                    className="profile-button wsl-button"
-                    key={distribution.name}
-                    onDoubleClick={() => {
-                      if (
-                        !window.confirm(
-                          `Open the WSL distribution "${distribution.name}" in a new terminal?`
-                        )
-                      ) {
-                        return;
-                      }
-                      const request: LocalTerminalRequest = {
-                        sessionId: crypto.randomUUID(),
-                        shell: 'wsl.exe',
-                        args: ['--distribution', distribution.name, '--cd', '~'],
-                        cols: 80,
-                        rows: 24,
-                        term: settings.defaultTerm
-                      };
-                      const tab: TerminalTab = {
-                        id: request.sessionId,
-                        name: distribution.name,
-                        request,
-                        status: 'starting'
-                      };
-                      setTabs((current) => [...current, tab]);
-                      setActiveTabId(tab.id);
-                    }}
-                  >
-                    <span>
-                      {distribution.isDefault ? '★ ' : ''}
-                      {distribution.name}
-                    </span>
-                    <small>
-                      {distribution.state} · WSL {distribution.version ?? '?'}
-                    </small>
-                  </button>
-                ))}
-                {wslDistributions.length === 0 && !wslLoading ? (
-                  <small className="muted">No distributions discovered.</small>
-                ) : null}
-              </section>
-            ) : null}
-            {profiles.length === 0 ? (
-              <div className="empty-state">
-                <span className="empty-icon" aria-hidden="true">
-                  +
-                </span>
-                <p>No saved sessions</p>
-                <small>Use the + button in the sidebar to keep a session profile.</small>
-              </div>
-            ) : null}
-          </aside>
+          <Sidebar
+            platform={info?.platform}
+            profiles={profiles}
+            wslDistributions={wslDistributions}
+            wslLoading={wslLoading}
+            onNewProfile={openNewProfile}
+            onOpenProfile={openProfile}
+            onEditProfile={openEditProfile}
+            onDeleteProfile={deleteProfileRecord}
+            onOpenWslDistribution={openWslDistribution}
+            onRefreshWsl={() => void discoverWsl()}
+            onCollapse={toggleSidebar}
+          />
         ) : (
           <aside className="sidebar collapsed-sidebar">
             <button
@@ -802,7 +685,7 @@ export function App(): React.JSX.Element {
               </div>
             ))}
           </div>
-          <div className="terminal-surface">
+          <div className="terminal-surface" data-active-status={activeTab?.status ?? 'none'}>
             {tabs.map((tab) => (
               <TerminalPane
                 key={tab.id}
@@ -837,11 +720,6 @@ export function App(): React.JSX.Element {
                   New local terminal
                 </button>
               </div>
-            ) : null}
-            {info ? (
-              <p className="terminal-line success">
-                bridge: {info.name} {info.version} ({info.platform})
-              </p>
             ) : null}
             {error ? (
               <p className="terminal-line error" role="alert">
@@ -989,40 +867,6 @@ export function App(): React.JSX.Element {
         ) : null}
       </section>
 
-      {profileMenu ? (
-        <div
-          className="sidebar-context-menu"
-          role="menu"
-          style={{ left: profileMenu.x, top: profileMenu.y }}
-        >
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              openEditProfile(profileMenu.profile);
-              setProfileMenu(null);
-            }}
-          >
-            Edit
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            className="danger"
-            onClick={() => {
-              void window.geared
-                .deleteProfile(profileMenu.profile.id)
-                .then(setProfiles)
-                .catch((reason: unknown) =>
-                  setError(reason instanceof Error ? reason.message : 'Unable to delete session')
-                );
-              setProfileMenu(null);
-            }}
-          >
-            Delete
-          </button>
-        </div>
-      ) : null}
       {showProfileEditor ? (
         <ProfileEditor
           key={editingProfile?.id ?? 'new-profile'}
@@ -1041,20 +885,6 @@ export function App(): React.JSX.Element {
           onClose={() => setShowQuickSsh(false)}
         />
       ) : null}
-
-      <footer className="statusbar">
-        <span className="statusbar-left">
-          {vaultStatus && !vaultStatus.unlocked ? <Lock size={11} aria-hidden="true" /> : null}
-          {vaultStatus
-            ? vaultStatus.unlocked
-              ? 'Geared Term · Vault unlocked'
-              : 'Geared Term · Vault locked'
-            : 'Geared Term'}
-        </span>
-        <span className={`statusbar-state state-${activeTab?.status ?? 'closed'}`}>
-          {activeTab ? statusLabel(activeTab.status) : 'Not connected'}
-        </span>
-      </footer>
 
       {vaultStatus && !vaultStatus.unlocked ? (
         <VaultGate
