@@ -17,6 +17,8 @@ import {
   Bot,
   FolderSync,
   Lock,
+  PanelLeftClose,
+  PanelLeftOpen,
   PanelRightClose,
   PanelRightOpen,
   SquareTerminal
@@ -659,8 +661,9 @@ export function App(): React.JSX.Element {
                   className="icon-button"
                   onClick={toggleSidebar}
                   aria-label="Collapse sessions sidebar"
+                  title="Collapse sessions sidebar"
                 >
-                  ‹
+                  <PanelLeftClose size={14} aria-hidden="true" />
                 </button>
               </div>
             </div>
@@ -765,8 +768,9 @@ export function App(): React.JSX.Element {
               className="icon-button"
               onClick={toggleSidebar}
               aria-label="Expand sessions sidebar"
+              title="Expand sessions sidebar"
             >
-              ›
+              <PanelLeftOpen size={14} aria-hidden="true" />
             </button>
           </aside>
         )}
