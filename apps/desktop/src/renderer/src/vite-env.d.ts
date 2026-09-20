@@ -160,10 +160,11 @@ declare global {
       onSftpCd: (listener: (event: SftpCdEvent) => void) => () => void;
       onMenuCommand: (listener: (command: string) => void) => () => void;
       executeMenuAction: (action: string) => Promise<SftpOperationResult>;
-      setTitleBarOverlay: (input: {
-        color: string;
-        symbolColor: string;
-      }) => Promise<SftpOperationResult>;
+      isWindowMaximized: () => Promise<boolean>;
+      windowControl: (
+        action: 'minimize' | 'toggle-maximize' | 'close'
+      ) => Promise<SftpOperationResult>;
+      onWindowMaximizeChanged: (listener: (maximized: boolean) => void) => () => void;
       listUserThemes: () => Promise<UserThemeList>;
       openThemesFolder: () => Promise<SftpOperationResult>;
       getRuntimeInfo: () => Promise<RuntimeInfo>;

@@ -114,20 +114,45 @@ textarea {
 .titlebar-actions {
   display: flex;
   align-items: center;
+  gap: 6px;
   margin-left: auto;
-  padding-right: 132px;
-  /* Electron's titlebar-area-* vars describe the draggable region left of the
-     overlay controls, so the controls occupy whatever the viewport has left. */
-  padding-right: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width));
   -webkit-app-region: no-drag;
+}
+
+.window-controls {
+  display: flex;
+  align-items: stretch;
+  align-self: stretch;
+  /* Windows caption buttons sit flush with the top-right corner; pull them
+     over the titlebar's right padding. */
+  margin-right: -12px;
+}
+
+.window-control {
+  display: inline-grid;
+  width: calc(46px * var(--gt-ui-scale, 1));
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--gt-text-muted, #a9b8cf);
+  cursor: pointer;
+}
+
+.window-control:hover,
+.window-control:focus-visible {
+  background: var(--gt-hover, #1a2332);
+  color: var(--gt-text, #e4eaf3);
+  outline: none;
+}
+
+.window-control-close:hover,
+.window-control-close:focus-visible {
+  background: #e81123;
+  color: #ffffff;
 }
 
 .titlebar-mac {
   padding-left: 82px;
-}
-
-.titlebar-mac .titlebar-actions {
-  padding-right: 0;
 }
 
 .desktop-menu {

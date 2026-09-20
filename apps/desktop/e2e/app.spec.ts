@@ -96,6 +96,7 @@ test('exposes exactly the documented preload surface', async () => {
       'onSftpCd',
       'onSftpTransferEvent',
       'onVaultChanged',
+      'onWindowMaximizeChanged',
       'openAiHistoryDirectory',
       'openConfigFolder',
       'openHistoryWindow',
@@ -104,6 +105,7 @@ test('exposes exactly the documented preload surface', async () => {
       'openThemesFolder',
       'platform',
       'probeEnvironment',
+      'isWindowMaximized',
       'renameLocalPath',
       'rotateVault',
       'runRemoteFileCommand',
@@ -114,7 +116,6 @@ test('exposes exactly the documented preload surface', async () => {
       'saveProfileWithCredentials',
       'saveSettings',
       'saveUiState',
-      'setTitleBarOverlay',
       'streamAi',
       'revealLocalPath',
       'sftpDelete',
@@ -124,7 +125,8 @@ test('exposes exactly the documented preload surface', async () => {
       'sftpTrackedDirectory',
       'unlockVault',
       'uploadPathsSftp',
-      'uploadSftp'
+      'uploadSftp',
+      'windowControl'
     ].sort()
   );
 });

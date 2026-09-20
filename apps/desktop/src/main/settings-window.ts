@@ -1,7 +1,12 @@
 import { BrowserWindow } from 'electron';
 import { join } from 'node:path';
 import type { Logger } from './logging';
-import { hideNativeMenuBar, showWindowWhenReady, windowChromeOptions } from './window-chrome';
+import {
+  forwardWindowControlState,
+  hideNativeMenuBar,
+  showWindowWhenReady,
+  windowChromeOptions
+} from './window-chrome';
 
 export type SettingsCategory =
   | 'general'
@@ -50,6 +55,7 @@ export class SettingsWindowManager {
       }
     });
     hideNativeMenuBar(window);
+    forwardWindowControlState(window);
     showWindowWhenReady(window, this.logger, 'settings');
     window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     window.webContents.on('will-navigate', (event, url) => {

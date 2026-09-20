@@ -47,9 +47,6 @@ export function HistoryWindow(): React.JSX.Element {
       const palette = resolvePalette(settings.theme, userThemes);
       applyPalette(palette);
       applyTypography(settings.uiFontSize, settings.uiFontFamily);
-      void window.geared
-        .setTitleBarOverlay({ color: palette.background, symbolColor: palette.text })
-        .catch(() => undefined);
     };
     let themes: UserTheme[] = [];
     void Promise.all([window.geared.getSettings(), window.geared.listUserThemes()])

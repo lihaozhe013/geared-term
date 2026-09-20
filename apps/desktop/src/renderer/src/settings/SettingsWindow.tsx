@@ -93,9 +93,6 @@ export function SettingsWindow(): React.JSX.Element {
   useEffect(() => {
     if (!palette || !settings) return;
     applyPalette(palette);
-    void window.geared
-      .setTitleBarOverlay({ color: palette.background, symbolColor: palette.text })
-      .catch(() => undefined);
     applyTypography(settings.uiFontSize, settings.uiFontFamily);
   }, [palette, settings]);
 

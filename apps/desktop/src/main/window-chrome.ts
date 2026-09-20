@@ -11,7 +11,7 @@ function applicationIconPath(): string {
 /** Shared hidden-title-bar configuration for every application window. */
 export function windowChromeOptions(): Pick<
   BrowserWindowConstructorOptions,
-  'autoHideMenuBar' | 'icon' | 'titleBarOverlay' | 'titleBarStyle' | 'trafficLightPosition'
+  'autoHideMenuBar' | 'icon' | 'titleBarStyle' | 'trafficLightPosition'
 > {
   if (process.platform === 'darwin') {
     return {
@@ -23,13 +23,22 @@ export function windowChromeOptions(): Pick<
   return {
     autoHideMenuBar: true,
     icon: applicationIconPath(),
-    titleBarStyle: 'hidden',
-    titleBarOverlay: {
-      color: '#0d1117',
-      symbolColor: '#c7d0df',
-      height: 40
+    titleBarStyle: 'hidden'
+  };
+}
+
+/**
+ * Mirrors the window maximized state to its renderer so the custom title bar
+ * window controls can swap between the maximize and restore glyphs.
+ */
+export function forwardWindowControlState(window: BrowserWindow): void {
+  const send = (): void => {
+    if (!window.isDestroyed()) {
+      window.webContents.send('window:maximized-changed', window.isMaximized());
     }
   };
+  window.on('maximize', send);
+  window.on('unmaximize', send);
 }
 
 export function hideNativeMenuBar(window: BrowserWindow): void {

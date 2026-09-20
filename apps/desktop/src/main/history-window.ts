@@ -1,7 +1,12 @@
 import { BrowserWindow } from 'electron';
 import { join } from 'node:path';
 import type { Logger } from './logging';
-import { hideNativeMenuBar, showWindowWhenReady, windowChromeOptions } from './window-chrome';
+import {
+  forwardWindowControlState,
+  hideNativeMenuBar,
+  showWindowWhenReady,
+  windowChromeOptions
+} from './window-chrome';
 
 /**
  * Single-instance chat-history window. Continuing a conversation broadcasts the
@@ -39,6 +44,7 @@ export class HistoryWindowManager {
       }
     });
     hideNativeMenuBar(window);
+    forwardWindowControlState(window);
     showWindowWhenReady(window, this.logger, 'history');
     window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     window.webContents.on('will-navigate', (event, url) => {

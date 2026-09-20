@@ -291,9 +291,6 @@ export function App(): React.JSX.Element {
 
   useEffect(() => {
     applyPalette(palette);
-    void window.geared
-      .setTitleBarOverlay({ color: palette.background, symbolColor: palette.text })
-      .catch(() => undefined);
     applyTypography(settings.uiFontSize, settings.uiFontFamily);
   }, [palette, settings.uiFontFamily, settings.uiFontSize]);
 

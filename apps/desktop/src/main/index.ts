@@ -92,7 +92,12 @@ import { TransferManager } from './sftp/transfers';
 import { buildApplicationMenu, executeApplicationMenuAction, type MenuLocale } from './menu';
 import { HistoryWindowManager } from './history-window';
 import { SettingsWindowManager, type SettingsCategory } from './settings-window';
-import { hideNativeMenuBar, showWindowWhenReady, windowChromeOptions } from './window-chrome';
+import {
+  forwardWindowControlState,
+  hideNativeMenuBar,
+  showWindowWhenReady,
+  windowChromeOptions
+} from './window-chrome';
 import { discoverWsl } from './wsl/discovery';
 import { probeEnvironment } from './environment/probe';
 import { EnvironmentManager } from './environment/manager';
@@ -279,6 +284,7 @@ function createWindow(): BrowserWindow {
     }
   });
   hideNativeMenuBar(window);
+  forwardWindowControlState(window);
   let persistingWindowState = false;
 
   showWindowWhenReady(window, logger, 'main');
@@ -361,23 +367,25 @@ function registerIpc(): void {
     return SftpOperationResultSchema.parse({ accepted: true });
   });
 
-  ipcMain.handle('window:set-titlebar-overlay', (event, input: unknown) => {
-    if (
-      !input ||
-      typeof input !== 'object' ||
-      !('color' in input) ||
-      !('symbolColor' in input) ||
-      typeof input.color !== 'string' ||
-      typeof input.symbolColor !== 'string' ||
-      !/^#[0-9a-fA-F]{6}$/u.test(input.color) ||
-      !/^#[0-9a-fA-F]{6}$/u.test(input.symbolColor)
-    ) {
-      throw new Error('Invalid title bar overlay colors');
+  ipcMain.handle('window:maximized', (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (!window) throw new Error('Application window is unavailable');
+    return window.isMaximized();
+  });
+
+  ipcMain.handle('window:control', (event, action: unknown) => {
+    if (action !== 'minimize' && action !== 'toggle-maximize' && action !== 'close') {
+      throw new Error('Invalid window control action');
     }
     const window = BrowserWindow.fromWebContents(event.sender);
     if (!window) throw new Error('Application window is unavailable');
-    if (process.platform !== 'darwin') {
-      window.setTitleBarOverlay({ color: input.color, symbolColor: input.symbolColor });
+    if (action === 'minimize') {
+      window.minimize();
+    } else if (action === 'toggle-maximize') {
+      if (window.isMaximized()) window.unmaximize();
+      else window.maximize();
+    } else {
+      window.close();
     }
     return SftpOperationResultSchema.parse({ accepted: true });
   });

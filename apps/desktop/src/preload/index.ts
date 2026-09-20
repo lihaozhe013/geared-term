@@ -444,13 +444,19 @@ const api = Object.freeze({
     }
     return SftpOperationResultSchema.parse(await ipcRenderer.invoke('menu:execute', action));
   },
-  setTitleBarOverlay: async (input: { color: string; symbolColor: string }) => {
-    if (!/^#[0-9a-fA-F]{6}$/u.test(input.color) || !/^#[0-9a-fA-F]{6}$/u.test(input.symbolColor)) {
-      throw new Error('Invalid title bar overlay colors');
+  isWindowMaximized: async () => Boolean(await ipcRenderer.invoke('window:maximized')),
+  windowControl: async (action: 'minimize' | 'toggle-maximize' | 'close') => {
+    if (action !== 'minimize' && action !== 'toggle-maximize' && action !== 'close') {
+      throw new Error('Invalid window control action');
     }
-    return SftpOperationResultSchema.parse(
-      await ipcRenderer.invoke('window:set-titlebar-overlay', input)
-    );
+    return SftpOperationResultSchema.parse(await ipcRenderer.invoke('window:control', action));
+  },
+  onWindowMaximizeChanged: (listener: (maximized: boolean) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, maximized: unknown): void => {
+      if (typeof maximized === 'boolean') listener(maximized);
+    };
+    ipcRenderer.on('window:maximized-changed', handler);
+    return () => ipcRenderer.removeListener('window:maximized-changed', handler);
   },
   listUserThemes: async () => UserThemeListSchema.parse(await ipcRenderer.invoke('themes:list')),
   openThemesFolder: async () =>
