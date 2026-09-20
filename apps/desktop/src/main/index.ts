@@ -1011,6 +1011,12 @@ function registerIpc(): void {
     return { deleted: true };
   });
 
+  ipcMain.handle('ai:history:clear', async () => {
+    const removed = await aiHistory.clear();
+    logger.debug('assistant', 'AI history cleared', { removed });
+    return { cleared: true, removed };
+  });
+
   ipcMain.handle('ai:history:open-directory', async () => {
     await fsMkdir(aiHistory.path, { recursive: true });
     await shell.openPath(aiHistory.path);

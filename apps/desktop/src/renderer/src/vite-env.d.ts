@@ -118,6 +118,7 @@ declare global {
       loadAiHistory: (input: AiHistoryLoadRequest) => Promise<AiHistoryLoadResult>;
       saveAiHistory: (input: AiHistorySaveRequest) => Promise<AiHistorySaved>;
       deleteAiHistory: (id: string) => Promise<{ deleted: boolean }>;
+      clearAiHistory: () => Promise<{ cleared: boolean; removed: number }>;
       openAiHistoryDirectory: () => Promise<{ opened: boolean }>;
       streamAi: (
         input: AiStreamRequest,

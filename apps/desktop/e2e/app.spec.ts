@@ -49,6 +49,7 @@ test('exposes exactly the documented preload surface', async () => {
     [
       'acceptAiEndpoint',
       'cancelSftpTransfer',
+      'clearAiHistory',
       'continueAiHistory',
       'createLocalTerminal',
       'createSavedSshTerminal',

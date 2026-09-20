@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -59,6 +59,20 @@ describe('ai history store', () => {
     await store.remove(saved.id);
     expect(await store.list()).toHaveLength(0);
     expect(await store.load(saved.id)).toBeUndefined();
+  });
+
+  it('clears every conversation while keeping unrelated files', async () => {
+    const store = createStore();
+    await store.save({ title: 'First', messages: [{ role: 'user', content: 'one' }] });
+    await store.save({ title: 'Second', messages: [{ role: 'user', content: 'two' }] });
+    const { mkdirSync, writeFileSync } = await import('node:fs');
+    mkdirSync(store.path, { recursive: true });
+    writeFileSync(join(store.path, 'notes.txt'), 'keep me', 'utf8');
+
+    await expect(store.clear()).resolves.toBe(2);
+    expect(await store.list()).toEqual([]);
+    expect(existsSync(join(store.path, 'notes.txt'))).toBe(true);
+    await expect(store.clear()).resolves.toBe(0);
   });
 
   it('rejects traversal-style identifiers', async () => {

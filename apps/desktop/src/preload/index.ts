@@ -235,6 +235,8 @@ const api = Object.freeze({
     const request = AiHistoryLoadRequestSchema.parse({ id });
     return (await ipcRenderer.invoke('ai:history:delete', request)) as { deleted: boolean };
   },
+  clearAiHistory: async () =>
+    (await ipcRenderer.invoke('ai:history:clear')) as { cleared: boolean; removed: number },
   openAiHistoryDirectory: async () =>
     (await ipcRenderer.invoke('ai:history:open-directory')) as { opened: boolean },
   deleteAiConnection: async (id: string) => {

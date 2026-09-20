@@ -156,6 +156,18 @@ export class AiHistoryStore {
     await unlink(join(this.directory, `${id}.md`)).catch(() => undefined);
   }
 
+  public async clear(): Promise<number> {
+    if (!existsSync(this.directory)) return 0;
+    const files = await readdir(this.directory);
+    let removed = 0;
+    for (const file of files) {
+      if (!file.endsWith('.md')) continue;
+      await unlink(join(this.directory, file)).catch(() => undefined);
+      removed += 1;
+    }
+    return removed;
+  }
+
   public get path(): string {
     return this.directory;
   }

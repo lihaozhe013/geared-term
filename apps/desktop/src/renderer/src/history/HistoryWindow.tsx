@@ -25,6 +25,7 @@ export function HistoryWindow(): React.JSX.Element {
   const [entries, setEntries] = useState<AiHistorySummary[]>([]);
   const [selected, setSelected] = useState<AiHistoryLoadResult | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
+  const [confirmingClearAll, setConfirmingClearAll] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -81,6 +82,18 @@ export function HistoryWindow(): React.JSX.Element {
     }
   };
 
+  const clearAll = async (): Promise<void> => {
+    try {
+      await window.geared.clearAiHistory();
+      setConfirmingClearAll(false);
+      setSelected(null);
+      setStatus('All conversations were deleted.');
+      refresh();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Unable to clear chat history');
+    }
+  };
+
   const continueInAssistant = async (): Promise<void> => {
     if (!selected) return;
     try {
@@ -103,6 +116,35 @@ export function HistoryWindow(): React.JSX.Element {
               <p className="history-count">{entries.length} conversations</p>
             </div>
             <div className="history-toolbar-actions">
+              {confirmingClearAll ? (
+                <>
+                  <button
+                    type="button"
+                    className="history-entry-danger"
+                    onClick={() => void clearAll()}
+                  >
+                    Delete all
+                  </button>
+                  <button
+                    type="button"
+                    className="icon-button"
+                    aria-label="Cancel clear all"
+                    onClick={() => setConfirmingClearAll(false)}
+                  >
+                    <X size={13} aria-hidden="true" />
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className="icon-button danger"
+                  aria-label="Clear all conversations"
+                  disabled={entries.length === 0}
+                  onClick={() => setConfirmingClearAll(true)}
+                >
+                  <Trash2 size={14} aria-hidden="true" />
+                </button>
+              )}
               <button
                 type="button"
                 className="icon-button"
@@ -187,6 +229,7 @@ export function HistoryWindow(): React.JSX.Element {
             <div className="history-preview-empty">
               <p className="muted">Select a conversation to preview it.</p>
               {error ? <p className="settings-status status-error">{error}</p> : null}
+              {status ? <p className="settings-status">{status}</p> : null}
             </div>
           )}
         </section>
