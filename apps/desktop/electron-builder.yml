@@ -39,6 +39,7 @@ mac:
   target:
     - dmg
 linux:
+  executableName: geared-term
   artifactName: geared-term-linux-${arch}-${version}.${ext}
   category: Development
   target:
