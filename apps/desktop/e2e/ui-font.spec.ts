@@ -1,10 +1,11 @@
 import { expect, test } from '@playwright/test';
-import { launchApp, type AppSession } from './fixtures';
+import { launchApp, openLocalTab, type AppSession } from './fixtures';
 
 let session: AppSession;
 
 test.beforeAll(async () => {
   session = await launchApp();
+  await openLocalTab(session.app);
   await expect(session.page.locator('.statusbar-state')).toHaveText('Running', {
     timeout: 30_000
   });

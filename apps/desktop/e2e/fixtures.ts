@@ -31,6 +31,16 @@ async function passVaultGate(page: Page): Promise<void> {
   await gate.waitFor({ state: 'detached', timeout: 10_000 });
 }
 
+/**
+ * The workspace now starts with zero terminals, so specs that need a shell
+ * must open one explicitly through the same menu command the UI exposes.
+ */
+export async function openLocalTab(app: ElectronApplication): Promise<void> {
+  await app.evaluate(({ Menu }) => {
+    Menu.getApplicationMenu()?.getMenuItemById('new-local')?.click();
+  });
+}
+
 export async function launchApp(): Promise<AppSession> {
   const mainEntry = join(appDirectory, 'out', 'main', 'index.js');
   if (!existsSync(mainEntry)) {

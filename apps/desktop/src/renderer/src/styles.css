@@ -1111,6 +1111,31 @@ button:disabled {
   line-height: 1.5;
 }
 
+.terminal-empty {
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin-top: 0;
+}
+
+.empty-state-action {
+  margin-top: 16px;
+  padding: 8px 14px;
+  border: 1px solid var(--gt-accent, #5c8ea5);
+  border-radius: var(--gt-radius-md);
+  color: var(--gt-background, #0d1117);
+  background: var(--gt-accent, #5c8ea5);
+  cursor: pointer;
+  font-size: var(--gt-fs-md);
+  font-weight: 600;
+}
+
+.empty-state-action:hover {
+  filter: brightness(1.1);
+}
+
 .terminal-card {
   display: grid;
   grid-template-rows: calc(34px * var(--gt-ui-scale, 1)) 1fr;
@@ -1169,6 +1194,21 @@ button:disabled {
 
 .tab-close:hover {
   color: var(--gt-danger, #f4a5a5);
+  background: var(--gt-hover, #1a2332);
+}
+
+.tab-new {
+  display: grid;
+  flex: none;
+  width: calc(32px * var(--gt-ui-scale, 1));
+  height: 100%;
+  place-items: center;
+  color: var(--gt-text-muted, #8391a9);
+  font-size: var(--gt-fs-lg);
+}
+
+.tab-new:hover {
+  color: var(--gt-text, #e4eaf3);
   background: var(--gt-hover, #1a2332);
 }
 

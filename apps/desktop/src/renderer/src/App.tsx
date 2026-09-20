@@ -215,8 +215,8 @@ export function App(): React.JSX.Element {
   const [uiState, setUiState] = useState<UiStateRecord>(defaultUiState);
   const [wslDistributions, setWslDistributions] = useState<WslDistribution[]>([]);
   const [wslLoading, setWslLoading] = useState(false);
-  const [tabs, setTabs] = useState<TerminalTab[]>(() => [createLocalTab()]);
-  const [activeTabId, setActiveTabId] = useState<string | null>(() => tabs[0]?.id ?? null);
+  const [tabs, setTabs] = useState<TerminalTab[]>([]);
+  const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showProfileEditor, setShowProfileEditor] = useState(false);
   const [editingProfile, setEditingProfile] = useState<SessionProfileRecord | undefined>();
@@ -320,9 +320,8 @@ export function App(): React.JSX.Element {
     setError(null);
   }, [settings.defaultTerm]);
 
-  const closeTab = useCallback((id: string, options?: { force?: boolean }): void => {
+  const closeTab = useCallback((id: string): void => {
     setTabs((current) => {
-      if (current.length <= 1 && !options?.force) return current;
       const index = current.findIndex((tab) => tab.id === id);
       const next = current.filter((tab) => tab.id !== id);
       setActiveTabId((active) => {
@@ -587,7 +586,7 @@ export function App(): React.JSX.Element {
           tab.id === tabId ? { ...tab, status: message.state as TabStatus } : tab
         )
       );
-      if (message.state === 'exited') closeTab(tabId, { force: true });
+      if (message.state === 'exited') closeTab(tabId);
     },
     [closeTab]
   );
@@ -784,18 +783,26 @@ export function App(): React.JSX.Element {
                 >
                   <span>{tab.name}</span>
                 </button>
-                {tabs.length > 1 ? (
-                  <button
-                    type="button"
-                    className="tab-close"
-                    onClick={() => closeTab(tab.id)}
-                    aria-label={`Close ${tab.name}`}
-                  >
-                    ×
-                  </button>
-                ) : null}
+                <button
+                  type="button"
+                  className="tab-close"
+                  onClick={() => closeTab(tab.id)}
+                  aria-label={`Close ${tab.name}`}
+                  title={tabs.length > 1 ? undefined : 'Closing the last tab empties the workspace'}
+                >
+                  ×
+                </button>
               </div>
             ))}
+            <button
+              type="button"
+              className="tab-new"
+              onClick={addLocalTab}
+              aria-label="New terminal"
+              title="New terminal (Ctrl+T)"
+            >
+              +
+            </button>
           </div>
           <div className="terminal-surface">
             {tabs.map((tab) => (
@@ -826,6 +833,20 @@ export function App(): React.JSX.Element {
                 }}
               />
             ))}
+            {tabs.length === 0 ? (
+              <div className="empty-state terminal-empty">
+                <span className="empty-icon" aria-hidden="true">
+                  &gt;_
+                </span>
+                <p>No open terminals</p>
+                <small>
+                  Open a local shell or start a session from the sidebar to get started.
+                </small>
+                <button type="button" className="empty-state-action" onClick={addLocalTab}>
+                  New local terminal
+                </button>
+              </div>
+            ) : null}
             {info ? (
               <p className="terminal-line success">
                 bridge: {info.name} {info.version} ({info.platform})

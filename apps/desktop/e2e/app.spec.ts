@@ -155,7 +155,7 @@ test('renders and executes the virtual menu on non-macOS platforms', async () =>
   await page.locator('.desktop-menu-button').first().click();
   await expect(page.locator('.desktop-menu-popover').first()).toBeVisible();
   await page.getByRole('menuitem', { name: 'New local terminal' }).click();
-  await expect(page.locator('.terminal-tab')).toHaveCount(2);
+  await expect(page.locator('.terminal-tab')).toHaveCount(1);
 });
 
 test('keeps the macOS application menu separate from File', async () => {

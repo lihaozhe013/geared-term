@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { launchApp, type AppSession } from './fixtures';
+import { launchApp, openLocalTab, type AppSession } from './fixtures';
 
 let session: AppSession;
 
@@ -23,14 +23,13 @@ function activeTerminalHost(page: AppSession['page']) {
   return page.locator('.terminal-wrapper:not([hidden]) .terminal-host');
 }
 
-function newLocalTabViaMenu(session: AppSession): Promise<void> {
-  return session.app.evaluate(({ Menu }) => {
-    Menu.getApplicationMenu()?.getMenuItemById('new-local')?.click();
-  });
+async function newLocalTabViaMenu(session: AppSession): Promise<void> {
+  await openLocalTab(session.app);
 }
 
 test('runs a local shell and echoes typed commands', async () => {
   const { page } = session;
+  await newLocalTabViaMenu(session);
   await waitForRunning(page);
   await activeTerminalHost(page).click();
   await page.keyboard.type('echo geared-e2e-marker');
@@ -40,6 +39,7 @@ test('runs a local shell and echoes typed commands', async () => {
 
 test('closes the tab automatically when the shell exits', async () => {
   const { page } = session;
+  await newLocalTabViaMenu(session);
   await waitForRunning(page);
   await newLocalTabViaMenu(session);
   await expect(page.getByRole('tab')).toHaveCount(2);
@@ -61,6 +61,7 @@ test('closes the tab automatically when the shell exits', async () => {
 
 test('opens, switches, and closes terminal tabs in isolation', async () => {
   const { page } = session;
+  await newLocalTabViaMenu(session);
   await waitForRunning(page);
   await newLocalTabViaMenu(session);
   await expect(page.getByRole('tab')).toHaveCount(2);
@@ -85,4 +86,18 @@ test('opens, switches, and closes terminal tabs in isolation', async () => {
   await expect(page.getByRole('tab')).toHaveCount(1);
   await expect(tabs.nth(0)).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('.statusbar-state')).toHaveText('Running');
+});
+
+test('starts with no tabs and supports closing the last one', async () => {
+  const { page } = session;
+  await expect(page.getByRole('tab')).toHaveCount(0);
+  await expect(page.locator('.terminal-empty')).toBeVisible();
+
+  await page.getByRole('button', { name: 'New local terminal' }).click();
+  await waitForRunning(page);
+  await expect(page.getByRole('tab')).toHaveCount(1);
+
+  await page.getByRole('button', { name: 'Close Local Shell' }).click();
+  await expect(page.getByRole('tab')).toHaveCount(0);
+  await expect(page.locator('.terminal-empty')).toBeVisible();
 });

@@ -1,11 +1,12 @@
 import { expect, test } from '@playwright/test';
 import { commandRevision } from '@geared-term/command-parser';
-import { launchApp, type AppSession } from './fixtures';
+import { launchApp, openLocalTab, type AppSession } from './fixtures';
 
 let session: AppSession;
 
 test.beforeEach(async () => {
   session = await launchApp();
+  await openLocalTab(session.app);
 });
 
 test.afterEach(async () => {
