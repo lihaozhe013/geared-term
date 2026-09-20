@@ -987,7 +987,16 @@ function registerIpc(): void {
 
   ipcMain.handle('ai:history:save', async (_event, input: unknown) => {
     const request = AiHistorySaveRequestSchema.parse(input);
-    return AiHistorySavedSchema.parse(await aiHistory.save(request));
+    try {
+      return AiHistorySavedSchema.parse(await aiHistory.save(request));
+    } catch (error) {
+      logger.warn('assistant', 'AI history save failed', {
+        id: request.id,
+        messageCount: request.messages.length,
+        failureReason: error instanceof Error ? error.message : String(error)
+      });
+      throw error;
+    }
   });
 
   ipcMain.handle('ai:history:delete', async (_event, input: unknown) => {

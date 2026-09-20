@@ -415,6 +415,17 @@ export function App(): React.JSX.Element {
     });
   }, [uiState]);
 
+  // Once opened, the assistant panel stays mounted (hidden via CSS) so an
+  // in-flight conversation and its streaming state survive panel switches.
+  const [assistantKeepAlive, setAssistantKeepAlive] = useState(
+    uiState.rightPanel === 'assistant' && !uiState.rightPanelCollapsed
+  );
+  useEffect(() => {
+    if (uiState.rightPanel === 'assistant' && !uiState.rightPanelCollapsed) {
+      setAssistantKeepAlive(true);
+    }
+  }, [uiState.rightPanel, uiState.rightPanelCollapsed]);
+
   const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? tabs[0];
   const profileGroups = Array.from(
     profiles.reduce((groups, profile) => {
@@ -839,8 +850,8 @@ export function App(): React.JSX.Element {
             ) : null}
           </div>
         </section>
-        {uiState.rightPanel && !uiState.rightPanelCollapsed ? (
-          <div className="right-panel">
+        {uiState.rightPanel ? (
+          <div className={`right-panel${uiState.rightPanelCollapsed ? ' is-hidden' : ''}`}>
             <div className="right-panel-switcher" role="tablist" aria-label="Right panel">
               <button
                 type="button"
@@ -894,8 +905,9 @@ export function App(): React.JSX.Element {
                 <PanelRightClose size={14} aria-hidden="true" />
               </button>
             </div>
-            {uiState.rightPanel === 'assistant' ? (
+            {assistantKeepAlive ? (
               <AssistantPanel
+                hidden={uiState.rightPanel !== 'assistant'}
                 targetSessionId={activeTab?.id}
                 sessionLabel={activeTab?.name}
                 language={settings.language}

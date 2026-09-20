@@ -34,6 +34,7 @@ import {
   X
 } from 'lucide-react';
 import { MarkdownView } from './assistant/MarkdownView';
+import { buildHistoryEntry } from './assistant/history-save';
 import { translate } from './i18n';
 
 type Message = {
@@ -90,6 +91,7 @@ type AssistantPanelProps = {
   onToggleSplitCommand?: () => void;
   pendingHistoryId?: string | null;
   onPendingHistoryConsumed?: () => void;
+  hidden?: boolean;
 };
 
 type ActivityLike = {
@@ -300,7 +302,8 @@ export function AssistantPanel({
   allowRiskyRun = false,
   onToggleSplitCommand,
   pendingHistoryId,
-  onPendingHistoryConsumed
+  onPendingHistoryConsumed,
+  hidden = false
 }: AssistantPanelProps): React.JSX.Element {
   const [connections, setConnections] = useState<AiConnectionRecord[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -325,6 +328,13 @@ export function AssistantPanel({
   const streamRef = useRef<{ cancel: () => void } | null>(null);
   const messagesRef = useRef<Message[]>([]);
   messagesRef.current = messages;
+  // Persistence reads these through refs because stream callbacks close over
+  // the render in which the request started and would otherwise observe stale
+  // reasoning/source state from the previous turn.
+  const reasoningRef = useRef('');
+  reasoningRef.current = reasoning;
+  const sourcesRef = useRef<SourceReference[]>([]);
+  sourcesRef.current = sources;
   const reasoningBoxRef = useRef<HTMLDivElement | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const messagesBoxRef = useRef<HTMLDivElement | null>(null);
@@ -553,6 +563,23 @@ export function AssistantPanel({
     );
   };
 
+  const persistConversation = (conversation: Message[]): void => {
+    if (!conversation.some((message) => message.content.trim().length > 0)) return;
+    window.geared
+      .saveAiHistory(
+        buildHistoryEntry({
+          id: conversationId,
+          ...(model ? { model } : {}),
+          reasoning: reasoningRef.current,
+          sources: sourcesRef.current,
+          messages: conversation
+        })
+      )
+      .catch((reason: unknown) => {
+        console.error('[assistant] failed to save chat history', reason);
+      });
+  };
+
   const receiveEvent = (event: AiStreamEvent): void => {
     if (event.kind === 'delta') {
       setMessages((current) => {
@@ -631,6 +658,7 @@ export function AssistantPanel({
       setStreaming(false);
       setReasoningLive(false);
       closeRunningActivities('failed');
+      persistConversation(messagesRef.current);
     } else if (event.kind === 'complete') {
       setStreaming(false);
       setReasoningLive(false);
@@ -643,43 +671,7 @@ export function AssistantPanel({
       });
       setShowTimeline(false);
       streamRef.current = null;
-      const turn = messagesRef.current.filter((message) => message.content.trim().length > 0);
-      if (turn.length > 0) {
-        const reversedAssistantIndex = [...turn]
-          .reverse()
-          .findIndex((message) => message.role === 'assistant');
-        const lastAssistantIndex =
-          reversedAssistantIndex < 0 ? -1 : turn.length - 1 - reversedAssistantIndex;
-        void window.geared
-          .saveAiHistory({
-            id: conversationId,
-            title:
-              turn.find((message) => message.role === 'user')?.content.slice(0, 80) ??
-              'Conversation',
-            ...(model ? { model } : {}),
-            messages: turn.map((message, index) => ({
-              role: message.role,
-              content: message.content,
-              ...(message.role === 'assistant' && index === lastAssistantIndex
-                ? {
-                    ...(reasoning ? { reasoning } : {}),
-                    ...(message.usage
-                      ? {
-                          usage: {
-                            inputTokens: message.usage.input,
-                            outputTokens: message.usage.output,
-                            reasoningTokens: message.usage.reasoning
-                          }
-                        }
-                      : {}),
-                    ...(sources.length > 0 ? { sources } : {}),
-                    ...(message.continuation ? { continuation: message.continuation } : {})
-                  }
-                : {})
-            }))
-          })
-          .catch(() => undefined);
-      }
+      persistConversation(messagesRef.current);
     }
   };
 
@@ -788,9 +780,15 @@ export function AssistantPanel({
     pendingRequestRef.current = request;
     scrollPinnedRef.current = true;
     setScrolledUp(false);
-    setMessages([...messages, { role: 'user', content: text }, { role: 'assistant', content: '', model }]);
+    const nextMessages: Message[] = [
+      ...messages,
+      { role: 'user', content: text },
+      { role: 'assistant', content: '', model }
+    ];
+    setMessages(nextMessages);
     setComposer('');
     setConsentRequest(null);
+    persistConversation(nextMessages);
     startStream(request);
   };
 
@@ -801,6 +799,7 @@ export function AssistantPanel({
     setReasoningLive(false);
     closeRunningActivities('done');
     setShowTimeline(false);
+    persistConversation(messagesRef.current);
   };
 
   // After a search closes and before the first answer token, the model is
@@ -825,7 +824,7 @@ export function AssistantPanel({
   })();
 
   return (
-    <aside className="assistant-panel" aria-label="AI assistant">
+    <aside className="assistant-panel" aria-label="AI assistant" hidden={hidden}>
       <div className="assistant-header">
         <Bot size={16} aria-hidden="true" className="assistant-header-icon" />
         <div className="assistant-header-titles">

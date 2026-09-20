@@ -321,6 +321,10 @@ body.panel-resizing {
   background: var(--gt-background, #0d1117);
 }
 
+.right-panel.is-hidden {
+  display: none;
+}
+
 .right-panel-switcher {
   display: flex;
   align-items: center;
@@ -385,6 +389,10 @@ body.panel-resizing {
   padding: 12px 14px;
   overflow: hidden;
   background: var(--gt-background, #0d1117);
+}
+
+.assistant-panel[hidden] {
+  display: none;
 }
 
 .sftp-panel {
