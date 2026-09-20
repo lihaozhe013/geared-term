@@ -32,6 +32,27 @@ test('runs a local shell and echoes typed commands', async () => {
   await expect(activeTerminal(page)).toContainText('geared-e2e-marker', { timeout: 15_000 });
 });
 
+test('closes the tab automatically when the shell exits', async () => {
+  const { page } = session;
+  await waitForRunning(page);
+  await page.getByRole('button', { name: '+ New local terminal' }).click();
+  await expect(page.getByRole('tab')).toHaveCount(2);
+  await activeTerminalHost(page).click();
+  await page.keyboard.type('exit');
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('tab')).toHaveCount(1, { timeout: 15_000 });
+  await expect(page.locator('.statusbar-state')).toHaveText('Running');
+
+  await activeTerminalHost(page).click();
+  await page.keyboard.type('exit');
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('tab')).toHaveCount(0, { timeout: 15_000 });
+
+  await page.getByRole('button', { name: '+ New local terminal' }).click();
+  await expect(page.getByRole('tab')).toHaveCount(1);
+  await waitForRunning(page);
+});
+
 test('opens, switches, and closes terminal tabs in isolation', async () => {
   const { page } = session;
   await waitForRunning(page);

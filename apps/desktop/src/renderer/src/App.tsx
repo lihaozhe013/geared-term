@@ -308,9 +308,9 @@ export function App(): React.JSX.Element {
     setError(null);
   }, [settings.defaultTerm]);
 
-  const closeTab = useCallback((id: string): void => {
+  const closeTab = useCallback((id: string, options?: { force?: boolean }): void => {
     setTabs((current) => {
-      if (current.length <= 1) return current;
+      if (current.length <= 1 && !options?.force) return current;
       const index = current.findIndex((tab) => tab.id === id);
       const next = current.filter((tab) => tab.id !== id);
       setActiveTabId((active) => {
@@ -562,8 +562,9 @@ export function App(): React.JSX.Element {
           tab.id === tabId ? { ...tab, status: message.state as TabStatus } : tab
         )
       );
+      if (message.state === 'exited') closeTab(tabId, { force: true });
     },
-    []
+    [closeTab]
   );
 
   const handleHostKeyPrompt = useCallback(
