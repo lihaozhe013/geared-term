@@ -950,15 +950,18 @@ button:disabled {
 .tab-bar {
   display: flex;
   min-width: 0;
+  height: 34px;
   align-items: stretch;
   overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
   border-bottom: 1px solid var(--gt-border, #2a3140);
   background: var(--gt-background, #0d1117);
 }
 
 .terminal-tab {
   display: flex;
-  min-width: 150px;
+  min-width: 120px;
   max-width: 240px;
   align-items: center;
   border-right: 1px solid var(--gt-border, #2a3140);
@@ -972,27 +975,18 @@ button:disabled {
   display: flex;
   min-width: 0;
   flex: 1;
-  flex-direction: column;
-  gap: 2px;
-  padding: 7px 9px;
+  align-items: center;
+  padding: 0 9px;
   text-align: left;
 }
 
-.terminal-tab span,
-.terminal-tab small {
+.terminal-tab span {
   overflow: hidden;
+  flex: 1;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.terminal-tab span {
   color: var(--gt-text-dim, #d8e0ee);
   font-size: 11px;
-}
-
-.terminal-tab small {
-  color: var(--gt-text-muted, #77879f);
-  font-size: 9px;
 }
 
 .tab-close {

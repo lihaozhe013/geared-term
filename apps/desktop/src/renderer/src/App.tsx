@@ -779,7 +779,6 @@ export function App(): React.JSX.Element {
                   onClick={() => setActiveTabId(tab.id)}
                 >
                   <span>{tab.name}</span>
-                  <small>{statusLabel(tab.status)}</small>
                 </button>
                 {tabs.length > 1 ? (
                   <button
