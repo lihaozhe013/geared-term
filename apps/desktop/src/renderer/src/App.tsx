@@ -43,7 +43,7 @@ type TerminalTab = {
 const defaultSettings: SettingsRecord = {
   schemaVersion: 1,
   language: 'system',
-  theme: 'Geared Dark',
+  theme: 'Catppuccin Mocha',
   terminalFontSize: 14,
   terminalLineHeight: 1.2,
   terminalCursor: 'block',
