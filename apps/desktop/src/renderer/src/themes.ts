@@ -1,3 +1,4 @@
+import type { ISearchDecorationOptions } from '@xterm/addon-search';
 import type { ThemeColors, UserTheme } from '@geared-term/protocol';
 
 export type Palette = {
@@ -19,6 +20,8 @@ export type Palette = {
   text: string;
   textDim: string;
   textMuted: string;
+  searchMatch: string;
+  searchMatchActive: string;
   ansi: string[];
 };
 
@@ -41,6 +44,8 @@ const GEARED_DARK: Palette = {
   text: '#e4eaf3',
   textDim: '#d8e0ee',
   textMuted: '#71809a',
+  searchMatch: '#545045',
+  searchMatchActive: '#8f6a55',
   ansi: [
     '#2a3140',
     '#e06c75',
@@ -77,7 +82,9 @@ const MIDNIGHT: Palette = {
   accent: '#6ea3c0',
   text: '#e7eefb',
   textDim: '#c9d6ea',
-  textMuted: '#67788f'
+  textMuted: '#67788f',
+  searchMatch: '#504c41',
+  searchMatchActive: '#8d6752'
 };
 
 const LIGHT: Palette = {
@@ -100,6 +107,8 @@ const LIGHT: Palette = {
   text: '#1d2633',
   textDim: '#33404f',
   textMuted: '#64748b',
+  searchMatch: '#efd8b8',
+  searchMatchActive: '#faa777',
   ansi: [
     '#4c4f69',
     '#d20f39',
@@ -140,6 +149,8 @@ const CATPPUCCIN_MOCHA: Palette = {
   text: '#cdd6f4',
   textDim: '#bac2de',
   textMuted: '#a6adc8',
+  searchMatch: '#605955',
+  searchMatchActive: '#97705f',
   ansi: [
     '#45475a',
     '#f38ba8',
@@ -166,7 +177,7 @@ const CATPPUCCIN_MACCHIATO: Palette = {
   foreground: '#cad3f5',
   cursor: '#f4dbd6',
   selection: '#5b6078',
-  accent: '#f5bde6',
+  accent: '#c6a0f6',
   bright: '#8bd5ca',
   danger: '#ed8796',
   shell: '#24273a',
@@ -180,6 +191,8 @@ const CATPPUCCIN_MACCHIATO: Palette = {
   text: '#cad3f5',
   textDim: '#b8c2e0',
   textMuted: '#a5adcb',
+  searchMatch: '#645f5d',
+  searchMatchActive: '#9a7464',
   ansi: [
     '#494d64',
     '#ed8796',
@@ -206,7 +219,7 @@ const CATPPUCCIN_FRAPPE: Palette = {
   foreground: '#c6d0f5',
   cursor: '#f2d5cf',
   selection: '#626880',
-  accent: '#f4b8e4',
+  accent: '#ca9ee6',
   bright: '#81c8be',
   danger: '#e78284',
   shell: '#303446',
@@ -220,6 +233,8 @@ const CATPPUCCIN_FRAPPE: Palette = {
   text: '#c6d0f5',
   textDim: '#b5bfe2',
   textMuted: '#a5adce',
+  searchMatch: '#6c6866',
+  searchMatchActive: '#9f7a6a',
   ansi: [
     '#51576d',
     '#e78284',
@@ -260,6 +275,8 @@ const CATPPUCCIN_LATTE: Palette = {
   text: '#4c4f69',
   textDim: '#5c5f77',
   textMuted: '#6c6f85',
+  searchMatch: '#ead3b4',
+  searchMatchActive: '#f7a374',
   ansi: [
     '#5c5f77',
     '#d20f39',
@@ -336,6 +353,8 @@ export function derivePalette(colors: ThemeColors): Palette {
   const accent = colors.accent ?? colors.bright ?? (dark ? '#89b4fa' : '#1e66f5');
   const bright = colors.bright ?? accent;
   const neutral = dark ? '#000000' : '#ffffff';
+  const searchYellow = dark ? '#f9e2af' : '#df8e1d';
+  const searchPeach = dark ? '#fab387' : '#fe640b';
   return {
     background: colors.background,
     foreground: colors.foreground,
@@ -355,6 +374,8 @@ export function derivePalette(colors: ThemeColors): Palette {
     text: colors.text ?? colors.foreground,
     textDim: colors.textDim ?? mix(colors.foreground, colors.background, 0.12),
     textMuted: colors.textMuted ?? mix(colors.foreground, colors.background, 0.4),
+    searchMatch: colors.searchMatch ?? mix(colors.background, searchYellow, 0.3),
+    searchMatchActive: colors.searchMatchActive ?? mix(colors.background, searchPeach, 0.55),
     ansi: colors.ansi ?? []
   };
 }
@@ -385,14 +406,21 @@ const paletteCssVariables: Record<keyof Palette, string> = {
   text: '--gt-text',
   textDim: '--gt-text-dim',
   textMuted: '--gt-text-muted',
+  searchMatch: '--gt-search-match',
+  searchMatchActive: '--gt-search-match-active',
   ansi: '--gt-ansi'
 };
 
-export function applyPalette(palette: Palette): void {
-  const style = document.documentElement.style;
+/**
+ * Builds every CSS custom property declaration for a palette, including all 16
+ * ANSI slots and the derived code-highlight tokens, so UI and terminal stay
+ * coordinated per SET-005. Kept pure for node-environment tests.
+ */
+export function paletteCssDeclarations(palette: Palette): Array<[string, string]> {
+  const declarations: Array<[string, string]> = [];
   for (const key of Object.keys(paletteCssVariables) as (keyof Palette)[]) {
     if (key === 'ansi') continue;
-    style.setProperty(paletteCssVariables[key], palette[key]);
+    declarations.push([paletteCssVariables[key] as string, palette[key] as string]);
   }
   const ansi = palette.ansi;
   const hasAnsi = ansi.length === 16;
@@ -400,18 +428,35 @@ export function applyPalette(palette: Palette): void {
     '--gt-code-bg': palette.inputBackground,
     '--gt-code-fg': palette.foreground,
     '--gt-code-comment': palette.textMuted,
-    '--gt-code-keyword': (hasAnsi ? ansi[5] : palette.accent) as string,
+    '--gt-code-keyword': palette.accent,
     '--gt-code-string': (hasAnsi ? ansi[2] : palette.bright) as string,
     '--gt-code-number': (hasAnsi ? ansi[3] : palette.accent) as string,
     '--gt-code-title': (hasAnsi ? ansi[4] : palette.bright) as string,
     '--gt-code-attr': (hasAnsi ? ansi[6] : palette.bright) as string
   };
   for (const [name, value] of Object.entries(codeTokens)) {
-    style.setProperty(name, value);
+    declarations.push([name, value]);
   }
   if (hasAnsi) {
-    style.setProperty('--gt-ansi-0', ansi[0] as string);
+    ansi.forEach((color, index) => declarations.push([`--gt-ansi-${index}`, color]));
   }
+  return declarations;
+}
+
+export function applyPalette(palette: Palette): void {
+  const style = document.documentElement.style;
+  for (const [name, value] of paletteCssDeclarations(palette)) {
+    style.setProperty(name, value);
+  }
+}
+
+export function buildSearchDecorations(palette: Palette): ISearchDecorationOptions {
+  return {
+    matchBackground: palette.searchMatch,
+    activeMatchBackground: palette.searchMatchActive,
+    matchOverviewRuler: palette.searchMatch,
+    activeMatchColorOverviewRuler: palette.searchMatchActive
+  };
 }
 
 export function buildXtermTheme(palette: Palette): Record<string, unknown> {

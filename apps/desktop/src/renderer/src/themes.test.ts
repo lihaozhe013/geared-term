@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { normalizeTerminalFontFallbacks } from '@geared-term/protocol';
-import { builtinThemeNames, derivePalette, resolvePalette } from './themes';
+import {
+  builtinThemes,
+  builtinThemeNames,
+  buildSearchDecorations,
+  derivePalette,
+  paletteCssDeclarations,
+  resolvePalette
+} from './themes';
 
 describe('normalizeTerminalFontFallbacks', () => {
   const entry = (name: string) => ({ name, scale: 1, offsetX: 0, offsetY: 0 });
@@ -69,5 +76,46 @@ describe('themes', () => {
 
   it('unknown names fall back to the default theme', () => {
     expect(resolvePalette('Nope', []).background).toBe('#0d1117');
+  });
+
+  it('uses the Catppuccin mauve as accent for every flavor', () => {
+    const accents = ['Mocha', 'Macchiato', 'Frappé', 'Latte'].map(
+      (flavor) => builtinThemes[`Catppuccin ${flavor}`]?.accent
+    );
+    expect(accents).toEqual(['#cba6f7', '#c6a0f6', '#ca9ee6', '#8839ef']);
+  });
+
+  it('emits every ANSI slot and the accent keyword token as CSS variables', () => {
+    const mocha = builtinThemes['Catppuccin Mocha'];
+    expect(mocha).toBeDefined();
+    if (!mocha) return;
+    const variables = new Map(paletteCssDeclarations(mocha));
+    mocha.ansi.forEach((color, index) => {
+      expect(variables.get(`--gt-ansi-${index}`)).toBe(color);
+    });
+    expect(variables.get('--gt-code-keyword')).toBe(mocha.accent);
+  });
+
+  it('derives coordinated search colors that user themes can override', () => {
+    const derived = derivePalette({
+      background: '#1e1e2e',
+      foreground: '#cdd6f4',
+      cursor: '#f5e0dc'
+    });
+    expect(derived.searchMatch).toMatch(/^#[0-9a-f]{6}$/u);
+    expect(derived.searchMatchActive).toMatch(/^#[0-9a-f]{6}$/u);
+    expect(derived.searchMatch).not.toBe(derived.searchMatchActive);
+    const decorations = buildSearchDecorations(derived);
+    expect(decorations.matchBackground).toBe(derived.searchMatch);
+    expect(decorations.activeMatchBackground).toBe(derived.searchMatchActive);
+    const explicit = derivePalette({
+      background: '#1e1e2e',
+      foreground: '#cdd6f4',
+      cursor: '#f5e0dc',
+      searchMatch: '#111111',
+      searchMatchActive: '#222222'
+    });
+    expect(explicit.searchMatch).toBe('#111111');
+    expect(explicit.searchMatchActive).toBe('#222222');
   });
 });

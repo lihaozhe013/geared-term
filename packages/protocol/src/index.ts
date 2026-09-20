@@ -774,6 +774,8 @@ export const ThemeColorsSchema = z
     textDim: ThemeColorSchema.optional(),
     textMuted: ThemeColorSchema.optional(),
     danger: ThemeColorSchema.optional(),
+    searchMatch: ThemeColorSchema.optional(),
+    searchMatchActive: ThemeColorSchema.optional(),
     ansi: z.array(ThemeColorSchema).length(16).optional()
   })
   .strict();

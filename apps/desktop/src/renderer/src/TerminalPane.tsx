@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { FitAddon } from '@xterm/addon-fit';
-import { SearchAddon } from '@xterm/addon-search';
+import { SearchAddon, type ISearchDecorationOptions } from '@xterm/addon-search';
 import { Terminal } from '@xterm/xterm';
 import { normalizeTerminalFontFallbacks } from '@geared-term/protocol';
 import {
@@ -11,7 +11,7 @@ import {
   type SettingsRecord,
   type TerminalPortMessage
 } from '@geared-term/protocol';
-import { buildXtermTheme, type Palette } from './themes';
+import { buildSearchDecorations, buildXtermTheme, type Palette } from './themes';
 import { extractSnapshot, type SnapshotTerminal, type TerminalSnapshot } from './terminal/snapshot';
 
 type TerminalRequest = LocalTerminalRequest | SshTerminalRequest | SshProfileTerminalRequest;
@@ -277,6 +277,10 @@ export function TerminalPane({
     terminalRef.current?.focus();
   };
 
+  const searchOptions = (): { decorations: ISearchDecorationOptions } => ({
+    decorations: buildSearchDecorations(paletteRef.current)
+  });
+
   return (
     <div className="terminal-wrapper" hidden={!active} data-session-id={request.sessionId}>
       {showSearch ? (
@@ -290,12 +294,16 @@ export function TerminalPane({
             onChange={(event) => {
               const value = event.target.value;
               setSearchText(value);
-              if (value) searchRef.current?.findNext(value, { incremental: true });
+              if (value)
+                searchRef.current?.findNext(value, {
+                  incremental: true,
+                  ...searchOptions()
+                });
             }}
             onKeyDown={(event) => {
               if (event.key === 'Enter') {
-                if (event.shiftKey) searchRef.current?.findPrevious(searchText, {});
-                else searchRef.current?.findNext(searchText, {});
+                if (event.shiftKey) searchRef.current?.findPrevious(searchText, searchOptions());
+                else searchRef.current?.findNext(searchText, searchOptions());
               } else if (event.key === 'Escape') {
                 closeSearch();
               }
@@ -305,7 +313,7 @@ export function TerminalPane({
             type="button"
             className="icon-button"
             aria-label="Previous match"
-            onClick={() => searchRef.current?.findPrevious(searchText, {})}
+            onClick={() => searchRef.current?.findPrevious(searchText, searchOptions())}
           >
             ↑
           </button>
@@ -313,7 +321,7 @@ export function TerminalPane({
             type="button"
             className="icon-button"
             aria-label="Next match"
-            onClick={() => searchRef.current?.findNext(searchText, {})}
+            onClick={() => searchRef.current?.findNext(searchText, searchOptions())}
           >
             ↓
           </button>
