@@ -794,15 +794,6 @@ export function App(): React.JSX.Element {
                 </button>
               </div>
             ))}
-            <button
-              type="button"
-              className="tab-new"
-              onClick={addLocalTab}
-              aria-label="New terminal"
-              title="New terminal (Ctrl+T)"
-            >
-              +
-            </button>
           </div>
           <div className="terminal-surface">
             {tabs.map((tab) => (

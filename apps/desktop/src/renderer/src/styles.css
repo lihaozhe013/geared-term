@@ -1189,21 +1189,6 @@ button:disabled {
   background: var(--gt-hover, #1a2332);
 }
 
-.tab-new {
-  display: grid;
-  flex: none;
-  width: calc(32px * var(--gt-ui-scale, 1));
-  height: 100%;
-  place-items: center;
-  color: var(--gt-text-muted, #8391a9);
-  font-size: var(--gt-fs-lg);
-}
-
-.tab-new:hover {
-  color: var(--gt-text, #e4eaf3);
-  background: var(--gt-hover, #1a2332);
-}
-
 .toolbar-button {
   margin-left: auto;
   padding: 6px 8px;
