@@ -20,7 +20,7 @@ async function activeSessionId(page: AppSession['page']): Promise<string> {
 }
 
 async function waitForRunning(page: AppSession['page']): Promise<void> {
-  await expect(page.locator('.status-pill')).toHaveText('Running', { timeout: 30_000 });
+  await expect(page.locator('.statusbar-state')).toHaveText('Running', { timeout: 30_000 });
 }
 
 function activeTerminal(page: AppSession['page']) {

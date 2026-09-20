@@ -82,7 +82,8 @@ export const defaultUiState: UiState = {
   sidebarCollapsed: false,
   rightPanel: null,
   rightPanelCollapsed: false,
-  splitRatio: 0.7
+  sidebarWidth: 240,
+  rightPanelWidth: 360
 };
 
 export const defaultProfile: Profile = {

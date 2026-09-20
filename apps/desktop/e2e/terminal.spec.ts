@@ -12,7 +12,7 @@ test.afterEach(async () => {
 });
 
 async function waitForRunning(page: AppSession['page']): Promise<void> {
-  await expect(page.locator('.status-pill')).toHaveText('Running', { timeout: 30_000 });
+  await expect(page.locator('.statusbar-state')).toHaveText('Running', { timeout: 30_000 });
 }
 
 function activeTerminal(page: AppSession['page']) {
@@ -49,7 +49,7 @@ test('opens, switches, and closes terminal tabs in isolation', async () => {
 
   await tabs.nth(0).click();
   await expect(tabs.nth(0)).toHaveAttribute('aria-selected', 'true');
-  await expect(page.locator('.status-pill')).toHaveText('Running');
+  await expect(page.locator('.statusbar-state')).toHaveText('Running');
   await expect(activeTerminal(page)).not.toContainText('second-tab-marker');
 
   await tabs.nth(1).click();
@@ -57,5 +57,5 @@ test('opens, switches, and closes terminal tabs in isolation', async () => {
   await page.getByRole('button', { name: 'Close Local Shell' }).nth(1).click();
   await expect(page.getByRole('tab')).toHaveCount(1);
   await expect(tabs.nth(0)).toHaveAttribute('aria-selected', 'true');
-  await expect(page.locator('.status-pill')).toHaveText('Running');
+  await expect(page.locator('.statusbar-state')).toHaveText('Running');
 });

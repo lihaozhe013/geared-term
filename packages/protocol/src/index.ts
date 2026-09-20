@@ -127,7 +127,9 @@ export const UiStateRecordSchema = z
     sidebarCollapsed: z.boolean(),
     rightPanel: z.enum(['sftp', 'assistant', 'environment']).nullable(),
     rightPanelCollapsed: z.boolean(),
-    splitRatio: z.number().min(0.15).max(0.85)
+    sidebarWidth: z.number().int().min(170).max(520).default(240),
+    rightPanelWidth: z.number().int().min(280).max(760).default(360),
+    splitRatio: z.number().min(0.15).max(0.85).optional()
   })
   .strict();
 

@@ -65,7 +65,8 @@ const defaultUiState: UiStateRecord = {
   sidebarCollapsed: false,
   rightPanel: null,
   rightPanelCollapsed: false,
-  splitRatio: 0.7
+  sidebarWidth: 240,
+  rightPanelWidth: 360
 };
 
 function createLocalTab(
@@ -138,6 +139,10 @@ function statusLabel(status: TabStatus): string {
     default:
       return 'Starting';
   }
+}
+
+function clampWidth(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, Math.round(value)));
 }
 
 function supportsSftp(request: TerminalRequest | undefined): boolean {
@@ -343,6 +348,52 @@ export function App(): React.JSX.Element {
     });
   }, [uiState]);
 
+  const [resizingPanel, setResizingPanel] = useState<'sidebar' | 'right' | null>(null);
+  const dragRef = useRef<{ side: 'sidebar' | 'right'; startX: number; startWidth: number } | null>(
+    null
+  );
+  const uiStateRef = useRef(uiState);
+  uiStateRef.current = uiState;
+
+  const handleResizeMove = useCallback((event: PointerEvent): void => {
+    const drag = dragRef.current;
+    if (!drag) return;
+    if (drag.side === 'sidebar') {
+      const sidebarWidth = clampWidth(drag.startWidth + event.clientX - drag.startX, 170, 520);
+      uiStateRef.current = { ...uiStateRef.current, sidebarWidth };
+    } else {
+      const rightPanelWidth = clampWidth(drag.startWidth - (event.clientX - drag.startX), 280, 760);
+      uiStateRef.current = { ...uiStateRef.current, rightPanelWidth };
+    }
+    setUiState(uiStateRef.current);
+  }, []);
+
+  const handleResizeEnd = useCallback((): void => {
+    dragRef.current = null;
+    setResizingPanel(null);
+    document.body.classList.remove('panel-resizing');
+    window.removeEventListener('pointermove', handleResizeMove);
+    window.removeEventListener('pointerup', handleResizeEnd);
+    void window.geared.saveUiState(uiStateRef.current).catch(() => undefined);
+  }, [handleResizeMove]);
+
+  const beginPanelResize = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>, side: 'sidebar' | 'right'): void => {
+      event.preventDefault();
+      dragRef.current = {
+        side,
+        startX: event.clientX,
+        startWidth:
+          side === 'sidebar' ? (uiState.sidebarWidth ?? 240) : (uiState.rightPanelWidth ?? 360)
+      };
+      setResizingPanel(side);
+      document.body.classList.add('panel-resizing');
+      window.addEventListener('pointermove', handleResizeMove);
+      window.addEventListener('pointerup', handleResizeEnd);
+    },
+    [handleResizeEnd, handleResizeMove, uiState.rightPanelWidth, uiState.sidebarWidth]
+  );
+
   const toggleAssistant = useCallback((): void => {
     const next: UiStateRecord = {
       ...uiState,
@@ -532,6 +583,10 @@ export function App(): React.JSX.Element {
     []
   );
 
+  const rightPanelOpen = Boolean(uiState.rightPanel && !uiState.rightPanelCollapsed);
+  const sidebarWidth = uiState.sidebarWidth ?? 240;
+  const rightPanelWidth = uiState.rightPanelWidth ?? 360;
+
   return (
     <main className="app-shell">
       <header className="titlebar">
@@ -549,9 +604,12 @@ export function App(): React.JSX.Element {
       </header>
 
       <section
-        className={`workspace ${uiState.sidebarCollapsed ? 'sidebar-collapsed' : ''} ${
-          uiState.rightPanel && !uiState.rightPanelCollapsed ? 'with-panel' : ''
-        }`}
+        className={`workspace ${uiState.sidebarCollapsed ? 'sidebar-collapsed' : ''}`}
+        style={{
+          gridTemplateColumns: `${uiState.sidebarCollapsed ? '40px' : `${sidebarWidth}px`} minmax(0, 1fr) ${
+            rightPanelOpen ? `${rightPanelWidth}px` : '40px'
+          }`
+        }}
         aria-label="Workspace"
       >
         {!uiState.sidebarCollapsed ? (
@@ -884,6 +942,26 @@ export function App(): React.JSX.Element {
               <PanelRightOpen size={14} aria-hidden="true" />
             </button>
           </aside>
+        ) : null}
+        {!uiState.sidebarCollapsed ? (
+          <div
+            className={`panel-resizer ${resizingPanel === 'sidebar' ? 'active' : ''}`}
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize sessions sidebar"
+            style={{ left: sidebarWidth - 3 }}
+            onPointerDown={(event) => beginPanelResize(event, 'sidebar')}
+          />
+        ) : null}
+        {rightPanelOpen ? (
+          <div
+            className={`panel-resizer ${resizingPanel === 'right' ? 'active' : ''}`}
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize right panel"
+            style={{ right: rightPanelWidth - 3 }}
+            onPointerDown={(event) => beginPanelResize(event, 'right')}
+          />
         ) : null}
       </section>
 
