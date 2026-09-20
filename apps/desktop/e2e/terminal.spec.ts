@@ -23,6 +23,12 @@ function activeTerminalHost(page: AppSession['page']) {
   return page.locator('.terminal-wrapper:not([hidden]) .terminal-host');
 }
 
+function newLocalTabViaMenu(session: AppSession): Promise<void> {
+  return session.app.evaluate(({ Menu }) => {
+    Menu.getApplicationMenu()?.getMenuItemById('new-local')?.click();
+  });
+}
+
 test('runs a local shell and echoes typed commands', async () => {
   const { page } = session;
   await waitForRunning(page);
@@ -35,7 +41,7 @@ test('runs a local shell and echoes typed commands', async () => {
 test('closes the tab automatically when the shell exits', async () => {
   const { page } = session;
   await waitForRunning(page);
-  await page.getByRole('button', { name: '+ New local terminal' }).click();
+  await newLocalTabViaMenu(session);
   await expect(page.getByRole('tab')).toHaveCount(2);
   await activeTerminalHost(page).click();
   await page.keyboard.type('exit');
@@ -48,7 +54,7 @@ test('closes the tab automatically when the shell exits', async () => {
   await page.keyboard.press('Enter');
   await expect(page.getByRole('tab')).toHaveCount(0, { timeout: 15_000 });
 
-  await page.getByRole('button', { name: '+ New local terminal' }).click();
+  await newLocalTabViaMenu(session);
   await expect(page.getByRole('tab')).toHaveCount(1);
   await waitForRunning(page);
 });
@@ -56,7 +62,7 @@ test('closes the tab automatically when the shell exits', async () => {
 test('opens, switches, and closes terminal tabs in isolation', async () => {
   const { page } = session;
   await waitForRunning(page);
-  await page.getByRole('button', { name: '+ New local terminal' }).click();
+  await newLocalTabViaMenu(session);
   await expect(page.getByRole('tab')).toHaveCount(2);
   await expect(page.locator('.terminal-wrapper:not([hidden])')).toHaveCount(1);
 

@@ -12,7 +12,7 @@ test.afterEach(async () => {
 });
 
 async function openSshProfileEditor(page: AppSession['page']): Promise<Locator> {
-  await page.getByRole('button', { name: '+ New saved profile' }).click();
+  await page.getByRole('button', { name: 'New session profile' }).click();
   const dialog = page.locator('.profile-editor');
   await expect(dialog).toBeVisible();
   await dialog.getByLabel('Kind').selectOption('ssh');

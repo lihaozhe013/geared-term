@@ -31,7 +31,9 @@ test('opens the settings window with category navigation', async () => {
 
 test('opens and cancels the temporary SSH dialog', async () => {
   const { page } = session;
-  await page.getByRole('button', { name: '+ Temporary SSH connection' }).click();
+  await session.app.evaluate(({ Menu }) => {
+    Menu.getApplicationMenu()?.getMenuItemById('quick-ssh')?.click();
+  });
   const dialog = page.getByRole('dialog', { name: 'Connect with SSH' });
   await expect(dialog).toBeVisible();
   await dialog.locator('button[data-modal-cancel]').click();
@@ -40,7 +42,7 @@ test('opens and cancels the temporary SSH dialog', async () => {
 
 test('opens the profile editor and reveals the vault box for SSH profiles', async () => {
   const { page } = session;
-  await page.getByRole('button', { name: '+ New saved profile' }).click();
+  await page.getByRole('button', { name: 'New session profile' }).click();
   const dialog = page.locator('.profile-editor');
   await expect(dialog).toBeVisible();
   await expect(dialog.locator('.vault-box')).toHaveCount(0);

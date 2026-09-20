@@ -877,19 +877,18 @@ button:disabled {
   width: 100%;
 }
 
-.profile-row {
+.sidebar-tools {
   display: flex;
-  gap: 4px;
-  align-items: stretch;
+  gap: 2px;
 }
 
 .profile-button {
   display: flex;
-  flex: 1;
+  width: 100%;
   min-width: 0;
-  flex-direction: column;
-  gap: 3px;
-  padding: 8px 10px;
+  gap: 8px;
+  align-items: center;
+  padding: 7px 10px;
   border-radius: var(--gt-radius-md);
   color: var(--gt-text-dim, #d8e0ee);
   text-align: left;
@@ -904,13 +903,23 @@ button:disabled {
 }
 
 .profile-button span {
+  flex: 1;
+  min-width: 0;
   font-family: 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;
 }
 
 .profile-button small {
+  flex-shrink: 0;
   color: var(--gt-text-muted, #71809a);
   font-size: 10px;
   text-transform: uppercase;
+}
+
+.profile-button small.profile-kind {
+  padding: 1px 5px;
+  border: 1px solid var(--gt-border, #2a3547);
+  border-radius: 4px;
+  font-size: 9px;
 }
 
 .empty-state {
@@ -1259,7 +1268,8 @@ button:disabled {
   font-size: 11px;
 }
 
-.sftp-context-menu {
+.sftp-context-menu,
+.sidebar-context-menu {
   position: fixed;
   z-index: 60;
   display: grid;
@@ -1271,7 +1281,8 @@ button:disabled {
   box-shadow: var(--gt-shadow-popover);
 }
 
-.sftp-context-menu button {
+.sftp-context-menu button,
+.sidebar-context-menu button {
   padding: 6px 8px;
   border: 0;
   border-radius: var(--gt-radius-sm);
@@ -1282,11 +1293,13 @@ button:disabled {
   font-size: 11px;
 }
 
-.sftp-context-menu button:hover {
+.sftp-context-menu button:hover,
+.sidebar-context-menu button:hover {
   background: var(--gt-hover, #1a2332);
 }
 
-.sftp-context-menu button.danger {
+.sftp-context-menu button.danger,
+.sidebar-context-menu button.danger {
   color: var(--gt-danger, #f4a5a5);
 }
 

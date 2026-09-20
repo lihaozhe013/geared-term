@@ -96,8 +96,13 @@ export function buildApplicationMenu(state: MenuState, commands: MenuCommands): 
     {
       label: t.file,
       submenu: [
-        { label: t.newLocalTerminal, click: () => commands.onCommand('new-local') },
-        { label: t.quickConnection, click: () => commands.onCommand('quick-ssh') },
+        {
+          id: 'new-local',
+          label: t.newLocalTerminal,
+          accelerator: 'CmdOrCtrl+T',
+          click: () => commands.onCommand('new-local')
+        },
+        { id: 'quick-ssh', label: t.quickConnection, click: () => commands.onCommand('quick-ssh') },
         { type: 'separator' },
         { label: t.settings, accelerator: 'CmdOrCtrl+,', click: commands.onOpenSettings },
         { label: t.openConfigFolder, click: commands.onOpenConfigFolder },

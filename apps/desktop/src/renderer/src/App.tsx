@@ -216,6 +216,11 @@ export function App(): React.JSX.Element {
   const [showProfileEditor, setShowProfileEditor] = useState(false);
   const [editingProfile, setEditingProfile] = useState<SessionProfileRecord | undefined>();
   const [showQuickSsh, setShowQuickSsh] = useState(false);
+  const [profileMenu, setProfileMenu] = useState<{
+    x: number;
+    y: number;
+    profile: SessionProfileRecord;
+  } | null>(null);
   const [pendingHistoryId, setPendingHistoryId] = useState<string | null>(null);
   const [vaultStatus, setVaultStatus] = useState<VaultStatus | null>(null);
   const snapshotExtractors = useRef(new Map<string, SnapshotExtractor>());
@@ -431,6 +436,19 @@ export function App(): React.JSX.Element {
     setError(null);
   }, []);
 
+  useEffect(() => {
+    if (!profileMenu) return;
+    const close = (): void => setProfileMenu(null);
+    window.addEventListener('click', close);
+    window.addEventListener('keydown', close);
+    window.addEventListener('resize', close);
+    return () => {
+      window.removeEventListener('click', close);
+      window.removeEventListener('keydown', close);
+      window.removeEventListener('resize', close);
+    };
+  }, [profileMenu]);
+
   const openQuickSsh = useCallback((request: SshTerminalRequest, name: string): void => {
     const tab: TerminalTab = { id: request.sessionId, name, request, status: 'starting' };
     setTabs((current) => [...current, tab]);
@@ -619,70 +637,47 @@ export function App(): React.JSX.Element {
           <aside className="sidebar">
             <div className="sidebar-heading">
               <p className="section-label">Sessions</p>
-              <button
-                type="button"
-                className="icon-button"
-                onClick={toggleSidebar}
-                aria-label="Collapse sessions sidebar"
-              >
-                ‹
-              </button>
+              <div className="sidebar-tools">
+                <button
+                  type="button"
+                  className="icon-button"
+                  onClick={openNewProfile}
+                  aria-label="New session profile"
+                >
+                  +
+                </button>
+                <button
+                  type="button"
+                  className="icon-button"
+                  onClick={toggleSidebar}
+                  aria-label="Collapse sessions sidebar"
+                >
+                  ‹
+                </button>
+              </div>
             </div>
-            <button type="button" className="primary-button" onClick={addLocalTab}>
-              + New local terminal
-            </button>
-            <button type="button" className="secondary-button" onClick={openNewProfile}>
-              + New saved profile
-            </button>
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={() => setShowQuickSsh(true)}
-            >
-              + Temporary SSH connection
-            </button>
             <div className="profile-list" aria-label="Saved sessions">
               {profileGroups.map(([groupName, groupProfiles]) => (
                 <section className="profile-group" key={groupName} aria-label={groupName}>
                   <p className="section-label">{groupName}</p>
                   {groupProfiles.map((profile) => (
-                    <div className="profile-row" key={profile.id}>
-                      <button
-                        type="button"
-                        className="profile-button"
-                        onClick={() => openProfile(profile)}
-                      >
-                        <span>{profile.name}</span>
-                        <small>{profile.kind}</small>
-                      </button>
-                      <button
-                        type="button"
-                        className="icon-button danger"
-                        onClick={() => {
-                          void window.geared
-                            .deleteProfile(profile.id)
-                            .then(setProfiles)
-                            .catch((reason: unknown) =>
-                              setError(
-                                reason instanceof Error
-                                  ? reason.message
-                                  : 'Unable to delete session'
-                              )
-                            );
-                        }}
-                        aria-label={`Delete ${profile.name}`}
-                      >
-                        ×
-                      </button>
-                      <button
-                        type="button"
-                        className="icon-button"
-                        onClick={() => openEditProfile(profile)}
-                        aria-label={`Edit ${profile.name}`}
-                      >
-                        ✎
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      className="profile-button"
+                      key={profile.id}
+                      onClick={() => openProfile(profile)}
+                      onContextMenu={(event) => {
+                        event.preventDefault();
+                        setProfileMenu({
+                          x: event.clientX,
+                          y: event.clientY,
+                          profile
+                        });
+                      }}
+                    >
+                      <small className="profile-kind">{profile.kind}</small>
+                      <span>{profile.name}</span>
+                    </button>
                   ))}
                 </section>
               ))}
@@ -751,7 +746,7 @@ export function App(): React.JSX.Element {
                   +
                 </span>
                 <p>No saved sessions</p>
-                <small>Use “New saved profile” in the sidebar to keep a session profile.</small>
+                <small>Use the + button in the sidebar to keep a session profile.</small>
               </div>
             ) : null}
           </aside>
@@ -968,6 +963,42 @@ export function App(): React.JSX.Element {
         ) : null}
       </section>
 
+      {profileMenu ? (
+        <div
+          className="sidebar-context-menu"
+          role="menu"
+          style={{ left: profileMenu.x, top: profileMenu.y }}
+        >
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              openEditProfile(profileMenu.profile);
+              setProfileMenu(null);
+            }}
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            className="danger"
+            onClick={() => {
+              void window.geared
+                .deleteProfile(profileMenu.profile.id)
+                .then(setProfiles)
+                .catch((reason: unknown) =>
+                  setError(
+                    reason instanceof Error ? reason.message : 'Unable to delete session'
+                  )
+                );
+              setProfileMenu(null);
+            }}
+          >
+            Delete
+          </button>
+        </div>
+      ) : null}
       {showProfileEditor ? (
         <ProfileEditor
           key={editingProfile?.id ?? 'new-profile'}
