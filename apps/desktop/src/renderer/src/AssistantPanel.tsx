@@ -458,7 +458,8 @@ export function AssistantPanel({
     const element = composerRef.current;
     if (!element) return;
     element.style.height = 'auto';
-    element.style.height = `${Math.min(element.scrollHeight, 190)}px`;
+    element.style.height = `${Math.min(element.scrollHeight, 132)}px`;
+    element.style.overflowY = element.scrollHeight > 132 ? 'auto' : 'hidden';
   }, [composer]);
 
   useEffect(() => {
@@ -955,7 +956,7 @@ export function AssistantPanel({
               title="Reasoning effort for this chat"
             >
               <span className="assistant-picker-label">
-                Reasoning: {responseOptions.reasoningEffort}
+                {responseOptions.reasoningEffort}
               </span>
               <ChevronDown size={13} aria-hidden="true" />
             </button>
@@ -1308,7 +1309,7 @@ export function AssistantPanel({
               aria-label="Stop"
               onClick={stop}
             >
-              <X size={18} aria-hidden="true" />
+              <X size={15} aria-hidden="true" />
             </button>
           ) : (
             <button
@@ -1317,7 +1318,7 @@ export function AssistantPanel({
               aria-label="Send"
               disabled={!composer.trim() || !selectedId || !model}
             >
-              <ArrowUp size={18} aria-hidden="true" />
+              <ArrowUp size={15} aria-hidden="true" />
             </button>
           )}
         </div>
