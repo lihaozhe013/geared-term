@@ -162,7 +162,6 @@ export function splitCommandBlock(value: string, shell: SupportedShell): Command
   }
   const input = value.trim();
   if (!input) return { parts: [], complete: true, splitAllowed: true };
-
   let start = 0;
   let quote: 'single' | 'double' | null = null;
   let escaped = false;
@@ -231,6 +230,28 @@ export function splitCommandBlock(value: string, shell: SupportedShell): Command
     return { parts: [input], complete: true, splitAllowed: false, fallbackReason: 'ambiguous' };
   }
   return { parts, complete: true, splitAllowed: true };
+}
+
+const isCommentOnlyPart = (part: string): boolean =>
+  part.split('\n').every((line) => !line.trim() || line.trim().startsWith('#'));
+
+/**
+ * Fold comment-only split parts into the command that follows them so a
+ * split presentation never surfaces comment-only cards. A trailing run of
+ * comments annotates no command and is dropped.
+ */
+export function mergeCommentParts(parts: string[]): string[] {
+  const merged: string[] = [];
+  const pending: string[] = [];
+  for (const part of parts) {
+    if (isCommentOnlyPart(part)) {
+      pending.push(part);
+      continue;
+    }
+    merged.push([...pending, part].join('\n'));
+    pending.length = 0;
+  }
+  return merged;
 }
 
 export function parseCommandBlock(input: string): CommandCandidate {

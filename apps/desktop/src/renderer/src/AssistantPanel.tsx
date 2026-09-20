@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import {
+  mergeCommentParts,
   parseCommandBlock,
   splitCommandBlock,
   type CommandCandidate,
@@ -154,9 +155,25 @@ function estimateTokens(text: string): number {
   return Math.ceil(tokens);
 }
 
+const fencePattern = /```[^\n]*\n[\s\S]*?```/g;
+
+type ContentSegment = { type: 'text' | 'fence'; value: string };
+
+function contentSegments(content: string): ContentSegment[] {
+  const segments: ContentSegment[] = [];
+  let cursor = 0;
+  for (const match of content.matchAll(fencePattern)) {
+    const index = match.index ?? 0;
+    if (index > cursor) segments.push({ type: 'text', value: content.slice(cursor, index) });
+    segments.push({ type: 'fence', value: match[0] });
+    cursor = index + match[0].length;
+  }
+  if (cursor < content.length) segments.push({ type: 'text', value: content.slice(cursor) });
+  return segments;
+}
+
 function commandCandidates(content: string, splitPresentation: boolean): CommandCandidate[] {
   const result: CommandCandidate[] = [];
-  const fencePattern = /```[^\n]*\n[\s\S]*?```/g;
   for (const match of content.matchAll(fencePattern)) {
     const block = match[0];
     if (!block) continue;
@@ -164,10 +181,10 @@ function commandCandidates(content: string, splitPresentation: boolean): Command
     if (splitPresentation && candidate.stability === 'stable' && candidate.shell !== 'unknown') {
       const split = splitCommandBlock(candidate.exactText, candidate.shell as SupportedShell);
       if (split.splitAllowed && split.parts.length > 1) {
+        const merged = mergeCommentParts(split.parts);
+        if (!merged.length) continue;
         result.push(
-          ...split.parts.map((part) =>
-            parseCommandBlock(`\`\`\`${candidate.shell}\n${part}\n\`\`\``)
-          )
+          ...merged.map((part) => parseCommandBlock(`\`\`\`${candidate.shell}\n${part}\n\`\`\``))
         );
         continue;
       }
@@ -1064,23 +1081,36 @@ export function AssistantPanel({
                 )
               ) : null}
               {message.content ? (
-                <MarkdownView source={message.content} />
+                contentSegments(message.content).map((segment, segmentIndex) => {
+                  if (segment.type === 'text') {
+                    return segment.value.trim() ? (
+                      <MarkdownView key={`segment-${segmentIndex}`} source={segment.value} />
+                    ) : null;
+                  }
+                  const candidates = commandCandidates(
+                    segment.value,
+                    splitCommandPresentation
+                  ).filter((candidate) => candidate.exactText);
+                  if (!candidates.length) {
+                    return <MarkdownView key={`segment-${segmentIndex}`} source={segment.value} />;
+                  }
+                  return (
+                    <Fragment key={`segment-${segmentIndex}`}>
+                      {candidates.map((candidate, candidateIndex) => (
+                        <CommandCard
+                          key={`${candidate.revision}-${candidateIndex}`}
+                          candidate={candidate}
+                          targetSessionId={targetSessionId}
+                          disabled={streaming}
+                          onError={handleCommandError}
+                        />
+                      ))}
+                    </Fragment>
+                  );
+                })
               ) : streaming ? (
                 <TypingDots />
               ) : null}
-              {message.role === 'assistant'
-                ? commandCandidates(message.content, splitCommandPresentation).map(
-                    (candidate, candidateIndex) => (
-                      <CommandCard
-                        key={`${candidate.revision}-${candidateIndex}`}
-                        candidate={candidate}
-                        targetSessionId={targetSessionId}
-                        disabled={streaming}
-                        onError={handleCommandError}
-                      />
-                    )
-                  )
-                : null}
               {sources.length > 0 && index === messages.length - 1 ? (
                 <div className="assistant-sources">
                   <span className="assistant-sources-label">Sources</span>

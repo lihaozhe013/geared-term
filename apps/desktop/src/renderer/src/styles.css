@@ -708,7 +708,9 @@ body.panel-resizing {
   border: 1px solid var(--gt-border, #2a3140);
   border-radius: var(--gt-radius-md);
   padding: 10px;
-  overflow-x: auto;
+  overflow-x: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
   color: var(--gt-code-fg, #d7deea);
   font-size: 11px;
 }
@@ -2052,6 +2054,7 @@ button:disabled {
 .assistant-messages {
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   padding-right: 3px;
 }
 

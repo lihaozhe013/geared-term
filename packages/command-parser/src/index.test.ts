@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { commandRevision, commandRisk, parseCommandBlock, splitCommandBlock } from './index';
+import {
+  commandRevision,
+  commandRisk,
+  mergeCommentParts,
+  parseCommandBlock,
+  splitCommandBlock
+} from './index';
 
 describe('conservative command parsing', () => {
   it('recognizes explicit shell fences', () => {
@@ -49,6 +55,24 @@ describe('conservative command parsing', () => {
       splitAllowed: false,
       fallbackReason: 'incomplete'
     });
+  });
+
+  it('folds comment-only parts into the command that follows them', () => {
+    const split = splitCommandBlock(
+      '# install\nyay -S neovim-git\n# or\nparu -S neovim-git',
+      'bash'
+    );
+    expect(split.parts).toEqual(['# install', 'yay -S neovim-git', '# or', 'paru -S neovim-git']);
+    expect(mergeCommentParts(split.parts)).toEqual([
+      '# install\nyay -S neovim-git',
+      '# or\nparu -S neovim-git'
+    ]);
+  });
+
+  it('drops trailing comment-only parts and keeps non-comment blocks intact', () => {
+    expect(mergeCommentParts(['# note', 'ls', '# done'])).toEqual(['# note\nls']);
+    expect(mergeCommentParts(['echo one'])).toEqual(['echo one']);
+    expect(mergeCommentParts([])).toEqual([]);
   });
 
   it('marks destructive commands for Insert-only handling', () => {
