@@ -1,7 +1,13 @@
 import { useEffect, useState } from 'react';
-import type { AiHistoryLoadResult, AiHistorySummary } from '@geared-term/protocol';
+import type {
+  AiHistoryLoadResult,
+  AiHistorySummary,
+  SettingsRecord,
+  UserTheme
+} from '@geared-term/protocol';
 import { FolderOpen, RefreshCw, Send, Trash2, X } from 'lucide-react';
 import { MarkdownView } from '../assistant/MarkdownView';
+import { applyPalette, applyTypography, resolvePalette } from '../themes';
 import { WindowTitleBar } from '../WindowTitleBar';
 
 function previewMarkdown(record: AiHistoryLoadResult): string {
@@ -35,6 +41,25 @@ export function HistoryWindow(): React.JSX.Element {
   };
 
   useEffect(refresh, []);
+
+  useEffect(() => {
+    const apply = (settings: SettingsRecord, userThemes: UserTheme[]): void => {
+      const palette = resolvePalette(settings.theme, userThemes);
+      applyPalette(palette);
+      applyTypography(settings.uiFontSize, settings.uiFontFamily);
+      void window.geared
+        .setTitleBarOverlay({ color: palette.background, symbolColor: palette.text })
+        .catch(() => undefined);
+    };
+    let themes: UserTheme[] = [];
+    void Promise.all([window.geared.getSettings(), window.geared.listUserThemes()])
+      .then(([settings, userThemes]) => {
+        themes = userThemes.themes;
+        apply(settings, themes);
+      })
+      .catch(() => undefined);
+    return window.geared.onSettingsChanged((settings) => apply(settings, themes));
+  }, []);
 
   const openEntry = (id: string): void => {
     void window.geared

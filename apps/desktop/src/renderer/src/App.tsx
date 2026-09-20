@@ -23,7 +23,7 @@ import {
   PanelRightOpen,
   SquareTerminal
 } from 'lucide-react';
-import { applyPalette, resolvePalette } from './themes';
+import { applyPalette, applyTypography, resolvePalette } from './themes';
 import { AssistantPanel } from './AssistantPanel';
 import { EnvironmentPanel } from './EnvironmentPanel';
 import { ProfileEditor } from './ProfileEditor';
@@ -294,13 +294,7 @@ export function App(): React.JSX.Element {
     void window.geared
       .setTitleBarOverlay({ color: palette.background, symbolColor: palette.text })
       .catch(() => undefined);
-    const style = document.documentElement.style;
-    style.setProperty('--gt-ui-font-size', `${settings.uiFontSize}px`);
-    if (settings.uiFontFamily.trim()) {
-      style.setProperty('--gt-ui-font-family', settings.uiFontFamily.trim());
-    } else {
-      style.removeProperty('--gt-ui-font-family');
-    }
+    applyTypography(settings.uiFontSize, settings.uiFontFamily);
   }, [palette, settings.uiFontFamily, settings.uiFontSize]);
 
   const discoverWsl = useCallback(async (): Promise<void> => {
