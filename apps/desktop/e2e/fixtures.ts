@@ -67,6 +67,12 @@ export async function launchApp(chromiumArgs: readonly string[] = []): Promise<A
       '--disable-backgrounding-occluded-windows',
       '--disable-renderer-backgrounding',
       '--disable-background-timer-throttling',
+      // GPU-less CI runners only get WebGL through SwiftShader, which
+      // Chromium 139+ refuses to use for WebGL unless explicitly opted in.
+      // Without it the WebGL renderer test silently falls back to the DOM
+      // renderer. DOM_RENDERER_ARGS still wins because it also disables the
+      // software rasterizer.
+      '--enable-unsafe-swiftshader',
       ...chromiumArgs
     ],
     executablePath: electronBinary,
