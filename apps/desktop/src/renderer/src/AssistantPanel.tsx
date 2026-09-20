@@ -591,10 +591,14 @@ export function AssistantPanel({
         ];
       });
     } else if (event.kind === 'continuation') {
+      // The stream event carries the `kind` discriminator, which is not part of
+      // AiContinuationMetadata and would fail strict schema validation when the
+      // stored value is echoed back in the next request or saved to history.
+      const { kind: _kind, ...continuation } = event;
       setMessages((current) => {
         const last = current.at(-1);
         if (!last || last.role !== 'assistant') return current;
-        return [...current.slice(0, -1), { ...last, continuation: event }];
+        return [...current.slice(0, -1), { ...last, continuation }];
       });
     } else if (event.kind === 'source') {
       setSources((current) =>
@@ -744,9 +748,19 @@ export function AssistantPanel({
     setShowTimeline(true);
     setError(null);
     setStreaming(true);
-    streamRef.current = window.geared.streamAi(request, (event) => {
-      receiveEvent(event as AiStreamEvent);
-    });
+    try {
+      streamRef.current = window.geared.streamAi(request, (event) => {
+        receiveEvent(event as AiStreamEvent);
+      });
+    } catch (reason) {
+      // A rejected request never reaches the main process, so no error event
+      // would arrive to end the stream; fail visibly instead of spinning.
+      streamRef.current = null;
+      setStreaming(false);
+      setReasoningLive(false);
+      closeRunningActivities('failed');
+      setError(reason instanceof Error ? reason.message : 'Unable to start AI stream');
+    }
   };
 
   const send = (): void => {
