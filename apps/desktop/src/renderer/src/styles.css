@@ -2087,6 +2087,42 @@ button:disabled {
   padding-right: 3px;
 }
 
+.assistant-jump-anchor {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  height: 0;
+}
+
+.assistant-jump-latest {
+  position: absolute;
+  right: 2px;
+  bottom: 10px;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid var(--gt-border-strong, #344157);
+  border-radius: 999px;
+  color: var(--gt-text-dim, #d8e0ee);
+  background: var(--gt-panel-alt, #161e2a);
+  box-shadow: var(--gt-shadow-popover);
+  cursor: pointer;
+  animation: gt-jump-in 150ms ease-out;
+}
+
+@keyframes gt-jump-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.assistant-jump-latest:hover {
+  color: var(--gt-accent, #5c8ea5);
+  border-color: var(--gt-accent, #5c8ea5);
+}
+
 .assistant-context-chip {
   margin-bottom: 10px;
   padding: 6px 8px;

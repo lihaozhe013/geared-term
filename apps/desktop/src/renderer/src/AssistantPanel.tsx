@@ -16,6 +16,7 @@ import type {
   SettingsRecord
 } from '@geared-term/protocol';
 import {
+  ArrowDown,
   ArrowUp,
   Bot,
   ChevronDown,
@@ -335,6 +336,8 @@ export function AssistantPanel({
   const reasoningBoxRef = useRef<HTMLDivElement | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const messagesBoxRef = useRef<HTMLDivElement | null>(null);
+  const scrollPinnedRef = useRef(true);
+  const [scrolledUp, setScrolledUp] = useState(false);
   const pendingRequestRef = useRef<{
     streamId: string;
     connectionId: string;
@@ -417,6 +420,8 @@ export function AssistantPanel({
     void window.geared
       .loadAiHistory({ id: pendingHistoryId })
       .then((record) => {
+        scrollPinnedRef.current = true;
+        setScrolledUp(false);
         setMessages(
           record.messages.map((message) => ({
             role: message.role,
@@ -468,14 +473,30 @@ export function AssistantPanel({
     return () => window.clearInterval(timer);
   }, [streaming]);
 
-  // Pin output to the bottom only while the user is already near it; reading
-  // older content must not be interrupted by forced scrolling.
+  // Follow new output only while pinned to the bottom; scrolling up locks the
+  // view until the user returns to the bottom or uses the jump button.
   useEffect(() => {
+    if (!scrollPinnedRef.current) return;
+    const box = messagesBoxRef.current;
+    if (box) box.scrollTop = box.scrollHeight;
+  }, [messages, reasoning, activities]);
+
+  const handleMessagesScroll = (): void => {
     const box = messagesBoxRef.current;
     if (!box) return;
     const distance = box.scrollHeight - box.scrollTop - box.clientHeight;
-    if (distance < 48) box.scrollTop = box.scrollHeight;
-  }, [messages, reasoning, activities]);
+    const pinned = distance < 48;
+    scrollPinnedRef.current = pinned;
+    setScrolledUp(!pinned && messagesRef.current.length > 0);
+  };
+
+  const jumpToLatest = (): void => {
+    const box = messagesBoxRef.current;
+    if (!box) return;
+    scrollPinnedRef.current = true;
+    setScrolledUp(false);
+    box.scrollTop = box.scrollHeight;
+  };
 
   const selectedConnection = connections.find((connection) => connection.id === selectedId);
   const modelOptions = selectedConnection?.models ?? [];
@@ -678,6 +699,8 @@ export function AssistantPanel({
   const startNewChat = (): void => {
     streamRef.current?.cancel();
     streamRef.current = null;
+    scrollPinnedRef.current = true;
+    setScrolledUp(false);
     setMessages([]);
     setComposer('');
     setReasoning('');
@@ -789,6 +812,8 @@ export function AssistantPanel({
         : {})
     };
     pendingRequestRef.current = request;
+    scrollPinnedRef.current = true;
+    setScrolledUp(false);
     setMessages([...messages, { role: 'user', content: text }, { role: 'assistant', content: '', model }]);
     setComposer('');
     setPendingSnapshot(null);
@@ -989,7 +1014,7 @@ export function AssistantPanel({
         ) : null}
       </div>
 
-      <div className="assistant-messages" aria-live="polite" ref={messagesBoxRef}>
+      <div className="assistant-messages" aria-live="polite" ref={messagesBoxRef} onScroll={handleMessagesScroll}>
         {attachedEnvironment ? (
           <div className="assistant-context-chip">
             Environment context attached · {attachedEnvironment.facts.os ?? 'unknown OS'} ·{' '}
@@ -1148,6 +1173,18 @@ export function AssistantPanel({
             </div>
           )
         )}
+        <div className="assistant-jump-anchor">
+          {scrolledUp ? (
+            <button
+              type="button"
+              className="assistant-jump-latest"
+              aria-label="Jump to latest"
+              onClick={jumpToLatest}
+            >
+              <ArrowDown size={14} aria-hidden="true" />
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {consentRequest ? (
