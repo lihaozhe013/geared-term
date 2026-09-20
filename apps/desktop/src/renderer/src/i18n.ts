@@ -132,7 +132,6 @@ const messages = {
     cancel: 'Cancel',
     sessions: 'Sessions',
     newLocal: '+ New local terminal',
-    saveSession: 'Save session',
     assistant: 'Assistant',
     hideAssistant: 'Hide assistant'
   },
@@ -263,7 +262,6 @@ const messages = {
     cancel: '取消',
     sessions: '会话',
     newLocal: '+ 新建本地终端',
-    saveSession: '保存会话',
     assistant: '助手',
     hideAssistant: '隐藏助手'
   }

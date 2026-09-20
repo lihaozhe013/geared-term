@@ -19,6 +19,7 @@ import {
   Lock,
   PanelRightClose,
   PanelRightOpen,
+  Settings,
   SquareTerminal
 } from 'lucide-react';
 import { applyPalette, resolvePalette } from './themes';
@@ -334,30 +335,6 @@ export function App(): React.JSX.Element {
     setError(null);
   }, []);
 
-  const saveActiveProfile = useCallback(async (): Promise<void> => {
-    const active = tabs.find((tab) => tab.id === activeTabId);
-    if (!active || 'host' in active.request || 'profileId' in active.request) {
-      setError('Use the profile editor to save SSH or WSL session settings.');
-      return;
-    }
-    const request = active.request;
-    const profile: SessionProfileRecord = {
-      id: active.id,
-      kind: 'local',
-      name: active.name,
-      term: request.term,
-      shell: request.shell,
-      args: request.args,
-      cwd: request.cwd
-    };
-    try {
-      setProfiles(await window.geared.saveProfile(profile));
-      setError(null);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to save session');
-    }
-  }, [activeTabId, tabs]);
-
   const toggleSidebar = useCallback((): void => {
     const next = { ...uiState, sidebarCollapsed: !uiState.sidebarCollapsed };
     setUiState(next);
@@ -560,7 +537,15 @@ export function App(): React.JSX.Element {
       <header className="titlebar">
         <span className="titlebar-app">Geared Term</span>
         <span className="titlebar-session">{activeTab?.name ?? ''}</span>
-        <span className="status-pill">{activeTab ? statusLabel(activeTab.status) : 'Ready'}</span>
+        <button
+          type="button"
+          className="icon-button"
+          aria-label="Settings"
+          title="Settings"
+          onClick={() => void window.geared.openSettings()}
+        >
+          <Settings size={14} aria-hidden="true" />
+        </button>
       </header>
 
       <section
@@ -705,7 +690,7 @@ export function App(): React.JSX.Element {
                   +
                 </span>
                 <p>No saved sessions</p>
-                <small>Use “Save session” above the terminal to keep a local profile.</small>
+                <small>Use “New saved profile” in the sidebar to keep a session profile.</small>
               </div>
             ) : null}
           </aside>
@@ -750,23 +735,6 @@ export function App(): React.JSX.Element {
                 ) : null}
               </div>
             ))}
-          </div>
-          <div className="terminal-toolbar">
-            <span>{activeTab?.name ?? 'Terminal'}</span>
-            <button
-              type="button"
-              className="toolbar-button"
-              onClick={() => void saveActiveProfile()}
-            >
-              Save session
-            </button>
-            <button
-              type="button"
-              className="toolbar-button"
-              onClick={() => void window.geared.openSettings()}
-            >
-              Settings
-            </button>
           </div>
           <div className="terminal-surface">
             {tabs.map((tab) => (
