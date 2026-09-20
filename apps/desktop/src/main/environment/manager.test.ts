@@ -4,6 +4,14 @@ import type { Logger } from '../logging';
 import type { AppStorage } from '../persistence/app-storage';
 import { EnvironmentManager } from './manager';
 
+// The manager test covers record migration/merge logic only; the real probe
+// spawns a platform-specific shell, so keep the test hermetic (see probe.test.ts
+// for probe coverage).
+vi.mock('./probe', () => ({
+  parseProbeOutput: vi.fn(() => ({})),
+  probeEnvironment: vi.fn(async () => ({ os: 'Test OS', shell: '/bin/sh' }))
+}));
+
 function logger(): Logger {
   return {
     debug: vi.fn(),
