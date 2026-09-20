@@ -197,7 +197,12 @@ const messages = {
     sftpCommandFailed: 'Unable to run the command',
     sftpOpenLocalFailed: 'Unable to open the local item',
     sftpDownloadedToDownloads:
-      'Downloads are going to {directory} (open a local folder to choose the target)'
+      'Downloads are going to {directory} (open a local folder to choose the target)',
+    terminalCopy: 'Copy',
+    terminalPaste: 'Paste',
+    terminalSelectAll: 'Select all',
+    terminalSearch: 'Search',
+    terminalClear: 'Clear'
   },
   'zh-CN': {
     settings: '设置',
@@ -389,7 +394,12 @@ const messages = {
     sftpDownloadFailed: '无法开始下载',
     sftpCommandFailed: '无法运行命令',
     sftpOpenLocalFailed: '无法打开本条目',
-    sftpDownloadedToDownloads: '下载将保存到 {directory}（打开本地文件夹可自选目标）'
+    sftpDownloadedToDownloads: '下载将保存到 {directory}（打开本地文件夹可自选目标）',
+    terminalCopy: '复制',
+    terminalPaste: '粘贴',
+    terminalSelectAll: '全选',
+    terminalSearch: '搜索',
+    terminalClear: '清屏'
   }
 } as const;
 

@@ -208,9 +208,17 @@ function attachedEnvironmentForTarget(
 }
 
 function installSecurityHandlers(): void {
-  session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => {
-    callback(false);
+  // Deny-by-default per SEC-005; terminal/field paste is core functionality,
+  // so only the two clipboard permissions are allowlisted. clipboard-read is
+  // additionally gated by a permission *check* (not a request) in Chromium.
+  const allowedPermissions = new Set(['clipboard-read', 'clipboard-sanitized-write']);
+  session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
+    callback(allowedPermissions.has(permission));
   });
+  session.defaultSession.setPermissionCheckHandler(
+    (_webContents, permission, _requestingOrigin, details) =>
+      allowedPermissions.has(permission) && details.isMainFrame
+  );
 }
 
 function installContentSecurityPolicy(): void {

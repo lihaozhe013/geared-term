@@ -2931,6 +2931,13 @@ button:disabled {
   color: var(--gt-text-dim, #8a93a6);
 }
 
+.sftp-menu-shortcut {
+  margin-left: auto;
+  padding-left: 18px;
+  color: var(--gt-text-dim, #8a93a6);
+  font-size: var(--gt-fs-xs);
+}
+
 .sftp-context-menu-submenu {
   position: absolute;
   top: -5px;

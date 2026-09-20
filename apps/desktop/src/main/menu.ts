@@ -21,6 +21,15 @@ let activeMenuState: MenuState | undefined;
 let activeMenuCommands: MenuCommands | undefined;
 
 /**
+ * Edit-role accelerators (Ctrl+C/V/X/Z/A) must not be registered with the
+ * system on Windows/Linux: registered accelerators consume the keys before
+ * they reach the terminal, breaking Ctrl+C interrupt (SPEC APP-019) and shell
+ * control codes (SPEC APP-021). Text fields keep native Chromium editing
+ * keys. The property is ignored on macOS, which keeps its native menu bar.
+ */
+const editRoleAccelerator = { registerAccelerator: process.platform === 'darwin' };
+
+/**
  * Executes the allowlisted actions exposed to the renderer menu. Keeping this
  * mapping in the main process prevents renderer input from becoming an
  * arbitrary Electron command or role.
@@ -245,13 +254,13 @@ export function buildApplicationMenu(state: MenuState, commands: MenuCommands): 
     {
       label: t.edit,
       submenu: [
-        { role: 'undo', label: t.undo },
-        { role: 'redo', label: t.redo },
+        { role: 'undo', label: t.undo, ...editRoleAccelerator },
+        { role: 'redo', label: t.redo, ...editRoleAccelerator },
         { type: 'separator' },
-        { role: 'cut', label: t.cut },
-        { role: 'copy', label: t.copy },
-        { role: 'paste', label: t.paste },
-        { role: 'selectAll', label: t.selectAll }
+        { role: 'cut', label: t.cut, ...editRoleAccelerator },
+        { role: 'copy', label: t.copy, ...editRoleAccelerator },
+        { role: 'paste', label: t.paste, ...editRoleAccelerator },
+        { role: 'selectAll', label: t.selectAll, ...editRoleAccelerator }
       ]
     },
     {

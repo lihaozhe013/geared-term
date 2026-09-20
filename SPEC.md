@@ -159,6 +159,11 @@ When terminal focus is active, the following behavior is required:
 - **APP-021**: Keyboard handling MUST preserve terminal control, Alt/Meta, navigation, function-key,
   Enter, Shift+Enter, Alt+Enter, Backspace, and backtab sequences expected by xterm-compatible
   applications.
+- **APP-022**: On Windows/Linux the hidden application menu MUST NOT register Edit-role
+  accelerators (`Ctrl+C/V/X/Z/A`), because registered accelerators consume these keys before the
+  terminal receives them; text fields keep native editing behavior. The terminal MUST offer a
+  right-click context menu with copy, paste, select all, search, and clear actions, where copy is
+  enabled only while a selection exists.
 
 ## 8. Sessions and profiles
 
@@ -569,7 +574,9 @@ reported in Settings without blocking startup.
 - **SEC-004**: The renderer MUST never access PTY handles, SSH sockets, SFTP handles, filesystem
   APIs, the SQLite database, network credentials, or decrypted secrets.
 - **SEC-005**: Navigation, new windows, downloads, permissions, and external URLs MUST be denied by
-  default and handled through allowlisted schemes and explicit application actions.
+  default and handled through allowlisted schemes and explicit application actions. The only
+  allowlisted permissions are `clipboard-read` and `clipboard-sanitized-write`, required for
+  terminal and text-field clipboard use; every other permission request or check MUST be denied.
 - **SEC-006**: External URLs MUST be limited to `https:` unless a specific local-development flow
   authorizes loopback HTTP. Dangerous schemes MUST be rejected.
 - **SEC-007**: Terminal, AI, and remote-file content are untrusted data. They MUST NOT become HTML,

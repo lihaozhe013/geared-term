@@ -12,6 +12,13 @@ import {
   type TerminalPortMessage
 } from '@geared-term/protocol';
 import { buildSearchDecorations, buildXtermTheme, type Palette } from './themes';
+import { translate } from './i18n';
+import { ContextMenu } from './sftp/context-menu';
+import {
+  buildTerminalContextMenu,
+  terminalShortcutsFor,
+  toTerminalPasteText
+} from './terminal/context-menu';
 import { attachWebglRenderer } from './terminal/renderer';
 import { extractSnapshot, type SnapshotTerminal, type TerminalSnapshot } from './terminal/snapshot';
 import {
@@ -91,6 +98,8 @@ export function TerminalPane({
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [showSearch, setShowSearch] = useState(false);
   const [searchText, setSearchText] = useState('');
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const contextMenuOpenRef = useRef(false);
   const terminalRef = useRef<Terminal | null>(null);
   const clientRef = useRef<TerminalClient | null>(null);
   const activeRef = useRef(active);
@@ -132,25 +141,38 @@ export function TerminalPane({
     terminal.open(host);
     const renderer = attachWebglRenderer(terminal);
     terminal.attachCustomKeyEventHandler((event) => {
+      // The open context menu owns the keyboard: block terminal input (and the
+      // Escape byte) while it is visible without stopping DOM propagation so
+      // the menu's own Escape handler still runs.
+      if (event.type === 'keydown' && contextMenuOpenRef.current) return false;
       if (event.type !== 'keydown' || (!event.ctrlKey && !event.metaKey)) return true;
-      const isMacCopyPaste = event.metaKey && !event.shiftKey && process.platform === 'darwin';
+      const isMac = window.geared.platform === 'darwin';
+      const isMacCopyPaste = event.metaKey && !event.shiftKey && isMac;
       const key = event.key.toLowerCase();
+      // Returning false only makes xterm skip the key; without preventDefault
+      // Chromium still runs its default edit command (Ctrl+Shift+V is
+      // paste-as-plain-text on the focused textarea), which fires a native
+      // paste event and the clipboard text reaches the shell twice.
       if (key === 'c' && ((event.ctrlKey && event.shiftKey) || isMacCopyPaste)) {
+        event.preventDefault();
         if (terminal.getSelection()) void navigator.clipboard.writeText(terminal.getSelection());
         return false;
       }
       if (key === 'v' && ((event.ctrlKey && event.shiftKey) || isMacCopyPaste)) {
+        event.preventDefault();
         void navigator.clipboard
           .readText()
-          .then((text) => terminal.paste(text))
+          .then((text) => terminal.paste(toTerminalPasteText(text)))
           .catch(() => undefined);
         return false;
       }
       if (key === 'a' && ((event.ctrlKey && event.shiftKey) || isMacCopyPaste)) {
+        event.preventDefault();
         terminal.selectAll();
         return false;
       }
-      if (key === 'f' && (event.ctrlKey || (event.metaKey && process.platform === 'darwin'))) {
+      if (key === 'f' && (event.ctrlKey || (event.metaKey && isMac))) {
+        event.preventDefault();
         setShowSearch((current) => {
           if (!current) requestAnimationFrame(() => searchInputRef.current?.focus());
           return !current;
@@ -403,6 +425,64 @@ export function TerminalPane({
     decorations: buildSearchDecorations(paletteRef.current)
   });
 
+  const closeContextMenu = (): void => {
+    contextMenuOpenRef.current = false;
+    setContextMenu(null);
+  };
+
+  const openContextMenu = (event: React.MouseEvent): void => {
+    event.preventDefault();
+    contextMenuOpenRef.current = true;
+    setContextMenu({ x: event.clientX, y: event.clientY });
+  };
+
+  const contextMenuItems = contextMenu
+    ? buildTerminalContextMenu({
+        hasSelection: terminalRef.current?.hasSelection() ?? false,
+        labels: {
+          copy: translate(settings.language, 'terminalCopy'),
+          paste: translate(settings.language, 'terminalPaste'),
+          selectAll: translate(settings.language, 'terminalSelectAll'),
+          search: translate(settings.language, 'terminalSearch'),
+          clear: translate(settings.language, 'terminalClear')
+        },
+        shortcuts: terminalShortcutsFor(window.geared.platform),
+        actions: {
+          copy: () => {
+            const terminal = terminalRef.current;
+            const selection = terminal?.getSelection() ?? '';
+            if (selection) void navigator.clipboard.writeText(selection).catch(() => undefined);
+            terminal?.focus();
+          },
+          paste: () => {
+            const terminal = terminalRef.current;
+            if (!terminal) return;
+            void navigator.clipboard
+              .readText()
+              .then((text) => terminal.paste(toTerminalPasteText(text)))
+              .catch(() => undefined)
+              .finally(() => terminal.focus());
+          },
+          selectAll: () => {
+            const terminal = terminalRef.current;
+            terminal?.selectAll();
+            terminal?.focus();
+          },
+          search: () => {
+            setShowSearch((current) => {
+              if (!current) requestAnimationFrame(() => searchInputRef.current?.focus());
+              return !current;
+            });
+          },
+          clear: () => {
+            const terminal = terminalRef.current;
+            terminal?.clear();
+            terminal?.focus();
+          }
+        }
+      })
+    : [];
+
   return (
     <div className="terminal-wrapper" hidden={!active} data-session-id={request.sessionId}>
       {showSearch ? (
@@ -469,7 +549,16 @@ export function TerminalPane({
               : `SSH terminal ${request.host}`
             : 'Local terminal'
         }
+        onContextMenu={openContextMenu}
       />
+      {contextMenu ? (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          items={contextMenuItems}
+          onClose={closeContextMenu}
+        />
+      ) : null}
     </div>
   );
 }
