@@ -203,7 +203,7 @@ export function AppearanceSection({
         <p className="settings-subheading">{t('fallbackFonts')}</p>
         <div className="settings-fallbacks">
           {draft.terminalFontFallbacks.map((entry, index) => (
-            <div className="settings-fallback-row" key={`${entry.name}-${index}`}>
+            <div className="settings-fallback-row" key={index}>
               <input
                 value={entry.name}
                 aria-label={`Fallback font ${index + 1}`}
