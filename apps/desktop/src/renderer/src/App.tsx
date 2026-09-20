@@ -144,16 +144,53 @@ function supportsSftp(request: TerminalRequest | undefined): boolean {
 }
 
 function environmentTarget(
-  request: TerminalRequest | undefined
-): { kind: 'local' | 'wsl'; targetKey: string; distribution?: string } | undefined {
-  if (!request || 'host' in request || 'profileId' in request) return undefined;
+  request: TerminalRequest | undefined,
+  profiles: SessionProfileRecord[]
+): {
+  kind: 'local' | 'wsl' | 'ssh';
+  targetKey: string;
+  distribution?: string;
+  shell?: string;
+  cwd?: string;
+  legacyTargetKeys?: string[];
+} | undefined {
+  if (!request) return undefined;
+  if ('host' in request) {
+    return {
+      kind: 'ssh',
+      targetKey: `${request.username}@${request.host}:${request.port}`
+    };
+  }
+  if ('profileId' in request) {
+    const profile = profiles.find((item) => item.id === request.profileId);
+    if (!profile?.host || !profile.user) return undefined;
+    return {
+      kind: 'ssh',
+      targetKey: `${profile.user}@${profile.host}:${profile.port ?? 22}`
+    };
+  }
   if (request.shell?.toLowerCase().endsWith('wsl.exe')) {
     const distribution = request.args.find(
-      (arg, index) => request.args[index - 1] === '--distribution'
+      (arg, index) => request.args[index - 1] === '--distribution' || request.args[index - 1] === '-d'
     );
-    if (distribution) return { kind: 'wsl', targetKey: `wsl:${distribution}`, distribution };
+    if (distribution) {
+      return {
+        kind: 'wsl',
+        targetKey: `wsl:${request.sessionId}`,
+        distribution,
+        shell: request.shell,
+        cwd: request.cwd,
+        legacyTargetKeys: [`wsl:${distribution}`]
+      };
+    }
   }
-  return { kind: 'local', targetKey: 'local' };
+  return {
+    kind: 'local',
+    targetKey: `local:${request.sessionId}`,
+    shell: request.shell,
+    cwd: request.cwd,
+    legacyTargetKeys: ['local']
+  };
 }
 
 export function App(): React.JSX.Element {
@@ -389,9 +426,9 @@ export function App(): React.JSX.Element {
   }, [activeTab?.request, uiState]);
 
   const toggleEnvironment = useCallback((): void => {
-    const target = environmentTarget(activeTab?.request);
+    const target = environmentTarget(activeTab?.request, profiles);
     if (!target) {
-      setError('Environment detection is available for local and WSL sessions.');
+      setError('Environment detection is unavailable for this session.');
       return;
     }
     const next: UiStateRecord = {
@@ -795,11 +832,11 @@ export function App(): React.JSX.Element {
                 className="right-panel-pill"
                 role="tab"
                 aria-selected={uiState.rightPanel === 'environment'}
-                disabled={!environmentTarget(activeTab?.request)}
+                disabled={!environmentTarget(activeTab?.request, profiles)}
                 title={
-                  environmentTarget(activeTab?.request)
+                  environmentTarget(activeTab?.request, profiles)
                     ? 'Environment context'
-                    : 'Environment detection requires a local or WSL session'
+                    : 'Environment detection is unavailable for this session'
                 }
                 onClick={toggleEnvironment}
               >
@@ -825,7 +862,7 @@ export function App(): React.JSX.Element {
                 targetSessionId={activeTab?.id}
                 sessionLabel={activeTab?.name}
                 language={settings.language}
-                environmentTargetKey={environmentTarget(activeTab?.request)?.targetKey}
+                environmentTargetKey={environmentTarget(activeTab?.request, profiles)?.targetKey}
                 splitCommandPresentation={settings.splitCommandPresentation}
                 onToggleSplitCommand={() => {
                   void saveSettings({
@@ -833,7 +870,6 @@ export function App(): React.JSX.Element {
                     splitCommandPresentation: !settings.splitCommandPresentation
                   }).catch(() => undefined);
                 }}
-                globalInstructions={settings.globalAiInstructions}
                 pendingHistoryId={pendingHistoryId}
                 onPendingHistoryConsumed={() => setPendingHistoryId(null)}
                 getSnapshot={() => {
@@ -852,9 +888,9 @@ export function App(): React.JSX.Element {
             ) : null}
             {uiState.rightPanel === 'environment' &&
             activeTab &&
-            environmentTarget(activeTab.request) ? (
+            environmentTarget(activeTab.request, profiles) ? (
               <EnvironmentPanel
-                target={environmentTarget(activeTab.request)!}
+                target={environmentTarget(activeTab.request, profiles)!}
                 onClose={toggleEnvironment}
               />
             ) : null}

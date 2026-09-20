@@ -63,7 +63,7 @@ describe('profile database', () => {
         name: 'assistant',
         protocol: 'responses',
         baseUrl: 'https://api.example.test/v1',
-        models: ['m1'],
+        models: [{ id: 'm1', model: 'm1' }],
         defaultModel: 'm1',
         apiKeyRef: undefined
       },
@@ -78,6 +78,7 @@ describe('profile database', () => {
         notes: 'n',
         instructions: 'i',
         attachToAi: true,
+        verified: false,
         detectedAt: null
       },
       '2026-01-01T00:00:00.000Z'
@@ -87,7 +88,7 @@ describe('profile database', () => {
     expect(loaded).toMatchObject({ id: 'p1', kind: 'ssh', host: 'example.test', port: 22 });
     expect(loaded?.secretRefs).toEqual({ password: 's1' });
     expect(database.getSecret('s1')).toEqual(secret);
-    expect(database.listAiConnections()[0]?.models).toEqual(['m1']);
+    expect(database.listAiConnections()[0]?.models).toEqual([{ id: 'm1', model: 'm1' }]);
     expect(database.listEnvironments()[0]?.facts).toEqual({ os: 'Linux' });
 
     const reopened = new ProfileDatabase(root, logger);
@@ -107,7 +108,7 @@ describe('profile database', () => {
         name: 'assistant',
         protocol: 'responses',
         baseUrl: 'https://api.example.test/v1',
-        models: ['m1'],
+        models: [{ id: 'm1', model: 'm1' }],
         defaultModel: 'm1',
         apiKeyRef: 's2'
       },
@@ -131,6 +132,35 @@ describe('profile database', () => {
     });
     expect(database.getSecret('s1')).toBeUndefined();
     database.close();
+  });
+
+  it('normalizes legacy string model rows without granting endpoint consent', () => {
+    const database = new ProfileDatabase(root, logger);
+    database.upsertAiConnection(
+      {
+        id: 'legacy-connection',
+        name: 'Legacy assistant',
+        protocol: 'responses',
+        baseUrl: 'https://api.example.test/v1',
+        models: [{ id: 'legacy-model', model: 'legacy-model' }],
+        defaultModel: 'legacy-model'
+      },
+      '2026-01-01T00:00:00.000Z'
+    );
+    database.close();
+
+    const raw = new Database(join(root, 'geared-term.db'));
+    raw
+      .prepare('UPDATE ai_connections SET models = ? WHERE id = ?')
+      .run(JSON.stringify(['legacy-model']), 'legacy-connection');
+    raw.close();
+
+    const reopened = new ProfileDatabase(root, logger);
+    expect(reopened.listAiConnections()[0]?.models).toEqual([
+      { id: 'legacy-model', model: 'legacy-model' }
+    ]);
+    expect(reopened.listAiConnections()[0]?.acceptedEndpoint).toBeUndefined();
+    reopened.close();
   });
 
   it('rolls back the whole transaction when a mutation fails mid-flight', () => {
@@ -198,6 +228,7 @@ describe('profile database', () => {
       notes: '',
       instructions: '',
       attachToAi: false,
+      verified: false,
       detectedAt: null
     };
     database.upsertEnvironment(environment, '2026-01-01T00:00:00.000Z');

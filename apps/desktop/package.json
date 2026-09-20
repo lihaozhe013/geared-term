@@ -16,7 +16,7 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "typecheck": "tsc -p tsconfig.json",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run src --passWithNoTests",
     "test:e2e": "playwright test -c playwright.config.ts",
     "audit:security": "node scripts/security-audit.mjs",
     "postinstall": "electron-builder install-app-deps",

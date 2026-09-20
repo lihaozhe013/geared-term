@@ -16,6 +16,7 @@ import {
 } from '../sftp/cd-tracking';
 import { SftpService } from '../sftp/sftp-service';
 import { KnownHostsStore } from './known-hosts';
+import { probeScript } from '../environment/probe';
 
 const { Client, utils } = ssh2;
 
@@ -43,6 +44,7 @@ type SshSession = {
 };
 
 export type SshSessionHooks = {
+  onReady?: (details: { sessionId: string; targetKey: string }) => void;
   onSftpCd?: (sessionId: string, directory: string | null) => void;
   onClosed?: (sessionId: string) => void;
 };
@@ -116,6 +118,10 @@ export class SshSessionManager {
             if (!session.closed) this.close(session, 'remote-channel-closed');
           });
           this.sendState(session, 'running');
+          this.hooks.onReady?.({
+            sessionId: session.id,
+            targetKey: `${request.username}@${request.host}:${request.port}`
+          });
         }
       );
     });
@@ -187,6 +193,67 @@ export class SshSessionManager {
       throw new Error('SSH terminal is not available');
     }
     session.channel.write(data);
+  }
+
+  public exec(
+    sessionId: string,
+    command = probeScript,
+    signal?: AbortSignal
+  ): Promise<string> {
+    const session = this.sessions.get(sessionId);
+    if (!session || session.closed) throw new Error('SSH terminal is not available');
+    return new Promise<string>((resolve, reject) => {
+      let output = '';
+      let outputBytes = 0;
+      let settled = false;
+      let channel: ClientChannel | undefined;
+      const timer = setTimeout(() => {
+        channel?.close();
+        finish(new Error('SSH environment probe timed out'));
+      }, 4_000);
+      const finish = (error: Error | null, value = ''): void => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        signal?.removeEventListener('abort', abort);
+        if (error) reject(error);
+        else resolve(value);
+      };
+      const abort = (): void => {
+        channel?.close();
+        finish(new Error('SSH environment probe cancelled'));
+      };
+      if (signal?.aborted) {
+        abort();
+        return;
+      }
+      signal?.addEventListener('abort', abort, { once: true });
+      const append = (chunk: Buffer | string): void => {
+        if (settled) return;
+        outputBytes += Buffer.byteLength(chunk.toString(), 'utf8');
+        if (outputBytes > 64 * 1024) {
+          channel?.close();
+          finish(new Error('SSH environment probe output exceeded its limit'));
+          return;
+        }
+        output += chunk.toString();
+      };
+      const quotedCommand = `'${command.replace(/'/gu, "'\\''")}'`;
+      session.client.exec(`sh -c ${quotedCommand}`, (error, nextChannel) => {
+        if (error) {
+          finish(error);
+          return;
+        }
+        channel = nextChannel;
+        nextChannel.on('data', append);
+        nextChannel.stderr.on('data', append);
+        nextChannel.on('error', (channelError: Error) => finish(channelError));
+        nextChannel.on('close', (code: number | undefined) => {
+          if (code === 0 || code === undefined) finish(null, output);
+          else finish(new Error(`SSH environment probe exited with code ${code}`));
+        });
+      });
+    });
   }
 
   private async verifyHost(

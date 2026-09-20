@@ -1,4 +1,5 @@
 import { URL } from 'node:url';
+import type { AiResponsesModelDefaults } from '@geared-term/protocol';
 
 export type AiProtocol = 'responses' | 'chat-completions';
 
@@ -8,6 +9,13 @@ export type NormalizedEndpoint = {
   modelsUrl: string;
   protocol: AiProtocol;
   identity: string;
+};
+
+export const defaultResponsesOptions: AiResponsesModelDefaults = {
+  reasoningEffort: 'default',
+  verbosity: 'default',
+  reasoningSummary: true,
+  webSearch: false
 };
 
 const terminalSuffixes = ['/chat/completions', '/responses', '/models'] as const;
@@ -49,14 +57,28 @@ export function normalizeEndpoint(input: string, protocol: AiProtocol): Normaliz
 
 export function buildChatCompletionsPayload(
   model: string,
-  messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>
+  messages: Array<{
+    role: 'system' | 'user' | 'assistant';
+    content: string;
+    continuation?: { connectionId: string; model: string; items: Array<Record<string, unknown>> };
+  }>
 ): Record<string, unknown> {
-  return { model, messages, stream: true };
+  return {
+    model,
+    messages: messages.map(({ role, content }) => ({ role, content })),
+    stream: true
+  };
 }
 
 export function buildResponsesPayload(
   model: string,
-  messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>
+  messages: Array<{
+    role: 'system' | 'user' | 'assistant';
+    content: string;
+    continuation?: { connectionId: string; model: string; items: Array<Record<string, unknown>> };
+  }>,
+  options: AiResponsesModelDefaults = defaultResponsesOptions,
+  connectionId?: string
 ): Record<string, unknown> {
   const instructions = messages
     .filter((message) => message.role === 'system')
@@ -64,8 +86,36 @@ export function buildResponsesPayload(
     .join('\n\n');
   const input = messages
     .filter((message) => message.role !== 'system')
-    .map((message) => ({ role: message.role, content: message.content }));
-  const payload: Record<string, unknown> = { model, input, stream: true, store: false };
+    .flatMap((message) => {
+      const continuation = message.continuation;
+      if (
+        message.role === 'assistant' &&
+        continuation &&
+        continuation.model === model &&
+        (!connectionId || continuation.connectionId === connectionId)
+      ) {
+        return continuation.items;
+      }
+      return [{ role: message.role, content: message.content }];
+    });
+  const payload: Record<string, unknown> = {
+    model,
+    input,
+    stream: true,
+    store: false,
+    include: ['reasoning.encrypted_content']
+  };
   if (instructions.length > 0) payload.instructions = instructions;
+  payload.reasoning = {
+    ...(options.reasoningEffort !== 'default' ? { effort: options.reasoningEffort } : {}),
+    summary: options.reasoningSummary ? 'auto' : 'none'
+  };
+  if (options.verbosity !== 'default') {
+    payload.text = { verbosity: options.verbosity };
+  }
+  if (options.webSearch) {
+    payload.tools = [{ type: 'web_search' }];
+    payload.include = ['reasoning.encrypted_content', 'web_search_call.action.sources'];
+  }
   return payload;
 }

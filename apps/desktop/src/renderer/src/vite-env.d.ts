@@ -95,6 +95,7 @@ declare global {
       listAiConnections: () => Promise<AiConnectionRecord[]>;
       saveAiConnection: (input: AiConnectionInput) => Promise<AiConnectionRecord[]>;
       deleteAiConnection: (id: string) => Promise<AiConnectionRecord[]>;
+      acceptAiEndpoint: (input: { connectionId: string; identity: string }) => Promise<AiConnectionRecord[]>;
       discoverAiModels: (input: AiDiscoverModelsRequest) => Promise<AiDiscoveredModels>;
       listAiHistory: () => Promise<AiHistoryList>;
       loadAiHistory: (input: AiHistoryLoadRequest) => Promise<AiHistoryLoadResult>;
@@ -148,6 +149,7 @@ declare global {
       downloadSftp: (input: SftpDownloadRequest) => Promise<SftpOperationResult>;
       executeCommandAction: (input: TerminalCommandAction) => Promise<{ accepted: true }>;
       listEnvironments: () => Promise<EnvironmentRecord[]>;
+      onEnvironmentUpdated: (listener: (environment: EnvironmentRecord) => void) => () => void;
       saveEnvironment: (input: EnvironmentRecord) => Promise<EnvironmentRecord[]>;
       deleteEnvironment: (id: string) => Promise<EnvironmentRecord[]>;
       probeEnvironment: (input: EnvironmentProbeRequest) => Promise<EnvironmentFacts>;

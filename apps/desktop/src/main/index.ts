@@ -5,6 +5,7 @@ import {
   AppInfoSchema,
   BUILTIN_THEME_NAMES,
   AiConnectionDeleteRequestSchema,
+  AiEndpointConsentRequestSchema,
   AiConnectionInputSchema,
   AiConnectionRecordSchema,
   AiStreamClientMessageSchema,
@@ -66,7 +67,7 @@ import {
   buildResponsesPayload,
   normalizeEndpoint
 } from './ai/endpoint';
-import { streamAiRequest } from './ai/provider';
+import { AiProviderError, streamAiRequest } from './ai/provider';
 import { discoverModels } from './ai/discovery';
 import { AiHistoryStore } from './ai/history';
 import { LocalTerminalManager } from './local-terminal';
@@ -88,6 +89,8 @@ import { HistoryWindowManager } from './history-window';
 import { SettingsWindowManager, type SettingsCategory } from './settings-window';
 import { discoverWsl } from './wsl/discovery';
 import { probeEnvironment } from './environment/probe';
+import { EnvironmentManager } from './environment/manager';
+import { buildAssistantContext } from './ai/context';
 
 const isDevelopment = !app.isPackaged;
 // Keeps automated runs (E2E tests, portable scenarios) hermetic by redirecting
@@ -100,6 +103,7 @@ let settingsWindow: SettingsWindowManager;
 let historyWindow: HistoryWindowManager;
 let localTerminals: LocalTerminalManager;
 let storage: AppStorage;
+let environmentManager: EnvironmentManager;
 let sshSessions: SshSessionManager;
 let transferManager: TransferManager;
 const aiControllers = new Map<string, AbortController>();
@@ -165,6 +169,33 @@ function isAllowedExternalUrl(value: string): boolean {
   } catch {
     return false;
   }
+}
+
+function safeAssistantFailure(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/cancelled|aborted/iu.test(message)) return 'cancelled';
+  if (/timeout/iu.test(message)) return 'timeout';
+  if (/response size limit/iu.test(message)) return 'response-size-limit';
+  const status = message.match(/provider rejected request \((\d{3})\)/u)?.[1];
+  if (status) return `provider-http-${status}`;
+  if (/endpoint/iu.test(message)) return 'invalid-endpoint';
+  return 'request-failed';
+}
+
+function attachedEnvironmentForTarget(targetKey: string): ReturnType<AppStorage['environmentSnapshot']>[number] | undefined {
+  const records = storage.environmentSnapshot().filter((record) => record.attachToAi);
+  const exact = records.find((record) => record.targetKey === targetKey);
+  if (exact) return exact;
+  if (targetKey.startsWith('local:')) {
+    return records.find((record) => record.kind === 'local' && record.targetKey === 'local');
+  }
+  if (targetKey.startsWith('wsl:')) {
+    const legacy = records.filter(
+      (record) => record.kind === 'wsl' && record.targetKey.startsWith('wsl:')
+    );
+    return legacy.length === 1 ? legacy[0] : undefined;
+  }
+  return undefined;
 }
 
 function installSecurityHandlers(): void {
@@ -532,7 +563,13 @@ function registerIpc(): void {
   });
   ipcMain.handle('environment:probe', async (_event, input: unknown) => {
     const request = EnvironmentProbeRequestSchema.parse(input);
-    return EnvironmentFactsSchema.parse(await probeEnvironment(request.kind, request.distribution));
+    return EnvironmentFactsSchema.parse(
+      await probeEnvironment(request.kind, request.distribution, process.platform, {
+        shell: request.shell,
+        cwd: request.cwd,
+        environment: request.environment
+      })
+    );
   });
   ipcMain.handle('terminal:command-action', (_event, input: unknown) => {
     const request = TerminalCommandActionSchema.parse(input);
@@ -565,6 +602,12 @@ function registerIpc(): void {
   ipcMain.handle('ai:save', async (_event, input: unknown) => {
     const connection = AiConnectionInputSchema.parse(input);
     return AiConnectionRecordSchema.array().parse(await storage.saveAiConnection(connection));
+  });
+  ipcMain.handle('ai:accept-endpoint', async (_event, input: unknown) => {
+    const request = AiEndpointConsentRequestSchema.parse(input);
+    return AiConnectionRecordSchema.array().parse(
+      await storage.acceptAiEndpoint(request.connectionId, request.identity)
+    );
   });
   ipcMain.handle('ai:delete', async (_event, input: unknown) => {
     const request = AiConnectionDeleteRequestSchema.parse(input);
@@ -666,13 +709,69 @@ function registerIpc(): void {
       aiControllers.delete(request.streamId);
     });
     void (async () => {
+      const startedAt = Date.now();
+      let httpStatus: number | undefined;
+      let inputTokens: number | undefined;
+      let outputTokens: number | undefined;
+      let reasoningTokens: number | undefined;
+      const sourceUrls = new Set<string>();
       try {
         const connection = storage.resolveAiConnection(request.connectionId, request.model);
+        const endpoint = normalizeEndpoint(connection.endpoint, connection.protocol);
+        const environment = request.targetKey
+          ? attachedEnvironmentForTarget(request.targetKey)
+          : undefined;
+        const context = buildAssistantContext({
+          globalInstructions: storage.settingsSnapshot().globalAiInstructions,
+          environment,
+          history: request.messages,
+          currentPrompt: request.prompt,
+          snapshot: request.snapshot
+        });
+        const responseOptions = request.responseOptions ?? connection.responseOptions;
+        logger.info('assistant', 'AI request prepared', {
+          streamId: request.streamId,
+          connectionId: connection.connectionId,
+          model: connection.model,
+          protocol: connection.protocol,
+          messageCount: context.messages.length,
+          systemBytes: context.systemBytes,
+          inputBytes: context.inputBytes,
+          categories: context.categories,
+          reasoningEffort: responseOptions.reasoningEffort,
+          verbosity: responseOptions.verbosity,
+          reasoningSummary: responseOptions.reasoningSummary,
+          webSearch: responseOptions.webSearch,
+          snapshotAttached: Boolean(request.snapshot)
+        });
+        if (connection.acceptedEndpoint !== endpoint.identity) {
+          port.postMessage(
+            AiStreamEventSchema.parse({
+              kind: 'consent-required',
+              endpoint: endpoint.baseUrl,
+              identity: endpoint.identity,
+              categories: context.categories
+            })
+          );
+          return;
+        }
+        logger.info('assistant', 'AI request started', {
+          streamId: request.streamId,
+          connectionId: connection.connectionId,
+          model: connection.model,
+          protocol: connection.protocol
+        });
         const payload =
           connection.protocol === 'responses'
-            ? buildResponsesPayload(connection.model, request.messages)
-            : buildChatCompletionsPayload(connection.model, request.messages);
-        await streamAiRequest({
+            ? buildResponsesPayload(
+                connection.model,
+                context.messages,
+                responseOptions,
+                connection.connectionId
+              )
+            : buildChatCompletionsPayload(connection.model, context.messages);
+        const providerResult = await streamAiRequest({
+          connectionId: connection.connectionId,
           endpoint: connection.endpoint,
           protocol: connection.protocol,
           model: connection.model,
@@ -680,10 +779,56 @@ function registerIpc(): void {
           apiKey: connection.apiKey,
           signal: controller.signal,
           onEvent: (streamEvent) => {
+            if (streamEvent.kind === 'usage') {
+              inputTokens = streamEvent.inputTokens;
+              outputTokens = streamEvent.outputTokens;
+              reasoningTokens = streamEvent.reasoningTokens;
+            } else if (streamEvent.kind === 'source') {
+              sourceUrls.add(streamEvent.url);
+            }
             if (!closed) port.postMessage(AiStreamEventSchema.parse(streamEvent));
           }
         });
+        httpStatus = providerResult.status;
+        logger.info('assistant', 'AI request completed', {
+          streamId: request.streamId,
+          connectionId: connection.connectionId,
+          model: connection.model,
+          protocol: connection.protocol,
+          durationMs: Date.now() - startedAt,
+          httpStatus,
+          inputTokens,
+          outputTokens,
+          reasoningTokens,
+          sourceCount: sourceUrls.size
+        });
       } catch (error) {
+        if (error instanceof AiProviderError) httpStatus = error.status;
+        logger.warn('assistant', 'AI request failed', {
+          streamId: request.streamId,
+          connectionId: (() => {
+            try {
+              return storage.resolveAiConnection(request.connectionId, request.model).connectionId;
+            } catch {
+              return request.connectionId;
+            }
+          })(),
+          model: request.model,
+          protocol: (() => {
+            try {
+              return storage.resolveAiConnection(request.connectionId, request.model).protocol;
+            } catch {
+              return 'unknown';
+            }
+          })(),
+          durationMs: Date.now() - startedAt,
+          httpStatus,
+          inputTokens,
+          outputTokens,
+          reasoningTokens,
+          sourceCount: sourceUrls.size,
+          failureReason: safeAssistantFailure(error)
+        });
         if (!controller.signal.aborted && !closed) {
           port.postMessage({
             kind: 'error',
@@ -772,7 +917,6 @@ void app.whenReady().then(async () => {
     ? join(process.cwd(), 'debug-logs')
     : join(app.getPath('userData'), 'logs');
   logger = createLogger(logDirectory);
-  localTerminals = new LocalTerminalManager(logger);
   storage = new AppStorage(app.getPath('userData'), logger, {
     isEncryptionAvailable: () => safeStorage.isEncryptionAvailable(),
     encryptString: (plaintext) => safeStorage.encryptString(plaintext),
@@ -781,15 +925,29 @@ void app.whenReady().then(async () => {
       process.platform === 'linux' ? safeStorage.getSelectedStorageBackend() : undefined
   });
   await storage.load();
+  environmentManager = new EnvironmentManager(storage, logger, (record) =>
+    sendToRenderer('environment:updated', EnvironmentRecordSchema.parse(record))
+  );
+  localTerminals = new LocalTerminalManager(logger, {
+    onReady: (details) => environmentManager.onLocalReady(details),
+    onClosed: (sessionId) => environmentManager.onClosed(sessionId)
+  });
   const knownHosts = new KnownHostsStore(join(app.getPath('userData'), 'known-hosts.json'), logger);
   transferManager = new TransferManager(
     (sessionId) => sshSessions.sftpService(sessionId),
     (event) => sendToRenderer('sftp:transfer-event', SftpTransferEventSchema.parse(event))
   );
   sshSessions = new SshSessionManager(logger, knownHosts, {
+    onReady: (details) =>
+      environmentManager.onSshReady(details, (signal) =>
+        sshSessions.exec(details.sessionId, undefined, signal)
+      ),
     onSftpCd: (sessionId, directory) =>
       sendToRenderer('sftp:cd', SftpCdEventSchema.parse({ sessionId, directory })),
-    onClosed: (sessionId) => transferManager.cancelForSession(sessionId)
+    onClosed: (sessionId) => {
+      environmentManager.onClosed(sessionId);
+      transferManager.cancelForSession(sessionId);
+    }
   });
   process.on('uncaughtException', (error) =>
     logger.error('system', 'Uncaught exception', { error: error.message })

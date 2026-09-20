@@ -95,7 +95,19 @@ function environment(term: string): Record<string, string> {
 export class LocalTerminalManager {
   private readonly sessions = new Map<string, LocalSession>();
 
-  public constructor(private readonly logger: Logger) {}
+  public constructor(
+    private readonly logger: Logger,
+    private readonly hooks: {
+      onReady?: (details: {
+        sessionId: string;
+        shell: string;
+        cwd: string;
+        environment: Record<string, string>;
+        request: LocalTerminalRequest;
+      }) => void;
+      onClosed?: (sessionId: string) => void;
+    } = {}
+  ) {}
 
   public create(rawRequest: unknown, port: MessagePortMain): void {
     const request = LocalTerminalRequestSchema.parse(rawRequest);
@@ -109,12 +121,14 @@ export class LocalTerminalManager {
     const shell = resolveShell(request.shell);
     const args =
       request.args.length > 0 ? request.args : process.platform === 'darwin' ? ['-l'] : [];
+    const cwd = resolveCwd(request.cwd);
+    const sessionEnvironment = environment(request.term);
     const terminal = spawn(shell, args, {
       name: request.term,
       cols: request.cols,
       rows: request.rows,
-      cwd: resolveCwd(request.cwd),
-      env: environment(request.term)
+      cwd,
+      env: sessionEnvironment
     });
     const session: LocalSession = {
       id: request.sessionId,
@@ -133,6 +147,13 @@ export class LocalTerminalManager {
     port.on('message', (event) => this.onClientMessage(session, event.data));
     port.on('close', () => this.close(session, 'renderer-port-closed'));
     this.sendState(session, 'running');
+    this.hooks.onReady?.({
+      sessionId: session.id,
+      shell,
+      cwd,
+      environment: sessionEnvironment,
+      request
+    });
     session.disposeData = terminal.onData((chunk) => this.enqueueOutput(session, chunk));
     session.disposeExit = terminal.onExit(({ exitCode, signal }) => {
       if (session.closed) {
@@ -142,6 +163,7 @@ export class LocalTerminalManager {
       session.disposeData.dispose();
       session.disposeExit.dispose();
       this.sessions.delete(session.id);
+      this.hooks.onClosed?.(session.id);
     });
     this.logger.info('terminal', 'Local terminal started', { sessionId: session.id, shell });
   }
@@ -255,6 +277,7 @@ export class LocalTerminalManager {
     }
     session.queue.length = 0;
     this.sessions.delete(session.id);
+    this.hooks.onClosed?.(session.id);
     session.sequence += 1;
     session.port.postMessage({
       kind: 'state',

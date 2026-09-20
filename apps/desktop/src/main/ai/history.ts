@@ -2,8 +2,26 @@ import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync } from 'node:fs';
 import { readFile, readdir, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { AiHistoryMessageSchema } from '@geared-term/protocol';
+import type {
+  AiContinuationMetadata,
+  AiSourceReference,
+  AiSnapshotAttachment
+} from '@geared-term/protocol';
 
-export type HistoryMessage = { role: 'user' | 'assistant'; content: string };
+export type HistoryMessage = {
+  role: 'user' | 'assistant';
+  content: string;
+  reasoning?: string;
+  usage?: {
+    inputTokens?: number;
+    outputTokens?: number;
+    reasoningTokens?: number;
+  };
+  snapshot?: AiSnapshotAttachment;
+  sources?: AiSourceReference[];
+  continuation?: AiContinuationMetadata;
+};
 
 export type HistoryEntryInput = {
   id?: string;
@@ -23,7 +41,7 @@ export type HistorySummary = {
 export type HistoryRecord = HistorySummary & { messages: HistoryMessage[] };
 
 type HistoryMetadata = {
-  schemaVersion: 1;
+  schemaVersion: 1 | 2;
   id: string;
   title: string;
   model?: string;
@@ -33,6 +51,8 @@ type HistoryMetadata = {
 
 const metadataPattern = /<!-- geared-term-history\n([\s\S]*?)\n-->/u;
 const sectionPattern = /\n## (user|assistant)\n\n/u;
+const messageMetadataPattern =
+  /^<!-- geared-term-message-base64\n([A-Za-z0-9+/=\r\n]+)\n-->\n*/u;
 
 /**
  * Human-readable Markdown conversation history (AI-020): a metadata comment
@@ -41,6 +61,7 @@ const sectionPattern = /\n## (user|assistant)\n\n/u;
  */
 export class AiHistoryStore {
   private directory: string;
+  private lastUpdatedAt = 0;
 
   public constructor(rootDirectory: string, directoryName = 'ai-history') {
     this.directory = join(rootDirectory, directoryName);
@@ -49,10 +70,18 @@ export class AiHistoryStore {
   public async save(entry: HistoryEntryInput): Promise<HistorySummary> {
     const id = entry.id && /^[A-Za-z0-9._-]+$/.test(entry.id) ? entry.id : randomUUID();
     mkdirSync(this.directory, { recursive: true });
-    const now = new Date().toISOString();
     const existing = await this.load(id).catch(() => undefined);
+    const clock = Date.now();
+    const previousTime = existing ? Date.parse(existing.updatedAt) : Number.NaN;
+    const timestamp = Math.max(
+      clock,
+      this.lastUpdatedAt + 1,
+      Number.isFinite(previousTime) ? previousTime + 1 : 0
+    );
+    this.lastUpdatedAt = timestamp;
+    const now = new Date(timestamp).toISOString();
     const metadata: HistoryMetadata = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       id,
       title: entry.title.slice(0, 200),
       model: entry.model,
@@ -63,7 +92,23 @@ export class AiHistoryStore {
       `<!-- geared-term-history\n${JSON.stringify(metadata, null, 2)}\n-->`,
       '',
       ...entry.messages.map(
-        (message) => `## ${message.role}\n\n${message.content.replace(/\n+$/u, '')}\n`
+        (message) => {
+          const messageMetadata = {
+            ...(message.reasoning !== undefined ? { reasoning: message.reasoning } : {}),
+            ...(message.usage ? { usage: message.usage } : {}),
+            ...(message.snapshot ? { snapshot: message.snapshot } : {}),
+            ...(message.sources ? { sources: message.sources } : {}),
+            ...(message.continuation ? { continuation: message.continuation } : {})
+          };
+          const metadataComment =
+            Object.keys(messageMetadata).length === 0
+              ? ''
+              : `<!-- geared-term-message-base64\n${Buffer.from(
+                  JSON.stringify(messageMetadata),
+                  'utf8'
+                ).toString('base64')}\n-->\n\n`;
+          return `## ${message.role}\n\n${metadataComment}${message.content.replace(/\n+$/u, '')}\n`;
+        }
       )
     ].join('\n');
     await writeFile(join(this.directory, `${id}.md`), document, {
@@ -125,15 +170,43 @@ export class AiHistoryStore {
     } catch {
       return undefined;
     }
-    if (metadata.schemaVersion !== 1 || !metadata.id) return undefined;
+    if (![1, 2].includes(metadata.schemaVersion) || !metadata.id) return undefined;
     const body = text.slice((metadataMatch.index ?? 0) + metadataMatch[0].length);
     const messages: HistoryMessage[] = [];
     const sections = body.split(sectionPattern);
     // split with a capturing group alternates [before, role, content, role, content…]
     for (let index = 1; index < sections.length; index += 2) {
       const role = sections[index] as 'user' | 'assistant';
-      const content = (sections[index + 1] ?? '').replace(/\n+$/u, '');
-      messages.push({ role, content });
+      let content = sections[index + 1] ?? '';
+      let messageMetadata: Partial<Omit<HistoryMessage, 'role' | 'content'>> = {};
+      const metadataMatch = messageMetadataPattern.exec(content);
+      if (metadataMatch) {
+        try {
+          const decoded = Buffer.from(metadataMatch[1] as string, 'base64').toString('utf8');
+          const parsed = JSON.parse(decoded) as unknown;
+          const candidateContent = content.slice(metadataMatch[0].length);
+          const candidate =
+            parsed && typeof parsed === 'object'
+              ? AiHistoryMessageSchema.safeParse({
+                  role,
+                  content: candidateContent.replace(/\n+$/u, ''),
+                  ...(parsed as Record<string, unknown>)
+                })
+              : undefined;
+          if (candidate?.success) {
+            const { role: _role, content: _content, ...metadata } = candidate.data;
+            messageMetadata = metadata;
+            content = candidateContent;
+          }
+        } catch {
+          // Keep the message content readable if optional metadata is corrupt.
+        }
+      }
+      messages.push({
+        role,
+        content: content.replace(/\n+$/u, ''),
+        ...messageMetadata
+      });
     }
     if (messages.length === 0) return undefined;
     return {

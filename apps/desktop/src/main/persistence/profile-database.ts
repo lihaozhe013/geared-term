@@ -7,10 +7,11 @@ import type {
   EnvironmentRecord,
   SessionProfileRecord
 } from '@geared-term/protocol';
+import { AiConnectionRecordSchema } from '@geared-term/protocol';
 import type { Logger } from '../logging';
 import { EncryptedSecretSchema, type EncryptedSecret } from './schema';
 
-export const profileDatabaseSchemaVersion = 1;
+export const profileDatabaseSchemaVersion = 2;
 
 type SecretRow = {
   id: string;
@@ -50,6 +51,7 @@ type AiConnectionRow = {
   models: string;
   default_model: string;
   api_key_secret_id: string | null;
+  accepted_endpoint: string | null;
 };
 
 type EnvironmentRow = {
@@ -60,6 +62,7 @@ type EnvironmentRow = {
   notes: string;
   instructions: string;
   attach_to_ai: number;
+  verified: number;
   detected_at: string | null;
 };
 
@@ -125,6 +128,14 @@ const migrations: Array<{ version: number; statements: string[] }> = [
       `CREATE INDEX idx_session_profiles_group ON session_profiles(group_name)`,
       `INSERT INTO schema_info (key, value) VALUES ('schema_version', '1')`
     ]
+  },
+  {
+    version: 2,
+    statements: [
+      `ALTER TABLE environments ADD COLUMN verified INTEGER NOT NULL DEFAULT 0`,
+      `ALTER TABLE ai_connections ADD COLUMN accepted_endpoint TEXT`,
+      `UPDATE schema_info SET value = '2' WHERE key = 'schema_version'`
+    ]
   }
 ];
 
@@ -189,9 +200,9 @@ function createStatements(database: Database.Database) {
     deleteProfile: database.prepare('DELETE FROM session_profiles WHERE id = ?'),
     upsertEnvironment: database.prepare(
       `INSERT INTO environments (
-         id, target_key, kind, facts, notes, instructions, attach_to_ai, detected_at, updated_at
+         id, target_key, kind, facts, notes, instructions, attach_to_ai, verified, detected_at, updated_at
        ) VALUES (
-         @id, @target_key, @kind, @facts, @notes, @instructions, @attach_to_ai, @detected_at,
+         @id, @target_key, @kind, @facts, @notes, @instructions, @attach_to_ai, @verified, @detected_at,
          @updated_at
        )
        ON CONFLICT(id) DO UPDATE SET
@@ -201,6 +212,7 @@ function createStatements(database: Database.Database) {
          notes = excluded.notes,
          instructions = excluded.instructions,
          attach_to_ai = excluded.attach_to_ai,
+         verified = excluded.verified,
          detected_at = excluded.detected_at,
          updated_at = excluded.updated_at`
     ),
@@ -210,9 +222,9 @@ function createStatements(database: Database.Database) {
     deleteEnvironment: database.prepare('DELETE FROM environments WHERE id = ?'),
     upsertAiConnection: database.prepare(
       `INSERT INTO ai_connections (
-         id, name, protocol, base_url, models, default_model, api_key_secret_id, updated_at
+         id, name, protocol, base_url, models, default_model, api_key_secret_id, accepted_endpoint, updated_at
        ) VALUES (
-         @id, @name, @protocol, @base_url, @models, @default_model, @api_key_secret_id,
+         @id, @name, @protocol, @base_url, @models, @default_model, @api_key_secret_id, @accepted_endpoint,
          @updated_at
        )
        ON CONFLICT(id) DO UPDATE SET
@@ -222,6 +234,7 @@ function createStatements(database: Database.Database) {
          models = excluded.models,
          default_model = excluded.default_model,
          api_key_secret_id = excluded.api_key_secret_id,
+         accepted_endpoint = excluded.accepted_endpoint,
          updated_at = excluded.updated_at`
     ),
     allAiConnections: database.prepare(
@@ -422,6 +435,7 @@ export class ProfileDatabase {
       notes: environment.notes,
       instructions: environment.instructions,
       attach_to_ai: environment.attachToAi ? 1 : 0,
+      verified: environment.verified ? 1 : 0,
       detected_at: environment.detectedAt,
       updated_at: updatedAt
     });
@@ -436,6 +450,7 @@ export class ProfileDatabase {
       notes: row.notes,
       instructions: row.instructions,
       attachToAi: row.attach_to_ai !== 0,
+      verified: row.verified !== 0,
       detectedAt: row.detected_at
     }));
   }
@@ -453,20 +468,24 @@ export class ProfileDatabase {
       models: JSON.stringify(connection.models),
       default_model: connection.defaultModel,
       api_key_secret_id: connection.apiKeyRef ?? null,
+      accepted_endpoint: connection.acceptedEndpoint ?? null,
       updated_at: updatedAt
     });
   }
 
   public listAiConnections(): AiConnectionRecord[] {
-    return (this.statements.allAiConnections.all() as AiConnectionRow[]).map((row) => ({
-      id: row.id,
-      name: row.name,
-      protocol: row.protocol,
-      baseUrl: row.base_url,
-      models: JSON.parse(row.models) as string[],
-      defaultModel: row.default_model,
-      apiKeyRef: row.api_key_secret_id ?? undefined
-    }));
+    return (this.statements.allAiConnections.all() as AiConnectionRow[]).map((row) =>
+      AiConnectionRecordSchema.parse({
+        id: row.id,
+        name: row.name,
+        protocol: row.protocol,
+        baseUrl: row.base_url,
+        models: JSON.parse(row.models) as unknown,
+        defaultModel: row.default_model,
+        apiKeyRef: row.api_key_secret_id ?? undefined,
+        acceptedEndpoint: row.accepted_endpoint ?? undefined
+      })
+    );
   }
 
   public deleteAiConnection(id: string): void {

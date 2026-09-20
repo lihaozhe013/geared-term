@@ -8,6 +8,8 @@ import {
 import type {
   AiActivityLabel,
   AiConnectionRecord,
+  AiResponsesModelDefaults,
+  AiResponsesReasoningEffort,
   AiStreamEvent,
   EnvironmentRecord,
   SettingsRecord
@@ -32,17 +34,27 @@ import {
 } from 'lucide-react';
 import { MarkdownView } from './assistant/MarkdownView';
 import { translate } from './i18n';
-import { formatSnapshotForPrompt, type TerminalSnapshot } from './terminal/snapshot';
+import { type TerminalSnapshot } from './terminal/snapshot';
 
 type Message = {
   role: 'user' | 'assistant';
   content: string;
   model?: string;
-  usage?: { input?: number; output?: number };
+  usage?: { input?: number; output?: number; reasoning?: number };
+  reasoning?: string;
+  snapshot?: TerminalSnapshot;
+  sources?: SourceReference[];
+  continuation?: { connectionId: string; model: string; items: Array<Record<string, unknown>> };
   durationMs?: number;
 };
 
 type SourceReference = { url: string; title?: string };
+
+type ConsentRequest = {
+  endpoint: string;
+  identity: string;
+  categories: string[];
+};
 
 type ActivityStep = {
   id: string;
@@ -76,7 +88,6 @@ type AssistantPanelProps = {
   environmentTargetKey?: string;
   splitCommandPresentation?: boolean;
   onToggleSplitCommand?: () => void;
-  globalInstructions?: string;
   pendingHistoryId?: string | null;
   onPendingHistoryConsumed?: () => void;
   getSnapshot?: () => TerminalSnapshot | null;
@@ -270,7 +281,6 @@ export function AssistantPanel({
   environmentTargetKey,
   splitCommandPresentation = false,
   onToggleSplitCommand,
-  globalInstructions = '',
   pendingHistoryId,
   onPendingHistoryConsumed,
   getSnapshot
@@ -278,6 +288,8 @@ export function AssistantPanel({
   const [connections, setConnections] = useState<AiConnectionRecord[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [model, setModel] = useState('');
+  const [responseOptions, setResponseOptions] = useState<AiResponsesModelDefaults | null>(null);
+  const [reasoningMenuOpen, setReasoningMenuOpen] = useState(false);
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
   const [attachMenuOpen, setAttachMenuOpen] = useState(false);
   const [composer, setComposer] = useState('');
@@ -294,6 +306,7 @@ export function AssistantPanel({
   const [activities, setActivities] = useState<ActivityStep[]>([]);
   const [streamStartedAt, setStreamStartedAt] = useState<number | null>(null);
   const [showTimeline, setShowTimeline] = useState(true);
+  const [consentRequest, setConsentRequest] = useState<ConsentRequest | null>(null);
   const [, setTick] = useState(0);
   const streamRef = useRef<{ cancel: () => void } | null>(null);
   const messagesRef = useRef<Message[]>([]);
@@ -301,6 +314,21 @@ export function AssistantPanel({
   const reasoningBoxRef = useRef<HTMLDivElement | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const messagesBoxRef = useRef<HTMLDivElement | null>(null);
+  const pendingRequestRef = useRef<{
+    streamId: string;
+    connectionId: string;
+    model: string;
+    targetKey?: string;
+    messages: Array<{
+      role: 'user' | 'assistant';
+      content: string;
+      snapshot?: TerminalSnapshot;
+      continuation?: { connectionId: string; model: string; items: Array<Record<string, unknown>> };
+    }>;
+    prompt: string;
+    snapshot?: TerminalSnapshot;
+    responseOptions?: AiResponsesModelDefaults;
+  } | null>(null);
 
   useEffect(() => {
     void window.geared
@@ -318,6 +346,20 @@ export function AssistantPanel({
       );
     return () => streamRef.current?.cancel();
   }, []);
+
+  useEffect(() => {
+    const connection = connections.find((item) => item.id === selectedId);
+    const profile = connection?.models.find((item) => item.model === model);
+    setResponseOptions(
+      profile?.responses ?? {
+        reasoningEffort: 'default',
+        verbosity: 'default',
+        reasoningSummary: true,
+        webSearch: false
+      }
+    );
+    setReasoningMenuOpen(false);
+  }, [connections, model, selectedId]);
 
   useEffect(() => {
     if (!environmentTargetKey) {
@@ -338,6 +380,13 @@ export function AssistantPanel({
   }, [environmentTargetKey]);
 
   useEffect(() => {
+    return window.geared.onEnvironmentUpdated((record) => {
+      if (record.targetKey !== environmentTargetKey) return;
+      setAttachedEnvironment(record.attachToAi ? record : null);
+    });
+  }, [environmentTargetKey]);
+
+  useEffect(() => {
     if (!pendingHistoryId) return;
     if (streaming) {
       setError('History cannot be loaded while a request is active.');
@@ -348,12 +397,29 @@ export function AssistantPanel({
       .loadAiHistory({ id: pendingHistoryId })
       .then((record) => {
         setMessages(
-          record.messages.map((message) => ({ role: message.role, content: message.content }))
+          record.messages.map((message) => ({
+            role: message.role,
+            content: message.content,
+            reasoning: message.reasoning,
+            usage: message.usage
+              ? {
+                  input: message.usage.inputTokens,
+                  output: message.usage.outputTokens,
+                  reasoning: message.usage.reasoningTokens
+                }
+              : undefined,
+            snapshot: message.snapshot,
+            sources: message.sources,
+            continuation: message.continuation
+          }))
         );
         setConversationId(record.id);
-        setReasoning('');
+        const lastAssistant = [...record.messages]
+          .reverse()
+          .find((message) => message.role === 'assistant');
+        setReasoning(lastAssistant?.reasoning ?? '');
         setReasoningLive(false);
-        setSources([]);
+        setSources(lastAssistant?.sources ?? []);
         setError(null);
       })
       .catch((reason: unknown) =>
@@ -392,16 +458,25 @@ export function AssistantPanel({
   const selectedConnection = connections.find((connection) => connection.id === selectedId);
   const modelOptions = selectedConnection?.models ?? [];
 
-  const pickConnectionModel = (id: string | null): void => {
-    setSelectedId(id);
-    const connection = connections.find((item) => item.id === id);
-    setModel(connection ? connection.defaultModel : '');
-    setModelMenuOpen(false);
-  };
+  const reasoningEfforts: AiResponsesReasoningEffort[] = [
+    'default',
+    'none',
+    'minimal',
+    'low',
+    'medium',
+    'high',
+    'xhigh',
+    'max'
+  ];
 
   // Mirrors the reference activity model: exactly one running step at a time;
   // a new running step auto-closes the previous one.
-  const upsertActivity = (id: string, label: AiActivityLabel, detail?: string): void => {
+  const upsertActivity = (
+    id: string,
+    label: AiActivityLabel,
+    detail?: string,
+    state: 'running' | 'done' = 'running'
+  ): void => {
     const now = Date.now();
     setActivities((current) => {
       const closed = current.map((step) =>
@@ -418,14 +493,24 @@ export function AssistantPanel({
                 ...step,
                 label,
                 detail,
-                state: 'running' as const,
+                state,
                 startedAt: now,
-                endedAt: undefined
+                endedAt: state === 'done' ? now : undefined
               }
             : step
         );
       }
-      return [...closed, { id, label, detail, state: 'running' as const, startedAt: now }];
+      return [
+        ...closed,
+        {
+          id,
+          label,
+          detail,
+          state,
+          startedAt: now,
+          ...(state === 'done' ? { endedAt: now } : {})
+        }
+      ];
     });
   };
 
@@ -447,8 +532,16 @@ export function AssistantPanel({
     } else if (event.kind === 'reasoning') {
       setReasoning((current) => current + event.text);
       setReasoningLive(true);
+      setMessages((current) => {
+        const last = current.at(-1);
+        if (!last || last.role !== 'assistant') return current;
+        return [
+          ...current.slice(0, -1),
+          { ...last, reasoning: `${last.reasoning ?? ''}${event.text}` }
+        ];
+      });
     } else if (event.kind === 'activity') {
-      upsertActivity(event.id, event.label, event.detail);
+      upsertActivity(event.id, event.label, event.detail, event.state);
     } else if (event.kind === 'usage') {
       setMessages((current) => {
         const last = current.at(-1);
@@ -457,9 +550,19 @@ export function AssistantPanel({
           ...current.slice(0, -1),
           {
             ...last,
-            usage: { input: event.inputTokens, output: event.outputTokens }
+            usage: {
+              input: event.inputTokens,
+              output: event.outputTokens,
+              reasoning: event.reasoningTokens
+            }
           }
         ];
+      });
+    } else if (event.kind === 'continuation') {
+      setMessages((current) => {
+        const last = current.at(-1);
+        if (!last || last.role !== 'assistant') return current;
+        return [...current.slice(0, -1), { ...last, continuation: event }];
       });
     } else if (event.kind === 'source') {
       setSources((current) =>
@@ -467,7 +570,26 @@ export function AssistantPanel({
           ? current
           : [...current, { url: event.url, title: event.title }]
       );
+      setMessages((current) => {
+        const last = current.at(-1);
+        if (!last || last.role !== 'assistant') return current;
+        if (last.sources?.some((source) => source.url === event.url)) return current;
+        return [
+          ...current.slice(0, -1),
+          { ...last, sources: [...(last.sources ?? []), { url: event.url, title: event.title }] }
+        ];
+      });
       upsertActivity(`read:${event.url}`, 'reading-source', event.title ?? event.url);
+    } else if (event.kind === 'consent-required') {
+      setConsentRequest({
+        endpoint: event.endpoint,
+        identity: event.identity,
+        categories: event.categories
+      });
+      setStreaming(false);
+      setReasoningLive(false);
+      closeRunningActivities('done');
+      streamRef.current = null;
     } else if (event.kind === 'error') {
       setError(event.message);
       setStreaming(false);
@@ -487,6 +609,12 @@ export function AssistantPanel({
       streamRef.current = null;
       const turn = messagesRef.current.filter((message) => message.content.trim().length > 0);
       if (turn.length > 0) {
+        const pending = pendingRequestRef.current;
+        const reversedAssistantIndex = [...turn]
+          .reverse()
+          .findIndex((message) => message.role === 'assistant');
+        const lastAssistantIndex =
+          reversedAssistantIndex < 0 ? -1 : turn.length - 1 - reversedAssistantIndex;
         void window.geared
           .saveAiHistory({
             id: conversationId,
@@ -494,7 +622,31 @@ export function AssistantPanel({
               turn.find((message) => message.role === 'user')?.content.slice(0, 80) ??
               'Conversation',
             ...(model ? { model } : {}),
-            messages: turn.map((message) => ({ role: message.role, content: message.content }))
+            messages: turn.map((message, index) => ({
+              role: message.role,
+              content: message.content,
+              ...(message.role === 'user' &&
+              pending?.snapshot &&
+              message.content === pending.prompt
+                ? { snapshot: pending.snapshot }
+                : {}),
+              ...(message.role === 'assistant' && index === lastAssistantIndex
+                ? {
+                    ...(reasoning ? { reasoning } : {}),
+                    ...(message.usage
+                      ? {
+                          usage: {
+                            inputTokens: message.usage.input,
+                            outputTokens: message.usage.output,
+                            reasoningTokens: message.usage.reasoning
+                          }
+                        }
+                      : {}),
+                    ...(sources.length > 0 ? { sources } : {}),
+                    ...(message.continuation ? { continuation: message.continuation } : {})
+                  }
+                : {})
+            }))
           })
           .catch(() => undefined);
       }
@@ -514,6 +666,17 @@ export function AssistantPanel({
     setPendingSnapshot(null);
     setAttachedSnapshot(null);
     setStreaming(false);
+    setConsentRequest(null);
+    pendingRequestRef.current = null;
+    const profile = selectedConnection?.models.find((item) => item.model === model);
+    setResponseOptions(
+      profile?.responses ?? {
+        reasoningEffort: 'default',
+        verbosity: 'default',
+        reasoningSummary: true,
+        webSearch: false
+      }
+    );
     setConversationId(crypto.randomUUID());
     setError(null);
   };
@@ -527,6 +690,25 @@ export function AssistantPanel({
   };
 
   const handleCommandError = (message: string): void => setError(message);
+
+  const acceptConsent = async (): Promise<void> => {
+    const consent = consentRequest;
+    const pending = pendingRequestRef.current;
+    if (!consent || !pending) return;
+    try {
+      const saved = await window.geared.acceptAiEndpoint({
+        connectionId: pending.connectionId,
+        identity: consent.identity
+      });
+      setConnections(saved);
+      const retry = { ...pending, streamId: crypto.randomUUID() };
+      pendingRequestRef.current = retry;
+      setConsentRequest(null);
+      startStream(retry);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Unable to save endpoint consent');
+    }
+  };
 
   const attachSnapshot = (): void => {
     setAttachMenuOpen(false);
@@ -547,41 +729,7 @@ export function AssistantPanel({
     }${snapshot.alternateScreen ? ' · alternate screen' : ''}`;
   };
 
-  const send = (): void => {
-    const text = composer.trim();
-    if (!text || !selectedId || !model || streaming) return;
-    const userMessage: Message = { role: 'user', content: text };
-    const nextMessages: Message[] = [...messages, userMessage];
-    const systemMessages: Array<{ role: 'system'; content: string }> = [];
-    if (globalInstructions.trim()) {
-      systemMessages.push({ role: 'system', content: globalInstructions.trim().slice(0, 8192) });
-    }
-    if (attachedEnvironment) {
-      systemMessages.push({
-        role: 'system',
-        content: `Environment context for ${attachedEnvironment.targetKey}:\n${JSON.stringify(
-          {
-            ...attachedEnvironment.facts,
-            notes: attachedEnvironment.notes,
-            instructions: attachedEnvironment.instructions
-          },
-          null,
-          2
-        )}`
-      });
-    }
-    if (attachedSnapshot) {
-      // The snapshot is an untrusted observation, never application instructions.
-      systemMessages.push({
-        role: 'system',
-        content: formatSnapshotForPrompt(attachedSnapshot)
-      });
-    }
-    const requestMessages = [...systemMessages, ...nextMessages];
-    setMessages([...nextMessages, { role: 'assistant', content: '', model }]);
-    setComposer('');
-    setPendingSnapshot(null);
-    setAttachedSnapshot(null);
+  const startStream = (request: NonNullable<typeof pendingRequestRef.current>): void => {
     setReasoning('');
     setSources([]);
     setActivities([]);
@@ -589,13 +737,42 @@ export function AssistantPanel({
     setShowTimeline(true);
     setError(null);
     setStreaming(true);
-    const streamId = crypto.randomUUID();
-    streamRef.current = window.geared.streamAi(
-      { streamId, connectionId: selectedId, model, messages: requestMessages },
-      (event) => {
-        receiveEvent(event as AiStreamEvent);
-      }
-    );
+    streamRef.current = window.geared.streamAi(request, (event) => {
+      receiveEvent(event as AiStreamEvent);
+    });
+  };
+
+  const send = (): void => {
+    const text = composer.trim();
+    if (!text || !selectedId || !model || streaming) return;
+    const historyMessages = messages
+      .filter((message) => message.content.trim().length > 0)
+      .map((message) => ({
+        role: message.role,
+        content: message.content,
+        ...(message.snapshot ? { snapshot: message.snapshot } : {}),
+        ...(message.continuation ? { continuation: message.continuation } : {})
+      }))
+      .slice(-99);
+    const request = {
+      streamId: crypto.randomUUID(),
+      connectionId: selectedId,
+      model,
+      ...(environmentTargetKey ? { targetKey: environmentTargetKey } : {}),
+      messages: historyMessages,
+      prompt: text,
+      ...(attachedSnapshot ? { snapshot: attachedSnapshot } : {}),
+      ...(selectedConnection?.protocol === 'responses' && responseOptions
+        ? { responseOptions }
+        : {})
+    };
+    pendingRequestRef.current = request;
+    setMessages([...messages, { role: 'user', content: text }, { role: 'assistant', content: '', model }]);
+    setComposer('');
+    setPendingSnapshot(null);
+    setAttachedSnapshot(null);
+    setConsentRequest(null);
+    startStream(request);
   };
 
   const stop = (): void => {
@@ -696,18 +873,42 @@ export function AssistantPanel({
               {modelOptions.length === 0 ? (
                 <p className="settings-hint">No models on this connection yet.</p>
               ) : null}
+              {connections.length > 1 ? (
+                <>
+                  <p className="assistant-menu-heading">Connections</p>
+                  {connections.map((connection) => (
+                    <button
+                      type="button"
+                      key={connection.id}
+                      role="menuitem"
+                      className={`assistant-menu-item ${connection.id === selectedId ? 'active' : ''}`}
+                      onClick={() => {
+                        setSelectedId(connection.id);
+                        setModel(connection.defaultModel);
+                        setModelMenuOpen(false);
+                      }}
+                    >
+                      {connection.name}
+                    </button>
+                  ))}
+                  <div className="assistant-menu-separator" />
+                </>
+              ) : null}
+              {connections.length > 1 ? (
+                <p className="assistant-menu-heading">Models</p>
+              ) : null}
               {modelOptions.map((option) => (
                 <button
                   type="button"
-                  key={option}
+                  key={option.id}
                   role="menuitem"
-                  className={`assistant-menu-item ${option === model ? 'active' : ''}`}
+                  className={`assistant-menu-item ${option.model === model ? 'active' : ''}`}
                   onClick={() => {
-                    setModel(option);
+                    setModel(option.model);
                     setModelMenuOpen(false);
                   }}
                 >
-                  {option}
+                  {option.label ? `${option.label} · ${option.model}` : option.model}
                 </button>
               ))}
               <div className="assistant-menu-separator" />
@@ -723,6 +924,46 @@ export function AssistantPanel({
               </button>
             </div>
           </>
+        ) : null}
+        {selectedConnection?.protocol === 'responses' && responseOptions ? (
+          <div className="assistant-reasoning-picker">
+            <button
+              type="button"
+              className="assistant-picker-button"
+              onClick={() => setReasoningMenuOpen((open) => !open)}
+              title="Reasoning effort for this chat"
+            >
+              <span className="assistant-picker-label">
+                Reasoning: {responseOptions.reasoningEffort}
+              </span>
+              <ChevronDown size={13} aria-hidden="true" />
+            </button>
+            {reasoningMenuOpen ? (
+              <>
+                <div className="assistant-menu-backdrop" onClick={() => setReasoningMenuOpen(false)} />
+                <div className="assistant-picker-menu" role="menu">
+                  {reasoningEfforts.map((effort) => (
+                    <button
+                      type="button"
+                      key={effort}
+                      role="menuitem"
+                      className={`assistant-menu-item ${
+                        responseOptions.reasoningEffort === effort ? 'active' : ''
+                      }`}
+                      onClick={() => {
+                        setResponseOptions((current) =>
+                          current ? { ...current, reasoningEffort: effort } : current
+                        );
+                        setReasoningMenuOpen(false);
+                      }}
+                    >
+                      {effort}
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : null}
+          </div>
         ) : null}
       </div>
 
@@ -868,6 +1109,9 @@ export function AssistantPanel({
                   {message.usage?.output !== undefined ? (
                     <MetaChip>out {message.usage.output}</MetaChip>
                   ) : null}
+                  {message.usage?.reasoning !== undefined ? (
+                    <MetaChip>reasoning {message.usage.reasoning}</MetaChip>
+                  ) : null}
                   {message.durationMs !== undefined ? (
                     <MetaChip>{formatElapsed(message.durationMs)}</MetaChip>
                   ) : null}
@@ -880,6 +1124,36 @@ export function AssistantPanel({
           )
         )}
       </div>
+
+      {consentRequest ? (
+        <div className="assistant-consent-card" role="dialog" aria-modal="true">
+          <div className="assistant-error-head">
+            <span>Allow AI context to be sent?</span>
+          </div>
+          <p>This endpoint has not been approved for this connection:</p>
+          <code>{consentRequest.endpoint}</code>
+          <ul>
+            {consentRequest.categories.map((category) => (
+              <li key={category}>{category.replaceAll('-', ' ')}</li>
+            ))}
+          </ul>
+          <div className="command-card-actions">
+            <button type="button" className="primary-button settings-apply" onClick={() => void acceptConsent()}>
+              Allow and send
+            </button>
+            <button
+              type="button"
+              className="toolbar-button"
+              onClick={() => {
+                setConsentRequest(null);
+                setError('Endpoint consent was not granted.');
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {error ? (
         <div className="assistant-error-card" role="alert">

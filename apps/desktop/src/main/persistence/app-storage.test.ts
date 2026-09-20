@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import Database from 'better-sqlite3';
 import { AppStorage } from './app-storage';
 import type { Logger } from '../logging';
+import { normalizeEndpoint } from '../ai/endpoint';
 
 function testLogger(): Logger {
   return {
@@ -70,6 +71,7 @@ describe('application storage', () => {
       notes: 'Development machine',
       instructions: 'Use the project virtual environment.',
       attachToAi: true,
+      verified: true,
       detectedAt: '2026-09-19T00:00:00.000Z'
     });
     expect(reloaded.environmentSnapshot()[0]?.facts.hostname).toBe('devbox');
@@ -107,13 +109,63 @@ describe('application storage', () => {
       name: 'Local model',
       protocol: 'chat-completions',
       baseUrl: 'http://127.0.0.1:11434/v1',
-      model: 'local-model',
+      models: [{ id: 'local-model', model: 'local-model' }],
+      defaultModel: 'local-model',
       apiKey: 'ai-secret'
     });
     expect(storage.aiConnectionsSnapshot()[0]?.apiKeyRef).toBeTruthy();
     expect(storage.resolveAiConnection(storage.aiConnectionsSnapshot()[0]!.id, '').apiKey).toBe(
       'ai-secret'
     );
+
+    const savedConnections = await storage.saveAiConnection({
+      name: 'Responses model',
+      protocol: 'responses',
+      baseUrl: 'https://api.example.test/v1',
+      models: [
+        {
+          id: 'reasoning-model',
+          model: 'reasoning-model',
+          responses: {
+            reasoningEffort: 'high',
+            verbosity: 'low',
+            reasoningSummary: false,
+            webSearch: true
+          }
+        }
+      ],
+      defaultModel: 'reasoning-model'
+    });
+    const responsesConnection = savedConnections.find((item) => item.protocol === 'responses');
+    expect(
+      storage.resolveAiConnection(responsesConnection!.id, 'reasoning-model').responseOptions
+    ).toEqual({
+      reasoningEffort: 'high',
+      verbosity: 'low',
+      reasoningSummary: false,
+      webSearch: true
+    });
+    const endpointIdentity = normalizeEndpoint(
+      'https://api.example.test/v1',
+      'responses'
+    ).identity;
+    await storage.acceptAiEndpoint(responsesConnection!.id, endpointIdentity);
+    expect(
+      storage.aiConnectionsSnapshot().find((item) => item.id === responsesConnection!.id)
+        ?.acceptedEndpoint
+    ).toBe(endpointIdentity);
+    await storage.saveAiConnection({
+      id: responsesConnection!.id,
+      name: 'Responses model',
+      protocol: 'responses',
+      baseUrl: 'https://api.example.test/other',
+      models: [{ id: 'reasoning-model', model: 'reasoning-model' }],
+      defaultModel: 'reasoning-model'
+    });
+    expect(
+      storage.aiConnectionsSnapshot().find((item) => item.id === responsesConnection!.id)
+        ?.acceptedEndpoint
+    ).toBeUndefined();
 
     storage.lockVault();
     expect(() => storage.resolveSshProfile('remote-prod', 'session-2', 80, 24)).toThrow(

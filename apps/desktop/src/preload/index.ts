@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 import {
   AppInfoSchema,
   AiConnectionDeleteRequestSchema,
+  AiEndpointConsentRequestSchema,
   AiConnectionInputSchema,
   AiConnectionRecordSchema,
   AiHistoryContinueSchema,
@@ -228,6 +229,12 @@ const api = Object.freeze({
     const request = AiConnectionDeleteRequestSchema.parse({ id });
     return AiConnectionRecordSchema.array().parse(await ipcRenderer.invoke('ai:delete', request));
   },
+  acceptAiEndpoint: async (input: { connectionId: string; identity: string }) => {
+    const request = AiEndpointConsentRequestSchema.parse(input);
+    return AiConnectionRecordSchema.array().parse(
+      await ipcRenderer.invoke('ai:accept-endpoint', request)
+    );
+  },
   streamAi: (input: AiStreamRequest, onEvent: (event: unknown) => void) => {
     const request = AiStreamRequestSchema.parse(input);
     const channel = new MessageChannel();
@@ -427,6 +434,14 @@ const api = Object.freeze({
   },
   listEnvironments: async () =>
     EnvironmentRecordSchema.array().parse(await ipcRenderer.invoke('environment:list')),
+  onEnvironmentUpdated: (listener: (environment: EnvironmentRecord) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, payload: unknown): void => {
+      const result = EnvironmentRecordSchema.safeParse(payload);
+      if (result.success) listener(result.data);
+    };
+    ipcRenderer.on('environment:updated', handler);
+    return () => ipcRenderer.removeListener('environment:updated', handler);
+  },
   saveEnvironment: async (input: EnvironmentRecord) => {
     const environment = EnvironmentRecordSchema.parse(input);
     return EnvironmentRecordSchema.array().parse(

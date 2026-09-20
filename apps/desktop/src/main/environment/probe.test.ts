@@ -33,5 +33,16 @@ describe('environment probes', () => {
       command: 'sh',
       args: ['-c', expect.any(String)]
     });
+    expect(buildProbeInvocation('local', 'linux', undefined, '/bin/zsh')).toEqual({
+      command: '/bin/zsh',
+      args: ['-c', expect.any(String)]
+    });
+  });
+
+  it('uses the requested PowerShell executable for Windows local probes', () => {
+    expect(buildProbeInvocation('local', 'win32', undefined, 'C:\\Program Files\\PowerShell\\7\\pwsh.exe')).toEqual({
+      command: 'C:\\Program Files\\PowerShell\\7\\pwsh.exe',
+      args: ['-NoLogo', '-NoProfile', '-Command', expect.any(String)]
+    });
   });
 });

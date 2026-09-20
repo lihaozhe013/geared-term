@@ -101,4 +101,50 @@ describe('ai history store', () => {
     expect(entries[0]?.id).toBe(second.id);
     expect(entries[1]?.id).toBe(first.id);
   });
+
+  it('round-trips reasoning, usage, snapshots, sources, and continuation metadata', async () => {
+    const store = createStore();
+    const saved = await store.save({
+      title: 'Inspect output',
+      model: 'responses-model',
+      messages: [
+        {
+          role: 'user',
+          content: 'Explain this output',
+          snapshot: {
+            source: 'selection',
+            truncated: false,
+            lineStart: null,
+            lineEnd: null,
+            charCount: 12,
+            alternateScreen: false,
+            text: 'untrusted output'
+          }
+        },
+        {
+          role: 'assistant',
+          content: 'The output is inconclusive.',
+          reasoning: 'Compare the observed fields first.',
+          usage: { inputTokens: 12, outputTokens: 8, reasoningTokens: 4 },
+          sources: [{ url: 'https://example.com', title: 'Example' }],
+          continuation: {
+            connectionId: 'connection-1',
+            model: 'responses-model',
+            items: [{ type: 'reasoning', encrypted_content: 'opaque' }]
+          }
+        }
+      ]
+    });
+    await expect(store.load(saved.id)).resolves.toMatchObject({
+      messages: [
+        { snapshot: { text: 'untrusted output' } },
+        {
+          reasoning: 'Compare the observed fields first.',
+          usage: { inputTokens: 12, outputTokens: 8, reasoningTokens: 4 },
+          sources: [{ url: 'https://example.com', title: 'Example' }],
+          continuation: { connectionId: 'connection-1' }
+        }
+      ]
+    });
+  });
 });

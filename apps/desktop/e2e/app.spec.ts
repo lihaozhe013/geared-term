@@ -16,7 +16,7 @@ test('opens the main window and connects the secure bridge', async () => {
   await expect(page).toHaveTitle('Geared Term');
   await expect(page.locator('.titlebar-app')).toHaveText('Geared Term');
   await expect(page.locator('.terminal-line.success')).toContainText('bridge: Geared Term');
-  await expect(page.locator('.terminal-line.success')).toContainText('(win32)');
+  await expect(page.locator('.terminal-line.success')).toContainText(`(${process.platform})`);
 });
 
 test('keeps the renderer sandboxed behind a frozen preload allowlist', async () => {

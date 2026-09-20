@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import {
   AiConnectionInputSchema,
   AiConnectionRecordSchema,
+  AiResponsesModelDefaultsSchema,
   type ProfileCredentials,
   SshTerminalRequestSchema,
   type AiConnectionInput,
@@ -491,7 +492,13 @@ export class AppStorage {
   public aiConnectionsSnapshot(): AiConnectionRecord[] {
     return this.requireDatabase()
       .listAiConnections()
-      .map((connection) => ({ ...connection, models: [...connection.models] }));
+      .map((connection) => ({
+        ...connection,
+        models: connection.models.map((model) => ({
+          ...model,
+          responses: model.responses ? { ...model.responses } : undefined
+        }))
+      }));
   }
 
   public async saveAiConnection(rawInput: AiConnectionInput): Promise<AiConnectionRecord[]> {
@@ -511,14 +518,29 @@ export class AppStorage {
     } else if (input.apiKey !== undefined) {
       apiKeyRef = undefined;
     }
+    const models = input.models.map((model) => {
+      const previous = current?.models.find((candidate) => candidate.model === model.model);
+      const responses =
+        input.protocol === 'responses'
+          ? AiResponsesModelDefaultsSchema.parse(
+              model.responses ?? previous?.responses ?? {}
+            )
+          : undefined;
+      return { ...model, responses };
+    });
     const connection = AiConnectionRecordSchema.parse({
       id,
       name: input.name,
       protocol: input.protocol,
       baseUrl: endpoint.baseUrl,
-      models: Array.from(new Set([...(current?.models ?? []), input.model])),
-      defaultModel: input.model,
-      apiKeyRef
+      models,
+      defaultModel: input.defaultModel,
+      apiKeyRef,
+      acceptedEndpoint:
+        current &&
+        normalizeEndpoint(current.baseUrl, current.protocol).identity === endpoint.identity
+          ? current.acceptedEndpoint
+          : undefined
     });
     database.transaction(() => {
       if (newSecret) database.putSecret(newSecret[0], newSecret[1]);
@@ -545,18 +567,44 @@ export class AppStorage {
     protocol: 'responses' | 'chat-completions';
     model: string;
     apiKey?: string;
+    responseOptions: ReturnType<typeof AiResponsesModelDefaultsSchema.parse>;
+    acceptedEndpoint?: string;
+    connectionId: string;
   } {
     const connection = this.requireDatabase()
       .listAiConnections()
       .find((item) => item.id === id);
     if (!connection) throw new Error('AI connection was not found');
+    const selected =
+      connection.models.find((item) => item.model === model) ??
+      connection.models.find((item) => item.model === connection.defaultModel);
+    if (!selected) throw new Error('AI model was not found in the selected connection');
     const apiKey = connection.apiKeyRef ? this.decryptSecret(connection.apiKeyRef) : undefined;
     return {
+      connectionId: connection.id,
       endpoint: connection.baseUrl,
       protocol: connection.protocol,
-      model: model || connection.defaultModel,
-      apiKey
+      model: selected.model,
+      apiKey,
+      responseOptions:
+        selected.responses ?? AiResponsesModelDefaultsSchema.parse({}),
+      acceptedEndpoint: connection.acceptedEndpoint
     };
+  }
+
+  public async acceptAiEndpoint(id: string, identity: string): Promise<AiConnectionRecord[]> {
+    const database = this.requireDatabase();
+    const connection = database.listAiConnections().find((item) => item.id === id);
+    if (!connection) throw new Error('AI connection was not found');
+    const endpoint = normalizeEndpoint(connection.baseUrl, connection.protocol);
+    if (endpoint.identity !== identity) throw new Error('AI endpoint identity has changed');
+    database.transaction(() => {
+      database.upsertAiConnection(
+        { ...connection, acceptedEndpoint: identity },
+        new Date().toISOString()
+      );
+    });
+    return this.aiConnectionsSnapshot();
   }
 
   public close(): void {

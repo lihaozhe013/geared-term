@@ -170,19 +170,75 @@ export const WslDistributionSchema = z.object({
   version: z.union([z.literal(1), z.literal(2), z.null()])
 });
 
+export const AiResponsesReasoningEffortSchema = z.enum([
+  'default',
+  'none',
+  'minimal',
+  'low',
+  'medium',
+  'high',
+  'xhigh',
+  'max'
+]);
+
+export const AiResponsesVerbositySchema = z.enum(['default', 'low', 'medium', 'high']);
+
+export const AiResponsesModelDefaultsSchema = z
+  .object({
+    reasoningEffort: AiResponsesReasoningEffortSchema.default('default'),
+    verbosity: AiResponsesVerbositySchema.default('default'),
+    reasoningSummary: z.boolean().default(true),
+    webSearch: z.boolean().default(false)
+  })
+  .strict();
+
+export const AiModelProfileSchema = z
+  .object({
+    id: z.string().min(1).max(256),
+    model: z.string().min(1).max(256),
+    label: z.string().max(256).optional(),
+    responses: AiResponsesModelDefaultsSchema.optional()
+  })
+  .strict();
+
+const LegacyAiModelSchema = z.string().min(1).max(256);
+const AiModelListSchema = z.array(z.union([AiModelProfileSchema, LegacyAiModelSchema])).max(256);
+
+function normalizeAiModels(
+  models: Array<z.infer<typeof AiModelProfileSchema> | string>
+): Array<z.infer<typeof AiModelProfileSchema>> {
+  return models.map((model) =>
+    typeof model === 'string' ? { id: model, model } : AiModelProfileSchema.parse(model)
+  );
+}
+
 export const AiConnectionRecordSchema = z
   .object({
     id: IdSchema,
     name: z.string().min(1).max(160),
     protocol: z.enum(['responses', 'chat-completions']),
     baseUrl: z.string().url(),
-    models: z.array(z.string().min(1).max(256)).max(256),
+    models: AiModelListSchema,
     defaultModel: z.string().min(1).max(256),
-    apiKeyRef: IdSchema.optional()
+    apiKeyRef: IdSchema.optional(),
+    acceptedEndpoint: z.string().max(512).optional()
+  })
+  .strict()
+  .transform((value) => ({ ...value, models: normalizeAiModels(value.models) }));
+
+const AiConnectionInputRecordSchema = z
+  .object({
+    id: IdSchema.optional(),
+    name: z.string().min(1).max(160),
+    protocol: z.enum(['responses', 'chat-completions']),
+    baseUrl: z.string().min(1).max(2048),
+    models: z.array(AiModelProfileSchema).min(1).max(256),
+    defaultModel: z.string().min(1).max(256),
+    apiKey: z.string().max(4096).optional()
   })
   .strict();
 
-export const AiConnectionInputSchema = z
+const LegacyAiConnectionInputSchema = z
   .object({
     id: IdSchema.optional(),
     name: z.string().min(1).max(160),
@@ -193,7 +249,24 @@ export const AiConnectionInputSchema = z
   })
   .strict();
 
+export const AiConnectionInputSchema = z
+  .union([AiConnectionInputRecordSchema, LegacyAiConnectionInputSchema])
+  .transform((value) => {
+    if ('model' in value) {
+      return {
+        ...value,
+        models: [{ id: value.model, model: value.model }],
+        defaultModel: value.model
+      };
+    }
+    return value;
+  });
+
 export const AiConnectionDeleteRequestSchema = z.object({ id: IdSchema }).strict();
+
+export const AiEndpointConsentRequestSchema = z
+  .object({ connectionId: IdSchema, identity: z.string().max(512) })
+  .strict();
 
 export const AiDiscoverModelsRequestSchema = z
   .object({
@@ -228,10 +301,48 @@ export const AiHistoryListSchema = z.object({ entries: z.array(AiHistorySummaryS
 
 export const AiHistoryLoadRequestSchema = z.object({ id: AiHistoryIdSchema }).strict();
 
+export const AiSourceReferenceSchema = z
+  .object({
+    url: z.string().url().regex(/^https?:\/\//iu),
+    title: z.string().max(512).optional()
+  })
+  .strict();
+
+export const AiContinuationMetadataSchema = z
+  .object({
+    connectionId: IdSchema,
+    model: z.string().min(1).max(256),
+    items: z.array(z.record(z.string(), z.unknown())).max(32)
+  })
+  .strict();
+
 export const AiHistoryMessageSchema = z
   .object({
     role: z.enum(['user', 'assistant']),
-    content: z.string().max(256 * 1024)
+    content: z.string().max(256 * 1024),
+    reasoning: z.string().max(256 * 1024).optional(),
+    usage: z
+      .object({
+        inputTokens: z.number().int().nonnegative().optional(),
+        outputTokens: z.number().int().nonnegative().optional(),
+        reasoningTokens: z.number().int().nonnegative().optional()
+      })
+      .strict()
+      .optional(),
+    snapshot: z
+      .object({
+        source: z.enum(['selection', 'viewport', 'viewport+preceding']),
+        truncated: z.boolean(),
+        lineStart: z.number().int().nonnegative().nullable(),
+        lineEnd: z.number().int().nonnegative().nullable(),
+        charCount: z.number().int().nonnegative(),
+        alternateScreen: z.boolean(),
+        text: z.string().max(256 * 1024)
+      })
+      .strict()
+      .optional(),
+    sources: z.array(AiSourceReferenceSchema).max(128).optional(),
+    continuation: AiContinuationMetadataSchema.optional()
   })
   .strict();
 
@@ -259,19 +370,39 @@ export const AiHistorySavedSchema = z
 
 export const AiHistoryContinueSchema = z.object({ id: AiHistoryIdSchema }).strict();
 
+export const AiSnapshotAttachmentSchema = z
+  .object({
+    source: z.enum(['selection', 'viewport', 'viewport+preceding']),
+    truncated: z.boolean(),
+    lineStart: z.number().int().nonnegative().nullable(),
+    lineEnd: z.number().int().nonnegative().nullable(),
+    charCount: z.number().int().nonnegative(),
+    alternateScreen: z.boolean(),
+    text: z.string().max(256 * 1024)
+  })
+  .strict();
+
 export const AiChatMessageSchema = z
   .object({
     role: z.enum(['system', 'user', 'assistant']),
-    content: z.string().max(256 * 1024)
+    content: z.string().max(256 * 1024),
+    continuation: AiContinuationMetadataSchema.optional(),
+    snapshot: AiSnapshotAttachmentSchema.optional()
   })
   .strict();
+
+export const AiStreamResponseOptionsSchema = AiResponsesModelDefaultsSchema;
 
 export const AiStreamRequestSchema = z
   .object({
     streamId: IdSchema,
     connectionId: IdSchema,
     model: z.string().min(1).max(256),
-    messages: z.array(AiChatMessageSchema).min(1).max(100)
+    targetKey: z.string().min(1).max(512).optional(),
+    messages: z.array(AiChatMessageSchema).max(100),
+    prompt: z.string().min(1).max(256 * 1024),
+    snapshot: AiSnapshotAttachmentSchema.optional(),
+    responseOptions: AiStreamResponseOptionsSchema.optional()
   })
   .strict();
 
@@ -295,17 +426,41 @@ export const AiStreamEventSchema = z.discriminatedUnion('kind', [
     kind: z.literal('activity'),
     id: z.string().min(1).max(128),
     label: AiActivityLabelSchema,
-    detail: z.string().max(200).optional()
+    detail: z.string().max(200).optional(),
+    state: z.enum(['running', 'done']).default('running')
   }),
   z.object({
     kind: z.literal('usage'),
     inputTokens: z.number().int().nonnegative().optional(),
-    outputTokens: z.number().int().nonnegative().optional()
+    outputTokens: z.number().int().nonnegative().optional(),
+    reasoningTokens: z.number().int().nonnegative().optional()
   }),
   z.object({
     kind: z.literal('source'),
-    url: z.string().url(),
+    url: z.string().url().regex(/^https?:\/\//iu),
     title: z.string().max(512).optional()
+  }),
+  z.object({
+    kind: z.literal('continuation'),
+    connectionId: IdSchema,
+    model: z.string().min(1).max(256),
+    items: z.array(z.record(z.string(), z.unknown())).max(32)
+  }),
+  z.object({
+    kind: z.literal('consent-required'),
+    endpoint: z.string().url(),
+    identity: z.string().max(512),
+    categories: z.array(
+      z.enum([
+        'system-prompt',
+        'global-instructions',
+        'environment-facts',
+        'environment-instructions',
+        'conversation-history',
+        'current-prompt',
+        'terminal-snapshot'
+      ])
+    )
   }),
   z.object({ kind: z.literal('complete') }),
   z.object({ kind: z.literal('error'), message: z.string().min(1).max(1024) })
@@ -689,6 +844,7 @@ export const EnvironmentRecordSchema = z
     notes: z.string().max(8192),
     instructions: z.string().max(8192),
     attachToAi: z.boolean(),
+    verified: z.boolean().default(false),
     detectedAt: z.string().max(64).nullable()
   })
   .strict();
@@ -696,7 +852,10 @@ export const EnvironmentRecordSchema = z
 export const EnvironmentProbeRequestSchema = z
   .object({
     kind: z.enum(['local', 'wsl']),
-    distribution: z.string().max(256).optional()
+    distribution: z.string().max(256).optional(),
+    shell: z.string().max(512).optional(),
+    cwd: z.string().max(4096).optional(),
+    environment: z.record(z.string().max(128), z.string().max(4096)).optional()
   })
   .strict()
   .superRefine((value, context) => {
@@ -807,6 +966,8 @@ export type AiHistoryLoadResult = z.infer<typeof AiHistoryLoadResultSchema>;
 export type AiHistorySaveRequest = z.infer<typeof AiHistorySaveRequestSchema>;
 export type AiHistorySaved = z.infer<typeof AiHistorySavedSchema>;
 export type AiHistoryContinue = z.infer<typeof AiHistoryContinueSchema>;
+export type AiSourceReference = z.infer<typeof AiSourceReferenceSchema>;
+export type AiContinuationMetadata = z.infer<typeof AiContinuationMetadataSchema>;
 export type VaultStatus = z.infer<typeof VaultStatusSchema>;
 export type SessionProfileRecord = z.infer<typeof SessionProfileRecordSchema>;
 export type ProfileCredentials = z.infer<typeof ProfileCredentialsSchema>;
@@ -817,7 +978,13 @@ export type SettingsRecord = z.infer<typeof SettingsRecordSchema>;
 export type WslDistribution = z.infer<typeof WslDistributionSchema>;
 export type AiConnectionRecord = z.infer<typeof AiConnectionRecordSchema>;
 export type AiConnectionInput = z.infer<typeof AiConnectionInputSchema>;
+export type AiEndpointConsentRequest = z.infer<typeof AiEndpointConsentRequestSchema>;
+export type AiResponsesReasoningEffort = z.infer<typeof AiResponsesReasoningEffortSchema>;
+export type AiResponsesVerbosity = z.infer<typeof AiResponsesVerbositySchema>;
+export type AiResponsesModelDefaults = z.infer<typeof AiResponsesModelDefaultsSchema>;
+export type AiModelProfile = z.infer<typeof AiModelProfileSchema>;
 export type AiChatMessage = z.infer<typeof AiChatMessageSchema>;
+export type AiSnapshotAttachment = z.infer<typeof AiSnapshotAttachmentSchema>;
 export type AiStreamRequest = z.infer<typeof AiStreamRequestSchema>;
 export type AiStreamEvent = z.infer<typeof AiStreamEventSchema>;
 export type AiActivityLabel = z.infer<typeof AiActivityLabelSchema>;

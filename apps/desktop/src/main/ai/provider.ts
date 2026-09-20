@@ -11,7 +11,18 @@ const connectTimeoutMs = 15_000;
 const idleTimeoutMs = 60_000;
 const maxResponseBytes = 4 * 1024 * 1024;
 
+export class AiProviderError extends Error {
+  public constructor(
+    message: string,
+    public readonly status?: number
+  ) {
+    super(message);
+    this.name = 'AiProviderError';
+  }
+}
+
 export type AiRequest = {
+  connectionId?: string;
   endpoint: string;
   protocol: AiProtocol;
   model: string;
@@ -37,13 +48,31 @@ async function readStream(
   response: Response,
   protocol: AiProtocol,
   onEvent: (event: AiStreamEvent) => void,
-  signal: AbortSignal
+  signal: AbortSignal,
+  continuationContext: { connectionId: string; model: string }
 ): Promise<void> {
   if (!response.body) throw new Error('AI provider returned no response body');
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
   let totalBytes = 0;
+  let completed = false;
+  const seenSources = new Set<string>();
+  const emitMapped = (mapped: AiStreamEvent | AiStreamEvent[] | undefined): void => {
+    if (!mapped) return;
+    for (const event of Array.isArray(mapped) ? mapped : [mapped]) {
+      if (event.kind === 'source') {
+        if (seenSources.has(event.url)) continue;
+        seenSources.add(event.url);
+      }
+      if (event.kind === 'continuation') {
+        onEvent({ ...event, ...continuationContext });
+      } else {
+        onEvent(event);
+      }
+      if (event.kind === 'complete') completed = true;
+    }
+  };
   while (true) {
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
     const result = await Promise.race([
@@ -64,12 +93,13 @@ async function readStream(
     for (const frame of split.frames) {
       const payload = parseSseFrame(frame);
       if (payload && typeof payload === 'object' && 'done' in payload && payload.done === true) {
-        onEvent({ kind: 'complete' });
+        if (!completed) onEvent({ kind: 'complete' });
+        completed = true;
         return;
       }
       const event =
         protocol === 'responses' ? mapResponseEvent(payload) : mapChatCompletionEvent(payload);
-      if (event) onEvent(event);
+      emitMapped(event);
     }
   }
   const finalPayload = parseSseFrame(buffer);
@@ -77,8 +107,8 @@ async function readStream(
     protocol === 'responses'
       ? mapResponseEvent(finalPayload)
       : mapChatCompletionEvent(finalPayload);
-  if (finalEvent) onEvent(finalEvent);
-  onEvent({ kind: 'complete' });
+  emitMapped(finalEvent);
+  if (!completed) onEvent({ kind: 'complete' });
 }
 
 export async function streamAiRequest(request: AiRequest): Promise<AiResponse> {
@@ -117,12 +147,16 @@ export async function streamAiRequest(request: AiRequest): Promise<AiResponse> {
         .text()
         .then((value) => value.slice(0, 1024))
         .catch(() => '');
-      throw new Error(
-        `AI provider rejected request (${response.status})${body ? `: ${body}` : ''}`
+      throw new AiProviderError(
+        `AI provider rejected request (${response.status})${body ? `: ${body}` : ''}`,
+        response.status
       );
     }
     request.onEvent({ kind: 'activity', id: 'work', label: 'working' });
-    await readStream(response, request.protocol, emit, signal);
+    await readStream(response, request.protocol, emit, signal, {
+      connectionId: request.connectionId ?? 'provider',
+      model: request.model
+    });
     return { endpoint, status: response.status };
   } finally {
     clearTimeout(timeout);

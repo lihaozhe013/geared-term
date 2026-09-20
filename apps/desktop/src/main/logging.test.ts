@@ -25,4 +25,32 @@ describe('log redaction', () => {
     expect(systemLog).toContain('plain message');
     expect(systemLog).toContain('example.com');
   });
+
+  it('keeps assistant lifecycle metadata while excluding request content', async () => {
+    const directory = await fs.mkdtemp(join(tmpdir(), 'geared-assistant-logging-'));
+    const logger = createLogger(directory);
+    logger.info('assistant', 'AI request prepared', {
+      connectionId: 'connection-1',
+      model: 'model',
+      protocol: 'responses',
+      messageCount: 4,
+      categories: ['system-prompt', 'terminal-snapshot'],
+      inputBytes: 512,
+      snapshotAttached: true
+    });
+    logger.info('assistant', 'AI request completed', {
+      durationMs: 120,
+      httpStatus: 200,
+      inputTokens: 12,
+      outputTokens: 8,
+      reasoningTokens: 3,
+      sourceCount: 2
+    });
+    const assistantLog = await fs.readFile(join(directory, 'debug-assistant.log'), 'utf8');
+    expect(assistantLog).toContain('messageCount');
+    expect(assistantLog).toContain('httpStatus');
+    expect(assistantLog).toContain('sourceCount');
+    expect(assistantLog).not.toContain('secret terminal output');
+    expect(assistantLog).not.toContain('user prompt');
+  });
 });
