@@ -9,6 +9,7 @@ import type {
 } from '@geared-term/protocol';
 import { FolderOpen, FolderSync, Plus } from 'lucide-react';
 import { settingsLocale, translate } from '../i18n';
+import gearedTermMark from '../assets/geared-term-mark.png';
 import { Row, Section, Stepper } from './primitives';
 
 export type Translate = (key: Parameters<typeof translate>[1]) => string;
@@ -540,16 +541,21 @@ export function AboutSection({
 }): React.JSX.Element {
   return (
     <Section title={t('groupAbout')}>
-      <p className="settings-about-line">
-        {info ? `${info.name} ${info.version}` : ''}
-        {info ? ` · ${t('platform')}: ${info.platform}` : ''}
-      </p>
-      {runtime ? (
-        <p className="settings-about-line">
-          Electron {runtime.electron} · Chromium {runtime.chrome} · Node {runtime.node}
-        </p>
-      ) : null}
-      {runtime ? <p className="settings-about-path">{runtime.configDirectory}</p> : null}
+      <div className="settings-about-header">
+        <img className="settings-about-icon" src={gearedTermMark} alt="" aria-hidden="true" />
+        <div className="settings-about-meta">
+          <p className="settings-about-line">
+            {info ? `${info.name} ${info.version} (${__APP_COMMIT__})` : ''}
+            {info ? ` · ${t('platform')}: ${info.platform}` : ''}
+          </p>
+          {runtime ? (
+            <p className="settings-about-line">
+              Electron {runtime.electron} · Chromium {runtime.chrome} · Node {runtime.node}
+            </p>
+          ) : null}
+          {runtime ? <p className="settings-about-path">{runtime.configDirectory}</p> : null}
+        </div>
+      </div>
       <div className="settings-actions-row">
         <button
           type="button"

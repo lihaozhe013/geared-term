@@ -1,3 +1,4 @@
+import { execSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import react from '@vitejs/plugin-react';
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite';
@@ -7,6 +8,19 @@ const aliases = {
   '@geared-term/protocol': resolve(__dirname, '../../packages/protocol/src/index.ts'),
   '@geared-term/command-parser': resolve(__dirname, '../../packages/command-parser/src/index.ts')
 };
+
+function resolveCommitHash(): string {
+  try {
+    return execSync('git rev-parse --short HEAD', {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore']
+    }).trim();
+  } catch {
+    return 'unknown';
+  }
+}
+
+const commitHash = resolveCommitHash();
 
 export default defineConfig({
   main: {
@@ -43,6 +57,7 @@ export default defineConfig({
   renderer: {
     root: resolve(__dirname, 'src/renderer'),
     resolve: { alias: aliases },
+    define: { __APP_COMMIT__: JSON.stringify(commitHash) },
     plugins: [react()],
     build: {
       rollupOptions: {

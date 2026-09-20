@@ -60,6 +60,8 @@ import type {
 } from '@geared-term/protocol';
 
 declare global {
+  const __APP_COMMIT__: string;
+
   interface Window {
     geared: {
       readonly platform: NodeJS.Platform;

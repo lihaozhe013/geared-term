@@ -1624,6 +1624,28 @@ button:disabled {
   flex-wrap: wrap;
 }
 
+.settings-about-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.settings-about-icon {
+  display: block;
+  width: calc(40px * var(--gt-ui-scale, 1));
+  height: calc(40px * var(--gt-ui-scale, 1));
+  border-radius: 8px;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+.settings-about-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
 .settings-about-line {
   margin: 0;
   font-size: var(--gt-fs-md);
