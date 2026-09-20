@@ -99,6 +99,7 @@ const userDataOverride = process.env.GEARED_USER_DATA?.trim();
 if (userDataOverride) app.setPath('userData', userDataOverride);
 let logger: Logger;
 let mainWindow: BrowserWindow | undefined;
+let quitRequested = false;
 let settingsWindow: SettingsWindowManager;
 let historyWindow: HistoryWindowManager;
 let localTerminals: LocalTerminalManager;
@@ -182,7 +183,9 @@ function safeAssistantFailure(error: unknown): string {
   return 'request-failed';
 }
 
-function attachedEnvironmentForTarget(targetKey: string): ReturnType<AppStorage['environmentSnapshot']>[number] | undefined {
+function attachedEnvironmentForTarget(
+  targetKey: string
+): ReturnType<AppStorage['environmentSnapshot']>[number] | undefined {
   const records = storage.environmentSnapshot().filter((record) => record.attachToAi);
   const exact = records.find((record) => record.targetKey === targetKey);
   if (exact) return exact;
@@ -282,7 +285,13 @@ function createWindow(): BrowserWindow {
           error: error instanceof Error ? error.message : String(error)
         });
       })
-      .finally(() => window.close());
+      .finally(() => {
+        window.close();
+        // Preventing the first close canceled the in-flight quit cycle, and on
+        // macOS window-all-closed does not re-issue it, which would leave the
+        // app running without windows until a second quit is requested.
+        if (quitRequested) app.quit();
+      });
   });
   window.webContents.setWindowOpenHandler(({ url }) => {
     if (isAllowedExternalUrl(url)) {
@@ -966,6 +975,7 @@ void app.whenReady().then(async () => {
 });
 
 app.on('before-quit', () => {
+  quitRequested = true;
   localTerminals?.closeAll();
   sshSessions?.closeAll();
 });
