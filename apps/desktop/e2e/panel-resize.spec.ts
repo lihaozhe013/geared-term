@@ -10,7 +10,7 @@ test.beforeEach(async () => {
 });
 
 test.afterEach(async () => {
-  await session.close();
+  await session?.close();
 });
 
 async function workspaceColumns(page: Page): Promise<string> {

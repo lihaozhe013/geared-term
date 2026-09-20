@@ -39,7 +39,17 @@ export async function launchApp(): Promise<AppSession> {
   const electronBinary = require('electron') as unknown as string;
   const userDataDirectory = await fs.mkdtemp(join(tmpdir(), 'geared-e2e-'));
   const app = await electron.launch({
-    args: [appDirectory],
+    // On a real (non-Xvfb) display a test window can be occluded by other
+    // windows; Chromium then stops presenting frames for it, and click
+    // actionability checks that wait for a stable box hang forever. Disable
+    // occlusion detection and raise the window so desktop runs behave like CI.
+    args: [
+      appDirectory,
+      '--disable-features=CalculateNativeWinOcclusion',
+      '--disable-backgrounding-occluded-windows',
+      '--disable-renderer-backgrounding',
+      '--disable-background-timer-throttling'
+    ],
     executablePath: electronBinary,
     cwd: userDataDirectory,
     env: {
@@ -48,6 +58,13 @@ export async function launchApp(): Promise<AppSession> {
     }
   });
   const page = await app.firstWindow();
+  await app.evaluate(({ BrowserWindow }) => {
+    for (const window of BrowserWindow.getAllWindows()) {
+      window.show();
+      window.moveTop();
+      window.focus();
+    }
+  });
   await page.waitForLoadState('domcontentloaded');
   await passVaultGate(page);
   return {

@@ -8,7 +8,7 @@ test.beforeEach(async () => {
 });
 
 test.afterEach(async () => {
-  await session.close();
+  await session?.close();
 });
 
 async function rowsLetterSpacing(page: AppSession['page']): Promise<string> {

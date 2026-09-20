@@ -8,7 +8,7 @@ test.beforeEach(async () => {
 });
 
 test.afterEach(async () => {
-  await session.close();
+  await session?.close();
 });
 
 test('wires navigation prevention onto the main window', async () => {

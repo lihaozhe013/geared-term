@@ -8,7 +8,7 @@ test.beforeEach(async () => {
 });
 
 test.afterEach(async () => {
-  await session.close();
+  await session?.close();
 });
 
 test('opens the settings window with category navigation', async () => {

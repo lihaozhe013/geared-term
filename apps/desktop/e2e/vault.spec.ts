@@ -8,7 +8,7 @@ test.beforeEach(async () => {
 });
 
 test.afterEach(async () => {
-  await session.close();
+  await session?.close();
 });
 
 async function openSshProfileEditor(page: AppSession['page']): Promise<Locator> {
