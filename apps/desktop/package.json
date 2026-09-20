@@ -20,7 +20,17 @@
     "test:e2e": "playwright test -c playwright.config.ts",
     "audit:security": "node scripts/security-audit.mjs",
     "postinstall": "electron-builder install-app-deps",
-    "package": "pnpm run build && electron-builder --config electron-builder.yml"
+    "build:win": "pnpm run build && electron-builder --config electron-builder.yml --win --publish never",
+    "build:win:x64": "pnpm run build && electron-builder --config electron-builder.yml --win --x64 --publish never",
+    "build:mac": "pnpm run build && electron-builder --config electron-builder.yml --mac --publish never",
+    "build:mac:arm64": "pnpm run build && electron-builder --config electron-builder.yml --mac --arm64 --publish never",
+    "build:mac:x64": "pnpm run build && electron-builder --config electron-builder.yml --mac --x64 --publish never",
+    "build:linux": "pnpm run build && electron-builder --config electron-builder.yml --linux --publish never",
+    "build:linux:x64": "pnpm run build && electron-builder --config electron-builder.yml --linux --x64 --publish never",
+    "package": "pnpm run build && electron-builder --config electron-builder.yml --publish never",
+    "package:win": "pnpm run build:win:x64",
+    "package:mac": "pnpm run build:mac:arm64",
+    "package:linux": "pnpm run build:linux:x64"
   },
   "dependencies": {
     "@geared-term/domain": "workspace:*",

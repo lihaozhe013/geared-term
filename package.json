@@ -6,7 +6,7 @@
   "description": "A secure Electron terminal application.",
   "packageManager": "pnpm@12.4.2",
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=26.0.0"
   },
   "scripts": {
     "dev": "pnpm --filter @geared-term/desktop dev",
@@ -16,7 +16,10 @@
     "test:e2e": "pnpm build && pnpm --filter @geared-term/desktop test:e2e",
     "format:check": "prettier --check .",
     "format": "prettier --write .",
-    "package": "pnpm --filter @geared-term/desktop package"
+    "package": "pnpm --filter @geared-term/desktop package",
+    "package:win": "pnpm --filter @geared-term/desktop package:win",
+    "package:mac": "pnpm --filter @geared-term/desktop package:mac",
+    "package:linux": "pnpm --filter @geared-term/desktop package:linux"
   },
   "devDependencies": {
     "@types/node": "26.6.2",

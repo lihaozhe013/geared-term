@@ -1,5 +1,6 @@
 appId: dev.gearedterm.desktop
 productName: Geared Term
+copyright: Copyright © 2026 Geared Term contributors
 directories:
   output: out/releases
   buildResources: resources
@@ -13,15 +14,35 @@ asar: true
 asarUnpack:
   - '**/*.node'
 win:
+  executableName: geared-term
+  artifactName: geared-term-win-${arch}-${version}.${ext}
   target:
-    - nsis
-    - portable
+    - target: nsis
+      arch:
+        - x64
+    - target: portable
+      arch:
+        - x64
+nsis:
+  artifactName: geared-term-win-${arch}-${version}-setup.${ext}
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  perMachine: false
+portable:
+  artifactName: geared-term-win-${arch}-${version}-portable.${ext}
 mac:
+  artifactName: geared-term-mac-${arch}-${version}.${ext}
+  category: public.app-category.developer-tools
+  hardenedRuntime: true
   target:
     - dmg
-  category: public.app-category.developer-tools
 linux:
+  artifactName: geared-term-linux-${arch}-${version}.${ext}
+  category: Development
   target:
     - AppImage
-  category: Development
-  artifactName: '${productName}-${version}-${arch}.${ext}'
+dmg:
+  artifactName: geared-term-mac-${arch}-${version}.${ext}
+publish: null

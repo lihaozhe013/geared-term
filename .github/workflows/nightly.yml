@@ -1,0 +1,301 @@
+name: Build and publish nightly packages
+
+on:
+  push:
+    branches:
+      - publish
+  workflow_dispatch:
+
+concurrency:
+  group: packaging-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '26'
+
+jobs:
+  checks:
+    name: Check and test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Cache Electron downloads
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/electron
+          key:
+            electron-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('apps/desktop/package.json',
+            'pnpm-lock.yaml') }}
+          restore-keys: |
+            electron-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      - name: Install X11 window manager
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends --yes openbox
+
+      - name: Electron E2E acceptance
+        run: |
+          xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24' \
+            bash -c 'openbox --sm-disable >/tmp/geared-term-openbox.log 2>&1 & sleep 1; pnpm test:e2e'
+
+  packages:
+    name: Package ${{ matrix.name }}
+    needs: checks
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows-x64
+            os: windows-latest
+            platform: windows
+            arch: x64
+          - name: macos-arm64
+            os: macos-latest
+            platform: macos
+            arch: arm64
+          - name: linux-x64
+            os: ubuntu-latest
+            platform: linux
+            arch: x64
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Cache Electron downloads
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cache/electron
+            ~/Library/Caches/electron
+            ~/AppData/Local/electron/Cache
+          key:
+            electron-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('apps/desktop/package.json',
+            'pnpm-lock.yaml') }}
+          restore-keys: |
+            electron-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Windows installer and portable
+        if: matrix.platform == 'windows'
+        run: pnpm run package:win
+
+      - name: Build macOS DMG
+        if: matrix.platform == 'macos'
+        run: pnpm run package:mac
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Build Linux AppImage
+        if: matrix.platform == 'linux'
+        run: pnpm run package:linux
+
+      - name: Verify Windows packages
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          $releases = 'apps/desktop/out/releases'
+          $setups = @(Get-ChildItem -Path $releases -Filter '*-setup.exe' -File)
+          $portables = @(Get-ChildItem -Path $releases -Filter '*-portable.exe' -File)
+          if ($setups.Count -ne 1 -or $setups[0].Length -le 0) {
+            throw "Expected exactly one non-empty Windows installer, found $($setups.Count)."
+          }
+          if ($portables.Count -ne 1 -or $portables[0].Length -le 0) {
+            throw "Expected exactly one non-empty Windows portable, found $($portables.Count)."
+          }
+
+      - name: Verify macOS DMG
+        if: matrix.platform == 'macos'
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          images=(apps/desktop/out/releases/*.dmg)
+          if (( ${#images[@]} != 1 )) || [[ ! -s "${images[0]}" ]]; then
+            echo "Expected exactly one non-empty macOS DMG, found ${#images[@]}."
+            exit 1
+          fi
+
+      - name: Verify Linux AppImage
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          images=(apps/desktop/out/releases/*.AppImage)
+          if (( ${#images[@]} != 1 )) || [[ ! -s "${images[0]}" ]]; then
+            echo "Expected exactly one non-empty Linux AppImage, found ${#images[@]}."
+            exit 1
+          fi
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: geared-term-${{ matrix.name }}
+          retention-days: 7
+          if-no-files-found: error
+          path: |
+            apps/desktop/out/releases/*.dmg
+            apps/desktop/out/releases/*-setup.exe
+            apps/desktop/out/releases/*-portable.exe
+            apps/desktop/out/releases/*.AppImage
+
+  release:
+    name: Publish nightly release
+    if: github.ref == 'refs/heads/publish'
+    needs: packages
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+
+    steps:
+      - name: Download platform packages
+        uses: actions/download-artifact@v8
+        with:
+          pattern: geared-term-*
+          path: staging
+          merge-multiple: true
+
+      - name: Prepare release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+
+          windows_installers=(staging/*-setup.exe)
+          windows_portables=(staging/*-portable.exe)
+          macos_images=(staging/*.dmg)
+          linux_images=(staging/*.AppImage)
+          if (( ${#windows_installers[@]} != 1 )) || (( ${#windows_portables[@]} != 1 )) || (( ${#macos_images[@]} != 1 )) || (( ${#linux_images[@]} != 1 )); then
+            echo "Expected exactly one package per platform, got ${#windows_installers[@]} Windows installers, ${#windows_portables[@]} Windows portables, ${#macos_images[@]} macOS and ${#linux_images[@]} Linux images."
+            exit 1
+          fi
+
+          mkdir -p release-assets
+          cp -- "${windows_installers[0]}" release-assets/geared-term-windows-x64-setup.exe
+          cp -- "${windows_portables[0]}" release-assets/geared-term-windows-x64-portable.exe
+          cp -- "${macos_images[0]}" release-assets/geared-term-macos-arm64.dmg
+          cp -- "${linux_images[0]}" release-assets/geared-term-linux-x64.AppImage
+          (
+            cd release-assets
+            shasum -a 256 \
+              geared-term-windows-x64-setup.exe \
+              geared-term-windows-x64-portable.exe \
+              geared-term-macos-arm64.dmg \
+              geared-term-linux-x64.AppImage \
+              > SHA256SUMS.txt
+          )
+
+      - name: Update nightly tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          COMMIT_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tag_lookup_ref="repos/${REPOSITORY}/git/ref/tags/nightly"
+          tag_update_ref="repos/${REPOSITORY}/git/refs/tags/nightly"
+          if gh api "${tag_lookup_ref}" >/dev/null 2>&1; then
+            gh api --method PATCH "${tag_update_ref}" \
+              -f "sha=${COMMIT_SHA}" \
+              -F force=true >/dev/null
+          else
+            gh api --method POST "repos/${REPOSITORY}/git/refs" \
+              -f ref=refs/tags/nightly \
+              -f "sha=${COMMIT_SHA}" >/dev/null
+          fi
+
+      - name: Replace nightly release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          COMMIT_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          releases_api="repos/${REPOSITORY}/releases"
+          release_body="Automated nightly build for commit ${COMMIT_SHA}."
+          release_body+=$'\n\nUnsigned development artifacts for macOS, Windows, and Linux.\n\nSHA-256 checksums are included in `SHA256SUMS.txt`.'
+
+          if release_id="$(gh api "${releases_api}/tags/nightly" --jq '.id' 2>/dev/null)"; then
+            gh api --method PATCH "${releases_api}/${release_id}" \
+              -f name="Geared Term Nightly" \
+              -f "body=${release_body}" \
+              -F draft=true \
+              -F prerelease=true \
+              -f make_latest=false >/dev/null
+          else
+            release_id="$(gh api --method POST "${releases_api}" \
+              -f tag_name=nightly \
+              -f name="Geared Term Nightly" \
+              -f "body=${release_body}" \
+              -F draft=true \
+              -F prerelease=true \
+              -f make_latest=false \
+              --jq '.id')"
+          fi
+
+          asset_ids="$(gh api --paginate "${releases_api}/${release_id}/assets?per_page=100" --jq '.[].id')"
+          while IFS= read -r asset_id; do
+            if [[ -n "${asset_id}" ]]; then
+              gh api --method DELETE "${releases_api}/assets/${asset_id}" >/dev/null
+            fi
+          done <<< "${asset_ids}"
+
+          gh release upload nightly \
+            release-assets/geared-term-windows-x64-setup.exe \
+            release-assets/geared-term-windows-x64-portable.exe \
+            release-assets/geared-term-macos-arm64.dmg \
+            release-assets/geared-term-linux-x64.AppImage \
+            release-assets/SHA256SUMS.txt \
+            --repo "${REPOSITORY}" \
+            --clobber
+
+          gh api --method PATCH "${releases_api}/${release_id}" \
+            -F draft=false \
+            -F prerelease=true \
+            -f make_latest=false >/dev/null
