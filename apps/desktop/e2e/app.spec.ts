@@ -46,6 +46,7 @@ test('exposes exactly the documented preload surface', async () => {
   );
   expect(keys).toEqual(
     [
+      'acceptAiEndpoint',
       'cancelSftpTransfer',
       'continueAiHistory',
       'createLocalTerminal',
@@ -81,8 +82,9 @@ test('exposes exactly the documented preload surface', async () => {
       'loadAiHistory',
       'lockVault',
       'makeLocalDirectory',
-      'onMenuCommand',
       'onAiHistoryContinue',
+      'onEnvironmentUpdated',
+      'onMenuCommand',
       'onSettingsChanged',
       'onSettingsNavigate',
       'onSftpCd',
@@ -134,7 +136,7 @@ test('reports application information from the main process', async () => {
     ).geared.getAppInfo()
   );
   expect(info.name).toBe('Geared Term');
-  expect(info.platform).toBe('win32');
+  expect(info.platform).toBe(process.platform);
   expect(info.isPackaged).toBe(false);
   expect(info.version).toMatch(/^\d+\.\d+\.\d+/);
 });
