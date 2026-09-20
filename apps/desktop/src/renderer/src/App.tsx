@@ -29,7 +29,7 @@ import { EnvironmentPanel } from './EnvironmentPanel';
 import { ProfileEditor } from './ProfileEditor';
 import { QuickSshDialog } from './QuickSshDialog';
 import { SftpPanel } from './SftpPanel';
-import { TerminalPane, type SnapshotExtractor, type SftpTerminalControl } from './TerminalPane';
+import { TerminalPane, type SftpTerminalControl } from './TerminalPane';
 import { VaultGate } from './VaultGate';
 import { WindowTitleBar } from './WindowTitleBar';
 
@@ -228,7 +228,6 @@ export function App(): React.JSX.Element {
   } | null>(null);
   const [pendingHistoryId, setPendingHistoryId] = useState<string | null>(null);
   const [vaultStatus, setVaultStatus] = useState<VaultStatus | null>(null);
-  const snapshotExtractors = useRef(new Map<string, SnapshotExtractor>());
   const sftpControls = useRef(new Map<string, SftpTerminalControl>());
 
   useEffect(() => {
@@ -802,13 +801,6 @@ export function App(): React.JSX.Element {
                 active={tab.id === activeTab?.id}
                 onState={(message) => handleState(tab.id, message)}
                 onHostKeyPrompt={handleHostKeyPrompt}
-                registerSnapshot={(extractor) => {
-                  if (extractor) {
-                    snapshotExtractors.current.set(tab.id, extractor);
-                  } else {
-                    snapshotExtractors.current.delete(tab.id);
-                  }
-                }}
                 onAlternateScreen={(value) =>
                   setAlternateScreens((current) => ({ ...current, [tab.id]: value }))
                 }
@@ -918,10 +910,6 @@ export function App(): React.JSX.Element {
                 }}
                 pendingHistoryId={pendingHistoryId}
                 onPendingHistoryConsumed={() => setPendingHistoryId(null)}
-                getSnapshot={() => {
-                  const extractor = activeTab ? snapshotExtractors.current.get(activeTab.id) : null;
-                  return extractor ? extractor() : null;
-                }}
               />
             ) : null}
             {uiState.rightPanel === 'sftp' && activeTab && supportsSftp(activeTab.request) ? (

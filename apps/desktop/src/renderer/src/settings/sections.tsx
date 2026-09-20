@@ -353,8 +353,7 @@ export function TerminalSection({
 }): React.JSX.Element {
   const [draft, setDraft] = useState({
     defaultTerm: settings.defaultTerm,
-    terminalCursor: settings.terminalCursor,
-    terminalContextPrecedingLines: settings.terminalContextPrecedingLines
+    terminalCursor: settings.terminalCursor
   });
   const [status, setStatus] = useState<string | null>(null);
   const update = (patch: Partial<typeof draft>): void => {
@@ -398,24 +397,6 @@ export function TerminalSection({
             </button>
           ))}
         </div>
-      </Row>
-      <Row label={t('contextLines')}>
-        <input
-          className="settings-input settings-input-narrow"
-          type="number"
-          min={0}
-          max={2000}
-          step={10}
-          value={draft.terminalContextPrecedingLines}
-          onChange={(event) =>
-            update({
-              terminalContextPrecedingLines: Math.min(
-                2000,
-                Math.max(0, Number(event.target.value) || 0)
-              )
-            })
-          }
-        />
       </Row>
       <div className="settings-actions-row">
         <button

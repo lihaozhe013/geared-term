@@ -23,7 +23,6 @@ import {
   Copy,
   CircleCheck,
   CircleX,
-  FileText,
   Globe,
   History,
   List,
@@ -36,7 +35,6 @@ import {
 } from 'lucide-react';
 import { MarkdownView } from './assistant/MarkdownView';
 import { translate } from './i18n';
-import { type TerminalSnapshot } from './terminal/snapshot';
 
 type Message = {
   role: 'user' | 'assistant';
@@ -44,7 +42,6 @@ type Message = {
   model?: string;
   usage?: { input?: number; output?: number; reasoning?: number };
   reasoning?: string;
-  snapshot?: TerminalSnapshot;
   sources?: SourceReference[];
   continuation?: { connectionId: string; model: string; items: Array<Record<string, unknown>> };
   durationMs?: number;
@@ -93,7 +90,6 @@ type AssistantPanelProps = {
   onToggleSplitCommand?: () => void;
   pendingHistoryId?: string | null;
   onPendingHistoryConsumed?: () => void;
-  getSnapshot?: () => TerminalSnapshot | null;
 };
 
 type ActivityLike = {
@@ -304,8 +300,7 @@ export function AssistantPanel({
   allowRiskyRun = false,
   onToggleSplitCommand,
   pendingHistoryId,
-  onPendingHistoryConsumed,
-  getSnapshot
+  onPendingHistoryConsumed
 }: AssistantPanelProps): React.JSX.Element {
   const [connections, setConnections] = useState<AiConnectionRecord[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -313,7 +308,6 @@ export function AssistantPanel({
   const [responseOptions, setResponseOptions] = useState<AiResponsesModelDefaults | null>(null);
   const [reasoningMenuOpen, setReasoningMenuOpen] = useState(false);
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
-  const [attachMenuOpen, setAttachMenuOpen] = useState(false);
   const [composer, setComposer] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [reasoning, setReasoning] = useState('');
@@ -322,8 +316,6 @@ export function AssistantPanel({
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [attachedEnvironment, setAttachedEnvironment] = useState<EnvironmentRecord | null>(null);
-  const [pendingSnapshot, setPendingSnapshot] = useState<TerminalSnapshot | null>(null);
-  const [attachedSnapshot, setAttachedSnapshot] = useState<TerminalSnapshot | null>(null);
   const [conversationId, setConversationId] = useState<string>(() => crypto.randomUUID());
   const [activities, setActivities] = useState<ActivityStep[]>([]);
   const [streamStartedAt, setStreamStartedAt] = useState<number | null>(null);
@@ -346,11 +338,9 @@ export function AssistantPanel({
     messages: Array<{
       role: 'user' | 'assistant';
       content: string;
-      snapshot?: TerminalSnapshot;
       continuation?: { connectionId: string; model: string; items: Array<Record<string, unknown>> };
     }>;
     prompt: string;
-    snapshot?: TerminalSnapshot;
     responseOptions?: AiResponsesModelDefaults;
   } | null>(null);
 
@@ -434,7 +424,6 @@ export function AssistantPanel({
                   reasoning: message.usage.reasoningTokens
                 }
               : undefined,
-            snapshot: message.snapshot,
             sources: message.sources,
             continuation: message.continuation
           }))
@@ -652,7 +641,6 @@ export function AssistantPanel({
       streamRef.current = null;
       const turn = messagesRef.current.filter((message) => message.content.trim().length > 0);
       if (turn.length > 0) {
-        const pending = pendingRequestRef.current;
         const reversedAssistantIndex = [...turn]
           .reverse()
           .findIndex((message) => message.role === 'assistant');
@@ -668,11 +656,6 @@ export function AssistantPanel({
             messages: turn.map((message, index) => ({
               role: message.role,
               content: message.content,
-              ...(message.role === 'user' &&
-              pending?.snapshot &&
-              message.content === pending.prompt
-                ? { snapshot: pending.snapshot }
-                : {}),
               ...(message.role === 'assistant' && index === lastAssistantIndex
                 ? {
                     ...(reasoning ? { reasoning } : {}),
@@ -708,8 +691,6 @@ export function AssistantPanel({
     setSources([]);
     setActivities([]);
     setStreamStartedAt(null);
-    setPendingSnapshot(null);
-    setAttachedSnapshot(null);
     setStreaming(false);
     setConsentRequest(null);
     pendingRequestRef.current = null;
@@ -755,25 +736,6 @@ export function AssistantPanel({
     }
   };
 
-  const attachSnapshot = (): void => {
-    setAttachMenuOpen(false);
-    const snapshot = getSnapshot?.() ?? null;
-    if (!snapshot) {
-      setError('The active terminal has no context to attach.');
-      return;
-    }
-    setPendingSnapshot(snapshot);
-    setError(null);
-  };
-
-  const snapshotSummary = (snapshot: TerminalSnapshot): string => {
-    const bounds =
-      snapshot.lineStart === null ? 'selection' : `lines ${snapshot.lineStart}-${snapshot.lineEnd}`;
-    return `${snapshot.source} · ${bounds} · ${snapshot.charCount} chars${
-      snapshot.truncated ? ' · truncated' : ''
-    }${snapshot.alternateScreen ? ' · alternate screen' : ''}`;
-  };
-
   const startStream = (request: NonNullable<typeof pendingRequestRef.current>): void => {
     setReasoning('');
     setSources([]);
@@ -795,7 +757,6 @@ export function AssistantPanel({
       .map((message) => ({
         role: message.role,
         content: message.content,
-        ...(message.snapshot ? { snapshot: message.snapshot } : {}),
         ...(message.continuation ? { continuation: message.continuation } : {})
       }))
       .slice(-99);
@@ -806,7 +767,6 @@ export function AssistantPanel({
       ...(environmentTargetKey ? { targetKey: environmentTargetKey } : {}),
       messages: historyMessages,
       prompt: text,
-      ...(attachedSnapshot ? { snapshot: attachedSnapshot } : {}),
       ...(selectedConnection?.protocol === 'responses' && responseOptions
         ? { responseOptions }
         : {})
@@ -816,8 +776,6 @@ export function AssistantPanel({
     setScrolledUp(false);
     setMessages([...messages, { role: 'user', content: text }, { role: 'assistant', content: '', model }]);
     setComposer('');
-    setPendingSnapshot(null);
-    setAttachedSnapshot(null);
     setConsentRequest(null);
     startStream(request);
   };
@@ -1234,37 +1192,6 @@ export function AssistantPanel({
         </div>
       ) : null}
 
-      {pendingSnapshot ? (
-        <details className="assistant-snapshot-preview" open>
-          <summary>Terminal context ready — {snapshotSummary(pendingSnapshot)}</summary>
-          <pre>{pendingSnapshot.text.slice(0, 2000)}</pre>
-          <div className="command-card-actions">
-            <button
-              type="button"
-              className="primary-button settings-apply"
-              onClick={() => {
-                setAttachedSnapshot(pendingSnapshot);
-                setPendingSnapshot(null);
-                setComposer((current) => current.trim() || 'Explain this terminal output.');
-              }}
-            >
-              Keep attached
-            </button>
-            <button
-              type="button"
-              className="toolbar-button"
-              onClick={() => setPendingSnapshot(null)}
-            >
-              Remove
-            </button>
-          </div>
-          <p className="muted">
-            The snapshot is sent once with your next message, delimited as untrusted terminal
-            output.
-          </p>
-        </details>
-      ) : null}
-
       <form
         className="assistant-composer"
         onSubmit={(event) => {
@@ -1272,49 +1199,7 @@ export function AssistantPanel({
           send();
         }}
       >
-        {attachedSnapshot ? (
-          <div className="assistant-attachment-chip">
-            <FileText size={13} aria-hidden="true" />
-            <span className="assistant-attachment-label">
-              {attachedSnapshot.source} · {sessionLabel ?? 'terminal'} ·{' '}
-              {attachedSnapshot.charCount} bytes
-            </span>
-            <button
-              type="button"
-              className="icon-button"
-              aria-label="Remove attached snapshot"
-              onClick={() => setAttachedSnapshot(null)}
-            >
-              <X size={12} aria-hidden="true" />
-            </button>
-          </div>
-        ) : null}
         <div className="assistant-composer-row">
-          <div className="assistant-attach">
-            <button
-              type="button"
-              className="icon-button"
-              aria-label="Attach context"
-              onClick={() => setAttachMenuOpen((open) => !open)}
-            >
-              <Plus size={15} aria-hidden="true" />
-            </button>
-            {attachMenuOpen ? (
-              <>
-                <div className="assistant-menu-backdrop" onClick={() => setAttachMenuOpen(false)} />
-                <div className="assistant-picker-menu assistant-menu-bottom" role="menu">
-                  <button
-                    type="button"
-                    className="assistant-menu-item"
-                    role="menuitem"
-                    onClick={attachSnapshot}
-                  >
-                    <FileText size={13} aria-hidden="true" /> Attach terminal snapshot
-                  </button>
-                </div>
-              </>
-            ) : null}
-          </div>
           <textarea
             ref={composerRef}
             value={composer}

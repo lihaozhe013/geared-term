@@ -818,8 +818,7 @@ function registerIpc(): void {
           globalInstructions: storage.settingsSnapshot().globalAiInstructions,
           environment,
           history: request.messages,
-          currentPrompt: request.prompt,
-          snapshot: request.snapshot
+          currentPrompt: request.prompt
         });
         const responseOptions = request.responseOptions ?? connection.responseOptions;
         logger.info('assistant', 'AI request prepared', {
@@ -834,8 +833,7 @@ function registerIpc(): void {
           reasoningEffort: responseOptions.reasoningEffort,
           verbosity: responseOptions.verbosity,
           reasoningSummary: responseOptions.reasoningSummary,
-          webSearch: responseOptions.webSearch,
-          snapshotAttached: Boolean(request.snapshot)
+          webSearch: responseOptions.webSearch
         });
         if (connection.acceptedEndpoint !== endpoint.identity) {
           port.postMessage(

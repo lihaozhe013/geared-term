@@ -20,7 +20,6 @@ import {
   toTerminalPasteText
 } from './terminal/context-menu';
 import { attachWebglRenderer } from './terminal/renderer';
-import { extractSnapshot, type SnapshotTerminal, type TerminalSnapshot } from './terminal/snapshot';
 import {
   buildLigatureJoiner,
   defaultLigatureSequences,
@@ -39,7 +38,6 @@ type TerminalClient =
   | ReturnType<Window['geared']['createLocalTerminal']>
   | ReturnType<Window['geared']['createSshTerminal']>
   | ReturnType<Window['geared']['createSavedSshTerminal']>;
-export type SnapshotExtractor = () => TerminalSnapshot | null;
 
 /** Imperative hooks the SFTP panel needs from the owning terminal. */
 export type SftpTerminalControl = {
@@ -58,7 +56,6 @@ type TerminalPaneProps = {
     message: TerminalPortMessage & { kind: 'prompt' },
     client: TerminalClient
   ) => void;
-  registerSnapshot?: (extractor: SnapshotExtractor | null) => void;
   onAlternateScreen?: (active: boolean) => void;
   registerSftpControl?: (control: SftpTerminalControl | null) => void;
 };
@@ -88,7 +85,6 @@ export function TerminalPane({
   active,
   onState,
   onHostKeyPrompt,
-  registerSnapshot,
   onAlternateScreen,
   registerSftpControl
 }: TerminalPaneProps): React.JSX.Element {
@@ -105,16 +101,12 @@ export function TerminalPane({
   const activeRef = useRef(active);
   const onStateRef = useRef(onState);
   const onHostKeyPromptRef = useRef(onHostKeyPrompt);
-  const registerSnapshotRef = useRef(registerSnapshot);
-  const precedingLinesRef = useRef(settings.terminalContextPrecedingLines);
   const onAlternateScreenRef = useRef(onAlternateScreen);
   const registerSftpControlRef = useRef(registerSftpControl);
   const paletteRef = useRef(palette);
   activeRef.current = active;
   onStateRef.current = onState;
   onHostKeyPromptRef.current = onHostKeyPrompt;
-  registerSnapshotRef.current = registerSnapshot;
-  precedingLinesRef.current = settings.terminalContextPrecedingLines;
   onAlternateScreenRef.current = onAlternateScreen;
   registerSftpControlRef.current = registerSftpControl;
   paletteRef.current = palette;
@@ -184,13 +176,6 @@ export function TerminalPane({
     fit.fit();
     fitRef.current = fit;
     terminalRef.current = terminal;
-    registerSnapshotRef.current?.(() => {
-      const current = terminalRef.current;
-      if (!current) return null;
-      return extractSnapshot(current as unknown as SnapshotTerminal, {
-        precedingLines: precedingLinesRef.current
-      });
-    });
 
     let disposed = false;
     let client: TerminalClient | undefined;
@@ -352,7 +337,6 @@ export function TerminalPane({
       handlerLeave.dispose();
       setAlternate(false);
       registerSftpControlRef.current?.(null);
-      registerSnapshotRef.current?.(null);
       client?.close();
       renderer.dispose();
       terminal.dispose();

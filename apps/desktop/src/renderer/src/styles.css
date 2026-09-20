@@ -849,22 +849,6 @@ body.panel-resizing {
   gap: 7px;
 }
 
-.assistant-snapshot-preview {
-  border: 1px solid var(--gt-border, #2a3140);
-  border-radius: var(--gt-radius-md);
-  padding: 8px 10px;
-  display: grid;
-  gap: 8px;
-}
-
-.assistant-snapshot-preview pre {
-  max-height: 180px;
-  overflow: auto;
-  font-size: var(--gt-fs-sm);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
 .assistant-markdown {
   user-select: text;
   line-height: 1.55;
@@ -2270,11 +2254,6 @@ button:disabled {
   box-shadow: var(--gt-shadow-popover);
 }
 
-.assistant-picker-menu.assistant-menu-bottom {
-  top: auto;
-  bottom: calc(100% + 6px);
-}
-
 .assistant-menu-item {
   display: flex;
   width: 100%;
@@ -2316,6 +2295,8 @@ button:disabled {
 .assistant-messages {
   flex: 1;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
   overflow-y: auto;
   overflow-x: hidden;
   padding-right: 3px;
@@ -2368,11 +2349,13 @@ button:disabled {
 }
 
 .assistant-empty {
+  flex: 1;
   display: grid;
+  place-content: center;
   justify-items: center;
   gap: 8px;
-  padding-top: 48px;
   color: var(--gt-text-muted, #71809a);
+  text-align: center;
 }
 
 .assistant-empty p {
@@ -2542,26 +2525,6 @@ button:disabled {
   gap: 7px;
 }
 
-.assistant-attachment-chip {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 8px;
-  border: 1px solid var(--gt-border-strong, #344157);
-  border-radius: var(--gt-radius-md);
-  color: var(--gt-text-muted, #71809a);
-  background: var(--gt-input-bg, #1a2332);
-  font-size: var(--gt-fs-sm);
-}
-
-.assistant-attachment-label {
-  min-width: 0;
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .assistant-composer-row {
   display: flex;
   align-items: flex-end;
@@ -2594,16 +2557,6 @@ button:disabled {
 
 .assistant-composer-row textarea::placeholder {
   color: var(--gt-text-muted, #71809a);
-}
-
-.assistant-attach {
-  position: relative;
-  display: grid;
-}
-
-.assistant-attach .icon-button {
-  width: calc(28px * var(--gt-ui-scale, 1));
-  height: calc(28px * var(--gt-ui-scale, 1));
 }
 
 .assistant-send-button {

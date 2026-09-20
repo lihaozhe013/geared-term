@@ -323,6 +323,18 @@ export const AiContinuationMetadataSchema = z
   })
   .strict();
 
+export const AiSnapshotAttachmentSchema = z
+  .object({
+    source: z.enum(['selection', 'viewport', 'viewport+preceding']),
+    truncated: z.boolean(),
+    lineStart: z.number().int().nonnegative().nullable(),
+    lineEnd: z.number().int().nonnegative().nullable(),
+    charCount: z.number().int().nonnegative(),
+    alternateScreen: z.boolean(),
+    text: z.string().max(256 * 1024)
+  })
+  .strict();
+
 export const AiHistoryMessageSchema = z
   .object({
     role: z.enum(['user', 'assistant']),
@@ -339,18 +351,10 @@ export const AiHistoryMessageSchema = z
       })
       .strict()
       .optional(),
-    snapshot: z
-      .object({
-        source: z.enum(['selection', 'viewport', 'viewport+preceding']),
-        truncated: z.boolean(),
-        lineStart: z.number().int().nonnegative().nullable(),
-        lineEnd: z.number().int().nonnegative().nullable(),
-        charCount: z.number().int().nonnegative(),
-        alternateScreen: z.boolean(),
-        text: z.string().max(256 * 1024)
-      })
-      .strict()
-      .optional(),
+    // Terminal snapshot attachments are no longer produced, but the field is
+    // kept so persisted history files written by older builds still validate
+    // (this schema is strict) instead of losing their message metadata.
+    snapshot: AiSnapshotAttachmentSchema.optional(),
     sources: z.array(AiSourceReferenceSchema).max(128).optional(),
     continuation: AiContinuationMetadataSchema.optional()
   })
@@ -380,24 +384,11 @@ export const AiHistorySavedSchema = z
 
 export const AiHistoryContinueSchema = z.object({ id: AiHistoryIdSchema }).strict();
 
-export const AiSnapshotAttachmentSchema = z
-  .object({
-    source: z.enum(['selection', 'viewport', 'viewport+preceding']),
-    truncated: z.boolean(),
-    lineStart: z.number().int().nonnegative().nullable(),
-    lineEnd: z.number().int().nonnegative().nullable(),
-    charCount: z.number().int().nonnegative(),
-    alternateScreen: z.boolean(),
-    text: z.string().max(256 * 1024)
-  })
-  .strict();
-
 export const AiChatMessageSchema = z
   .object({
     role: z.enum(['system', 'user', 'assistant']),
     content: z.string().max(256 * 1024),
-    continuation: AiContinuationMetadataSchema.optional(),
-    snapshot: AiSnapshotAttachmentSchema.optional()
+    continuation: AiContinuationMetadataSchema.optional()
   })
   .strict();
 
@@ -414,7 +405,6 @@ export const AiStreamRequestSchema = z
       .string()
       .min(1)
       .max(256 * 1024),
-    snapshot: AiSnapshotAttachmentSchema.optional(),
     responseOptions: AiStreamResponseOptionsSchema.optional()
   })
   .strict();
@@ -473,8 +463,7 @@ export const AiStreamEventSchema = z.discriminatedUnion('kind', [
         'environment-facts',
         'environment-instructions',
         'conversation-history',
-        'current-prompt',
-        'terminal-snapshot'
+        'current-prompt'
       ])
     )
   }),
