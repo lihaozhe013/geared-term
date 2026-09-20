@@ -88,6 +88,7 @@ type AssistantPanelProps = {
   language?: SettingsRecord['language'];
   environmentTargetKey?: string;
   splitCommandPresentation?: boolean;
+  allowRiskyRun?: boolean;
   onToggleSplitCommand?: () => void;
   pendingHistoryId?: string | null;
   onPendingHistoryConsumed?: () => void;
@@ -197,11 +198,13 @@ function commandCandidates(content: string, splitPresentation: boolean): Command
 function CommandCard({
   candidate,
   targetSessionId,
+  allowRiskyRun,
   disabled,
   onError
 }: {
   candidate: CommandCandidate;
   targetSessionId?: string;
+  allowRiskyRun: boolean;
   disabled: boolean;
   onError: (message: string) => void;
 }): React.JSX.Element {
@@ -210,7 +213,7 @@ function CommandCard({
     Boolean(targetSessionId) &&
     candidate.runAllowed &&
     candidate.stability === 'stable' &&
-    candidate.risk === 'normal';
+    (candidate.risk === 'normal' || allowRiskyRun);
 
   const copy = async (): Promise<void> => {
     try {
@@ -297,6 +300,7 @@ export function AssistantPanel({
   language = 'en-US',
   environmentTargetKey,
   splitCommandPresentation = false,
+  allowRiskyRun = false,
   onToggleSplitCommand,
   pendingHistoryId,
   onPendingHistoryConsumed,
@@ -1101,6 +1105,7 @@ export function AssistantPanel({
                           key={`${candidate.revision}-${candidateIndex}`}
                           candidate={candidate}
                           targetSessionId={targetSessionId}
+                          allowRiskyRun={allowRiskyRun}
                           disabled={streaming}
                           onError={handleCommandError}
                         />

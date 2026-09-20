@@ -109,3 +109,62 @@ test('inserts commands into the terminal through the gated action', async () => 
   expect(result.accepted).toBe(true);
   await expect(activeTerminal(page)).toContainText('geared-e2e-inserted', { timeout: 15_000 });
 });
+
+test('runs destructive commands once allowRiskyRun is enabled', async () => {
+  const { page } = session;
+  await waitForRunning(page);
+  const sessionId = await activeSessionId(page);
+  const payload = 'echo geared-e2e-risky; rm -rf /tmp/opencode/geared-e2e-missing';
+  const runDestructive = () =>
+    page.evaluate(
+      ([id, text, revision]) => {
+        const request = {
+          sessionId: id,
+          action: 'run' as const,
+          shell: 'bash' as const,
+          payload: text,
+          revision
+        };
+        return (
+          window as unknown as {
+            geared: {
+              executeCommandAction: (input: typeof request) => Promise<{ accepted: boolean }>;
+            };
+          }
+        ).geared.executeCommandAction(request);
+      },
+      [sessionId, payload, commandRevision(payload)]
+    );
+
+  await expect(runDestructive()).rejects.toThrow(/not safe to run/u);
+
+  const settings = await page.evaluate(() =>
+    (
+      window as unknown as {
+        geared: { getSettings: () => Promise<Record<string, unknown>> };
+      }
+    ).geared.getSettings()
+  );
+  await page.evaluate((current) => {
+    return (
+      window as unknown as {
+        geared: {
+          saveSettings: (next: Record<string, unknown>) => Promise<Record<string, unknown>>;
+        };
+      }
+    ).geared.saveSettings({ ...current, allowRiskyRun: true });
+  }, settings);
+
+  expect((await runDestructive()).accepted).toBe(true);
+  await expect(activeTerminal(page)).toContainText('geared-e2e-risky', { timeout: 15_000 });
+
+  await page.evaluate((current) => {
+    return (
+      window as unknown as {
+        geared: {
+          saveSettings: (next: Record<string, unknown>) => Promise<Record<string, unknown>>;
+        };
+      }
+    ).geared.saveSettings({ ...current, allowRiskyRun: false });
+  }, settings);
+});

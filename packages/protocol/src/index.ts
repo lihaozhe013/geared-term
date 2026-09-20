@@ -143,6 +143,7 @@ export const SettingsRecordSchema = z
     terminalCursor: z.enum(['block', 'underline', 'bar']),
     defaultTerm: z.enum(['xterm-256color', 'xterm', 'vt520', 'linux', 'screen']),
     splitCommandPresentation: z.boolean(),
+    allowRiskyRun: z.boolean().default(false),
     terminalContextPrecedingLines: z.number().int().min(0).max(2000),
     remoteFileCommands: z.string().max(4096).default('cat\nless\nvim'),
     uiFontFamily: z.string().max(256).default(''),

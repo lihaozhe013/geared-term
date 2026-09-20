@@ -50,6 +50,7 @@ const defaultSettings: SettingsRecord = {
   terminalCursor: 'block',
   defaultTerm: 'xterm-256color',
   splitCommandPresentation: false,
+  allowRiskyRun: false,
   terminalContextPrecedingLines: 100,
   remoteFileCommands: 'cat\nless\nvim',
   uiFontFamily: '',
@@ -889,6 +890,7 @@ export function App(): React.JSX.Element {
                 language={settings.language}
                 environmentTargetKey={environmentTarget(activeTab?.request, profiles)?.targetKey}
                 splitCommandPresentation={settings.splitCommandPresentation}
+                allowRiskyRun={settings.allowRiskyRun}
                 onToggleSplitCommand={() => {
                   void saveSettings({
                     ...settings,

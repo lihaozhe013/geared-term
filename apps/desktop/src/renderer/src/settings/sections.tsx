@@ -60,6 +60,16 @@ export function GeneralSection({
         />
         <span>{t('splitCommands')}</span>
       </label>
+      <label className="settings-check">
+        <input
+          type="checkbox"
+          checked={settings.allowRiskyRun}
+          onChange={(event) =>
+            void onSave({ allowRiskyRun: event.target.checked }).catch(() => undefined)
+          }
+        />
+        <span>{t('allowRiskyRun')}</span>
+      </label>
     </Section>
   );
 }

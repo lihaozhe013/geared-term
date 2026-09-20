@@ -587,9 +587,10 @@ function registerIpc(): void {
     }
     if (request.action === 'run') {
       const candidate = parseCommandBlock(`\`\`\`${request.shell}\n${request.payload}\n\`\`\``);
+      const riskyRunAllowed = storage.settingsSnapshot().allowRiskyRun;
       if (
         !candidate.runAllowed ||
-        candidate.risk === 'destructive' ||
+        (candidate.risk === 'destructive' && !riskyRunAllowed) ||
         candidate.exactText !== request.payload
       ) {
         throw new Error('The command is not safe to run');

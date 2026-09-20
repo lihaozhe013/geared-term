@@ -19,6 +19,7 @@ const messages = {
     cursorBar: 'Bar',
     defaultTerm: 'Default terminal type',
     splitCommands: 'Show safe command blocks separately',
+    allowRiskyRun: 'Allow Run on risky commands (sudo, rm -rf, ...)',
     contextLines: 'Terminal context lines for commands',
     remoteCommands: 'Remote file commands (one per line)',
     remoteCommandsHint:
@@ -151,6 +152,7 @@ const messages = {
     cursorBar: '竖线',
     defaultTerm: '默认终端类型',
     splitCommands: '将安全命令块分开展示',
+    allowRiskyRun: '允许一键运行有风险的命令（sudo、rm -rf 等）',
     contextLines: '命令上下文行数',
     remoteCommands: '远程文件命令（每行一条）',
     remoteCommandsHint: '用于 SFTP 文件右键菜单；文件名会被安全引用，控制字符将被拒绝。',
