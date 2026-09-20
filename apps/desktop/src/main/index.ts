@@ -54,6 +54,8 @@ import {
   SftpUploadRequestSchema,
   SshProfileTerminalRequestSchema,
   TerminalCommandActionSchema,
+  TerminalLigatureRequestSchema,
+  TerminalLigatureSequencesSchema,
   UiStateRecordSchema,
   VaultPasswordRequestSchema,
   VaultRotateRequestSchema,
@@ -71,6 +73,7 @@ import { AiProviderError, streamAiRequest } from './ai/provider';
 import { discoverModels } from './ai/discovery';
 import { AiHistoryStore } from './ai/history';
 import { LocalTerminalManager } from './local-terminal';
+import { resolveTerminalLigatureSequences } from './ligatures';
 import { commandRevision, parseCommandBlock } from '@geared-term/command-parser';
 import { AppStorage } from './persistence/app-storage';
 import { loadUserThemes } from './persistence/user-themes';
@@ -604,6 +607,10 @@ function registerIpc(): void {
       sshSessions.sendInput(request.sessionId, data);
       return { accepted: true };
     }
+  });
+  ipcMain.handle('terminal:ligature-sequences', async (_event, input: unknown) => {
+    const request = TerminalLigatureRequestSchema.parse(input);
+    return TerminalLigatureSequencesSchema.parse(await resolveTerminalLigatureSequences(request));
   });
   ipcMain.handle('wsl:list', async () => WslDistributionSchema.array().parse(await discoverWsl()));
   ipcMain.handle('ai:list', () =>

@@ -115,6 +115,9 @@ const messages = {
     uiFontFamily: 'UI font family',
     uiFontSize: 'UI font size',
     terminalFontFamily: 'Terminal font family',
+    fontLigatures: 'Enable font ligatures',
+    fontLigaturesHint:
+      'Renders programming ligatures (=>, ->, !==) as single glyphs when the terminal font provides them.',
     fallbackFonts: 'Fallback fonts (ordered)',
     addFallback: 'Add fallback font',
     fontScale: 'Scale',
@@ -246,6 +249,8 @@ const messages = {
     uiFontFamily: '界面字体',
     uiFontSize: '界面字号',
     terminalFontFamily: '终端字体',
+    fontLigatures: '启用字体连字',
+    fontLigaturesHint: '当终端字体支持时，将编程连字（=>、->、!== 等）渲染为单个字形。',
     fallbackFonts: '回退字体（有序）',
     addFallback: '添加回退字体',
     fontScale: '缩放',

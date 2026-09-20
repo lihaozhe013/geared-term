@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
   AppInfoSchema,
+  DEFAULT_TERMINAL_LIGATURE_SEQUENCES,
+  normalizeLigatureSequences,
   SftpDownloadRequestSchema,
   SftpListRequestSchema,
   SftpOperationResultSchema,
   SftpRemoteEntrySchema,
   SftpUploadRequestSchema,
   SessionProfileSaveRequestSchema,
+  SettingsRecordSchema,
   TerminalCommandActionSchema,
   TerminalPortMessageSchema
 } from './index';
@@ -101,5 +104,46 @@ describe('protocol schemas', () => {
         profile: { ...base, secretRefs: { password: 'secret-ref' } }
       }).success
     ).toBe(false);
+  });
+
+  it('defaults terminal font ligatures for records saved before the setting existed', () => {
+    const legacy = {
+      schemaVersion: 1,
+      language: 'en-US',
+      theme: 'Catppuccin Mocha',
+      terminalFontSize: 14,
+      terminalLineHeight: 1.2,
+      terminalCursor: 'block',
+      defaultTerm: 'xterm-256color',
+      splitCommandPresentation: false,
+      terminalContextPrecedingLines: 100
+    };
+    expect(SettingsRecordSchema.parse(legacy).terminalFontLigatures).toBe(false);
+    expect(SettingsRecordSchema.parse({ ...legacy, terminalFontLigatures: true })).toMatchObject({
+      terminalFontLigatures: true
+    });
+    expect(
+      SettingsRecordSchema.safeParse({
+        ...legacy,
+        terminalFontLigatures: 'yes'
+      }).success
+    ).toBe(false);
+  });
+
+  it('normalizes ligature sequences and orders them longest-first', () => {
+    expect(normalizeLigatureSequences(['=>', '=>', '<', 'a', '!=', '->>', '   ', '=>!!'])).toEqual([
+      '=>!!',
+      '->>',
+      '!=',
+      '=>'
+    ]);
+    expect(normalizeLigatureSequences(DEFAULT_TERMINAL_LIGATURE_SEQUENCES)).toEqual(
+      normalizeLigatureSequences(normalizeLigatureSequences(DEFAULT_TERMINAL_LIGATURE_SEQUENCES))
+    );
+    expect(
+      normalizeLigatureSequences(DEFAULT_TERMINAL_LIGATURE_SEQUENCES).every(
+        (sequence) => sequence.length >= 2 && sequence.length <= 8
+      )
+    ).toBe(true);
   });
 });

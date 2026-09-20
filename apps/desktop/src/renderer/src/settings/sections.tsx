@@ -126,6 +126,7 @@ export function AppearanceSection({
       uiFontFamily: draft.uiFontFamily,
       uiFontSize: draft.uiFontSize,
       terminalFontFamily: draft.terminalFontFamily.trim() || 'Cascadia Code',
+      terminalFontLigatures: draft.terminalFontLigatures,
       terminalFontSize: draft.terminalFontSize,
       terminalLineHeight: draft.terminalLineHeight,
       terminalFontFallbacks: normalizeTerminalFontFallbacks(
@@ -181,6 +182,15 @@ export function AppearanceSection({
           spellCheck={false}
         />
       </Row>
+      <label className="settings-check">
+        <input
+          type="checkbox"
+          checked={draft.terminalFontLigatures}
+          onChange={(event) => update('terminalFontLigatures', event.target.checked)}
+        />
+        <span>{t('fontLigatures')}</span>
+      </label>
+      <p className="settings-hint">{t('fontLigaturesHint')}</p>
       <Row label={t('fontSize')}>
         <Stepper
           value={draft.terminalFontSize}

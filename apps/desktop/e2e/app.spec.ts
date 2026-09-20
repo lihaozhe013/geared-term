@@ -68,6 +68,7 @@ test('exposes exactly the documented preload surface', async () => {
       'getAutoUnlockStatus',
       'getRuntimeInfo',
       'getSettings',
+      'getTerminalLigatureSequences',
       'getUiState',
       'getVaultStatus',
       'initializeVault',

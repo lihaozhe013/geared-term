@@ -56,6 +56,7 @@ const defaultSettings: SettingsRecord = {
   uiFontFamily: '',
   uiFontSize: 13,
   terminalFontFamily: 'Cascadia Code',
+  terminalFontLigatures: false,
   terminalFontFallbacks: [],
   globalAiInstructions: ''
 };

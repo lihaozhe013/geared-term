@@ -13,6 +13,11 @@ import {
 } from '@geared-term/protocol';
 import { buildSearchDecorations, buildXtermTheme, type Palette } from './themes';
 import { extractSnapshot, type SnapshotTerminal, type TerminalSnapshot } from './terminal/snapshot';
+import {
+  buildLigatureJoiner,
+  defaultLigatureSequences,
+  loadLigatureSequences
+} from './terminal/ligatures';
 
 type TerminalRequest = LocalTerminalRequest | SshTerminalRequest | SshProfileTerminalRequest;
 type TerminalClient =
@@ -245,6 +250,33 @@ export function TerminalPane({
       clientRef.current = null;
     };
   }, [request]);
+
+  useEffect(() => {
+    const terminal = terminalRef.current;
+    if (!terminal || !settings.terminalFontLigatures) return;
+    let cancelled = false;
+    let joinerId: number | null = null;
+    void loadLigatureSequences(settings.terminalFontFamily)
+      .catch(() => null)
+      .then((sequences) => {
+        if (cancelled) return;
+        const table = sequences ?? defaultLigatureSequences();
+        if (table.length === 0) return;
+        joinerId = terminal.registerCharacterJoiner(buildLigatureJoiner(table));
+      });
+    return () => {
+      cancelled = true;
+      if (joinerId !== null) {
+        const id = joinerId;
+        joinerId = null;
+        try {
+          terminal.deregisterCharacterJoiner(id);
+        } catch {
+          // the terminal is already disposed when the whole pane unmounts
+        }
+      }
+    };
+  }, [request, settings.terminalFontLigatures, settings.terminalFontFamily]);
 
   useEffect(() => {
     const terminal = terminalRef.current;

@@ -149,6 +149,7 @@ export const SettingsRecordSchema = z
     uiFontFamily: z.string().max(256).default(''),
     uiFontSize: z.number().min(10).max(24).default(13),
     terminalFontFamily: z.string().min(1).max(256).default('Cascadia Code'),
+    terminalFontLigatures: z.boolean().default(false),
     terminalFontFallbacks: z
       .array(
         z
@@ -954,6 +955,74 @@ export function normalizeTerminalFontFallbacks(
   }
   return result;
 }
+
+/**
+ * Conservative set of programming ligature sequences shared by the most
+ * common coding fonts (Fira Code, Cascadia Code, JetBrains Mono). Used as the
+ * joiner table when the actual font cannot be inspected.
+ */
+export const DEFAULT_TERMINAL_LIGATURE_SEQUENCES: readonly string[] = parseLigatureCorpus(`
+  -> ->> --> -< -<<
+  => =>> =<<
+  == === =:= =/= =/
+  != !== !!
+  <= <<= <=> <== <==>
+  >= >>= >>> >>-
+  <- <-- <<- <-> <-->
+  :: ::: :=
+  && || ||=
+  ..< ..= ... ..
+  << >>
+  |> <| <|> ||>
+  ~~ ~~> ~=
+  ++ +++
+  /// //! /* */ //
+  ## ### -- --- __
+  <$ <@ <+ <* </ </>
+`);
+
+/**
+ * Additional, font-specific ligature sequences that are only probed against
+ * the real font tables and are never joined blindly by the fallback table.
+ */
+export const EXTENDED_TERMINAL_LIGATURE_SEQUENCES: readonly string[] = parseLigatureCorpus(`
+  =< <: >: -~ .? =^
+  ?. ?: ;; ;;;
+  ||| <|| |-> <-< <-| |- -|
+  >-> >=> <~~ ~~<
+  /\\ \\/ <//> <% %>
+  |= &= ::= [|] {|} |]
+`);
+
+function parseLigatureCorpus(corpus: string): string[] {
+  return corpus.split(/\s+/).filter((sequence) => sequence.length > 0);
+}
+
+const LIGATURE_SEQUENCE_PATTERN = /^[\x21-\x7e]+$/;
+
+/**
+ * Normalizes a ligature sequence list: keeps only printable ASCII sequences of
+ * two to eight characters, deduplicates, and orders longest-first so that
+ * regex-based joiners prefer the widest match at each position.
+ */
+export function normalizeLigatureSequences(sequences: readonly string[]): string[] {
+  const seen = new Set<string>();
+  for (const raw of sequences) {
+    const sequence = raw.trim();
+    if (sequence.length < 2 || sequence.length > 8) continue;
+    if (!LIGATURE_SEQUENCE_PATTERN.test(sequence)) continue;
+    seen.add(sequence);
+  }
+  return [...seen].sort((a, b) => b.length - a.length || (a < b ? -1 : 1));
+}
+
+export const TerminalLigatureRequestSchema = z
+  .object({
+    fontFamily: z.string().min(1).max(256)
+  })
+  .strict();
+
+export const TerminalLigatureSequencesSchema = z.array(z.string().min(1).max(8)).max(2048);
 export type TerminalCommandAction = z.infer<typeof TerminalCommandActionSchema>;
 export type EnvironmentFacts = z.infer<typeof EnvironmentFactsSchema>;
 export type EnvironmentRecord = z.infer<typeof EnvironmentRecordSchema>;
@@ -980,6 +1049,7 @@ export type SessionProfileSaveProfile = z.infer<typeof SessionProfileSaveProfile
 export type SessionProfileSaveRequest = z.infer<typeof SessionProfileSaveRequestSchema>;
 export type UiStateRecord = z.infer<typeof UiStateRecordSchema>;
 export type SettingsRecord = z.infer<typeof SettingsRecordSchema>;
+export type TerminalLigatureRequest = z.infer<typeof TerminalLigatureRequestSchema>;
 export type WslDistribution = z.infer<typeof WslDistributionSchema>;
 export type AiConnectionRecord = z.infer<typeof AiConnectionRecordSchema>;
 export type AiConnectionInput = z.infer<typeof AiConnectionInputSchema>;

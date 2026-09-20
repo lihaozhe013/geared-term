@@ -51,6 +51,8 @@ import {
   SshProfileTerminalRequestSchema,
   SshTerminalRequestSchema,
   TerminalCommandActionSchema,
+  TerminalLigatureRequestSchema,
+  TerminalLigatureSequencesSchema,
   VaultPasswordRequestSchema,
   VaultRotateRequestSchema,
   VaultStatusSchema,
@@ -431,6 +433,12 @@ const api = Object.freeze({
   executeCommandAction: async (input: TerminalCommandAction) => {
     const action = TerminalCommandActionSchema.parse(input);
     return ipcRenderer.invoke('terminal:command-action', action) as Promise<{ accepted: true }>;
+  },
+  getTerminalLigatureSequences: async (fontFamily: string) => {
+    const request = TerminalLigatureRequestSchema.parse({ fontFamily });
+    return TerminalLigatureSequencesSchema.parse(
+      await ipcRenderer.invoke('terminal:ligature-sequences', request)
+    );
   },
   listEnvironments: async () =>
     EnvironmentRecordSchema.array().parse(await ipcRenderer.invoke('environment:list')),

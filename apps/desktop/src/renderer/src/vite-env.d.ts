@@ -148,6 +148,7 @@ declare global {
       uploadSftp: (input: SftpUploadRequest) => Promise<SftpOperationResult>;
       downloadSftp: (input: SftpDownloadRequest) => Promise<SftpOperationResult>;
       executeCommandAction: (input: TerminalCommandAction) => Promise<{ accepted: true }>;
+      getTerminalLigatureSequences: (fontFamily: string) => Promise<string[]>;
       listEnvironments: () => Promise<EnvironmentRecord[]>;
       onEnvironmentUpdated: (listener: (environment: EnvironmentRecord) => void) => () => void;
       saveEnvironment: (input: EnvironmentRecord) => Promise<EnvironmentRecord[]>;

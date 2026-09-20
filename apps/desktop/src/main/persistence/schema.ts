@@ -73,6 +73,7 @@ export const defaultSettings: Settings = {
   uiFontFamily: '',
   uiFontSize: 13,
   terminalFontFamily: 'Cascadia Code',
+  terminalFontLigatures: false,
   terminalFontFallbacks: [],
   globalAiInstructions: ''
 };
