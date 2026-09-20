@@ -20,8 +20,13 @@ test('copies and pastes with terminal keyboard shortcuts', async () => {
     timeout: 30_000
   });
   const host = page.locator('.terminal-wrapper:not([hidden]) .terminal-host');
+  const rows = page.locator('.terminal-wrapper:not([hidden]) .xterm-rows');
   await host.click();
   await page.keyboard.type(`echo ${MARKER}`);
+  // keyboard.type only dispatches key events; the shell echo trails behind on
+  // loaded runners. Copy is a one-shot action, so wait until the whole line has
+  // round-tripped into the buffer or the chords would snapshot a partial line.
+  await expect.poll(() => rows.textContent(), { timeout: 15_000 }).toContain(MARKER);
 
   // Copy chord: select the buffer and write it to the system clipboard. The
   // DOM renderer's selection extraction can truncate trailing cells, so
@@ -38,7 +43,7 @@ test('copies and pastes with terminal keyboard shortcuts', async () => {
   await page.keyboard.press('Control+c');
   await page.keyboard.press('Control+Shift+v');
   await page.keyboard.press('Enter');
-  await expect(page.locator('.terminal-wrapper:not([hidden]) .xterm-rows')).toContainText(MARKER, {
+  await expect(rows).toContainText(MARKER, {
     timeout: 15_000
   });
 
