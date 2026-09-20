@@ -4,6 +4,9 @@ copyright: Copyright © 2026 Geared Term contributors
 directories:
   output: out/releases
   buildResources: resources
+extraResources:
+  - from: resources/icons/geared-term.png
+    to: icons/geared-term.png
 files:
   - out/main/**
   - out/preload/**
@@ -14,6 +17,7 @@ asar: true
 asarUnpack:
   - '**/*.node'
 win:
+  icon: icons/geared-term.ico
   executableName: geared-term
   artifactName: geared-term-win-${arch}-${version}.${ext}
   target:
@@ -33,12 +37,14 @@ nsis:
 portable:
   artifactName: geared-term-win-${arch}-${version}-portable.${ext}
 mac:
+  icon: icons/geared-term.icns
   artifactName: geared-term-mac-${arch}-${version}.${ext}
   category: public.app-category.developer-tools
   hardenedRuntime: true
   target:
     - dmg
 linux:
+  icon: icons/linux
   executableName: geared-term
   artifactName: geared-term-linux-${arch}-${version}.${ext}
   category: Development

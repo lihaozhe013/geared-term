@@ -1,6 +1,7 @@
 import { Settings } from 'lucide-react';
 import type { SettingsRecord } from '@geared-term/protocol';
 import { DesktopMenuBar } from './DesktopMenuBar';
+import gearedTermMark from './assets/geared-term-mark.png';
 
 type WindowTitleBarProps = {
   title: string;
@@ -30,7 +31,7 @@ export function WindowTitleBar({
     <header className={`titlebar ${isMac ? 'titlebar-mac' : 'titlebar-overlay'}`}>
       <div className="titlebar-leading">
         <span className="titlebar-app">
-          <span className="titlebar-logo" aria-hidden="true" />
+          <img className="titlebar-logo" src={gearedTermMark} alt="" aria-hidden="true" />
           {title}
         </span>
         {!isMac && showMenu ? (

@@ -1,6 +1,13 @@
+/// <reference types="vite/client" />
+
 export {};
 
 declare module '*.css';
+
+declare module '*.png' {
+  const source: string;
+  export default source;
+}
 
 import type {
   AiConnectionInput,

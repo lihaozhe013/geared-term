@@ -91,20 +91,12 @@ textarea {
 }
 
 .titlebar-logo {
-  display: inline-grid;
+  display: block;
   width: calc(18px * var(--gt-ui-scale, 1));
   height: calc(18px * var(--gt-ui-scale, 1));
-  place-items: center;
-  border: 1px solid color-mix(in srgb, var(--gt-accent, #5c8ea5) 80%, transparent);
   border-radius: 5px;
-  color: var(--gt-background, #0d1117);
-  background: var(--gt-accent, #5c8ea5);
-}
-
-.titlebar-logo::before {
-  content: 'G';
-  font-size: var(--gt-fs-xs);
-  font-weight: 800;
+  flex-shrink: 0;
+  object-fit: contain;
 }
 
 .titlebar-session {
