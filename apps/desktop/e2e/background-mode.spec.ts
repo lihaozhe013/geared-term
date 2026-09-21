@@ -15,6 +15,10 @@ const secondaryLaunchArgs = [
   '--disable-renderer-backgrounding',
   '--disable-background-timer-throttling',
   '--enable-unsafe-swiftshader',
+  // Playwright applies the sandbox workaround to its primary Electron
+  // process on Linux. The raw secondary process does not go through that
+  // launcher, so disable the sandbox only for this test child.
+  ...(process.platform === 'linux' ? ['--no-sandbox'] : []),
   ...DOM_RENDERER_ARGS
 ];
 
@@ -58,7 +62,7 @@ async function setBackgroundMode(enabled: boolean): Promise<void> {
 
 function spawnSecondaryInstance(): ChildProcess {
   return spawn(require('electron') as unknown as string, secondaryLaunchArgs, {
-    stdio: 'ignore',
+    stdio: ['ignore', 'ignore', 'pipe'],
     env: {
       ...process.env,
       GEARED_USER_DATA: join(session.userDataDirectory, 'user-data')
@@ -68,10 +72,13 @@ function spawnSecondaryInstance(): ChildProcess {
 
 async function waitForProcessExit(
   child: ChildProcess
-): Promise<{ code: number | null; signal: NodeJS.Signals | null }> {
+): Promise<{ code: number | null; signal: NodeJS.Signals | null; stderr: string }> {
   return new Promise((resolve, reject) => {
+    const stderr: string[] = [];
+    child.stderr?.setEncoding('utf8');
+    child.stderr?.on('data', (chunk: string) => stderr.push(chunk));
     child.once('error', reject);
-    child.once('exit', (code, signal) => resolve({ code, signal }));
+    child.once('exit', (code, signal) => resolve({ code, signal, stderr: stderr.join('') }));
   });
 }
 
@@ -118,7 +125,10 @@ test('keeps the process resident and restores the window when the app relaunches
   // A second launch of the same profile must hand off to the resident
   // instance, which re-shows the hidden window.
   const secondExit = await waitForProcessExit(spawnSecondaryInstance());
-  expect(secondExit).toEqual({ code: 0, signal: null });
+  expect({ code: secondExit.code, signal: secondExit.signal }, secondExit.stderr).toEqual({
+    code: 0,
+    signal: null
+  });
   await expect
     .poll(
       () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.isVisible()),
@@ -159,7 +169,10 @@ test('keeps bounded high-volume output flowing while hidden', async () => {
     .toBe(false);
 
   const secondExit = await waitForProcessExit(spawnSecondaryInstance());
-  expect(secondExit).toEqual({ code: 0, signal: null });
+  expect({ code: secondExit.code, signal: secondExit.signal }, secondExit.stderr).toEqual({
+    code: 0,
+    signal: null
+  });
   await expect(page.locator('.terminal-wrapper:not([hidden]) .xterm-rows')).toContainText(
     'geared-background-after',
     { timeout: 20_000 }
