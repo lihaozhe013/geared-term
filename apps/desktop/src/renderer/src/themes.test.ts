@@ -4,6 +4,7 @@ import {
   builtinThemes,
   builtinThemeNames,
   buildSearchDecorations,
+  buildXtermTheme,
   derivePalette,
   paletteCssDeclarations,
   resolvePalette
@@ -83,6 +84,66 @@ describe('themes', () => {
       (flavor) => builtinThemes[`Catppuccin ${flavor}`]?.accent
     );
     expect(accents).toEqual(['#cba6f7', '#c6a0f6', '#ca9ee6', '#8839ef']);
+  });
+
+  it('pins the Mocha ANSI array to the official terminal palette', () => {
+    expect(builtinThemes['Catppuccin Mocha']?.ansi).toEqual([
+      '#45475a',
+      '#f38ba8',
+      '#a6e3a1',
+      '#f9e2af',
+      '#89b4fa',
+      '#f5c2e7',
+      '#94e2d5',
+      '#bac2de',
+      '#585b70',
+      '#f38ba8',
+      '#a6e3a1',
+      '#f9e2af',
+      '#89b4fa',
+      '#f5c2e7',
+      '#94e2d5',
+      '#a6adc8'
+    ]);
+  });
+
+  it('maps the ANSI array onto xterm named theme slots', () => {
+    const mocha = builtinThemes['Catppuccin Mocha'];
+    expect(mocha).toBeDefined();
+    if (!mocha) return;
+    const theme = buildXtermTheme(mocha);
+    expect(theme.background).toBe('#1e1e2e');
+    expect(theme.foreground).toBe('#cdd6f4');
+    expect(theme.cursor).toBe('#f5e0dc');
+    expect(theme.selectionBackground).toBe('#585b70');
+    expect(theme.black).toBe('#45475a');
+    expect(theme.green).toBe('#a6e3a1');
+    expect(theme.brightBlack).toBe('#585b70');
+    expect(theme.brightWhite).toBe('#a6adc8');
+    expect(theme.extendedAnsi).toEqual(['#fab387', '#f5e0dc']);
+  });
+
+  it('derives a full 16-color ANSI palette for themes without one', () => {
+    const derived = derivePalette({
+      background: '#101018',
+      foreground: '#e0e0e8',
+      cursor: '#80ffcc'
+    });
+    expect(derived.ansi).toHaveLength(16);
+    for (const color of derived.ansi) expect(color).toMatch(/^#[0-9a-f]{6}$/u);
+    const theme = buildXtermTheme(derived);
+    expect(theme.green).toBe(derived.ansi[2]);
+  });
+
+  it('keeps a user override of a built-in theme fully ANSI-themed', () => {
+    const palette = resolvePalette('Catppuccin Mocha', [
+      {
+        name: 'Catppuccin Mocha',
+        colors: { background: '#101018', foreground: '#e0e0e8', cursor: '#80ffcc' }
+      }
+    ]);
+    expect(palette.ansi).toHaveLength(16);
+    expect(palette.extendedAnsi).toEqual(['#fab387', '#f5e0dc']);
   });
 
   it('emits every ANSI slot and the accent keyword token as CSS variables', () => {

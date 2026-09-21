@@ -1,4 +1,5 @@
 import type { ISearchDecorationOptions } from '@xterm/addon-search';
+import type { ITheme } from '@xterm/xterm';
 import type { ThemeColors, UserTheme } from '@geared-term/protocol';
 
 export type Palette = {
@@ -23,6 +24,9 @@ export type Palette = {
   searchMatch: string;
   searchMatchActive: string;
   ansi: string[];
+  /** Colors for xterm's extended palette (indices 16-255), following the
+   *  official vendor schemes; undefined leaves the stock 256-color cube. */
+  extendedAnsi?: string[];
 };
 
 const GEARED_DARK: Palette = {
@@ -151,6 +155,7 @@ const CATPPUCCIN_MOCHA: Palette = {
   textMuted: '#a6adc8',
   searchMatch: '#605955',
   searchMatchActive: '#97705f',
+  extendedAnsi: ['#fab387', '#f5e0dc'],
   ansi: [
     '#45475a',
     '#f38ba8',
@@ -193,6 +198,7 @@ const CATPPUCCIN_MACCHIATO: Palette = {
   textMuted: '#a5adcb',
   searchMatch: '#645f5d',
   searchMatchActive: '#9a7464',
+  extendedAnsi: ['#f5a97f', '#f4dbd6'],
   ansi: [
     '#494d64',
     '#ed8796',
@@ -235,6 +241,7 @@ const CATPPUCCIN_FRAPPE: Palette = {
   textMuted: '#a5adce',
   searchMatch: '#6c6866',
   searchMatchActive: '#9f7a6a',
+  extendedAnsi: ['#ef9f76', '#f2d5cf'],
   ansi: [
     '#51576d',
     '#e78284',
@@ -277,6 +284,7 @@ const CATPPUCCIN_LATTE: Palette = {
   textMuted: '#6c6f85',
   searchMatch: '#ead3b4',
   searchMatchActive: '#f7a374',
+  extendedAnsi: ['#fe640b', '#dc8a78'],
   ansi: [
     '#5c5f77',
     '#d20f39',
@@ -343,6 +351,62 @@ function isDark(color: string): boolean {
   return (red * 299 + green * 587 + blue * 114) / 1000 < 128;
 }
 
+type DerivedAnsiBases = {
+  dark: boolean;
+  accent: string;
+  danger: string;
+};
+
+/**
+ * Builds a coordinated 16-color ANSI palette for user themes that do not
+ * declare one: slots 1-6 reuse the theme's danger/accent colors plus fixed
+ * Catppuccin-style hues for the missing channels, grays derive from the
+ * background/foreground mix, and bright slots mirror their base colors the
+ * same way official vendor schemes do.
+ */
+function deriveAnsi(colors: ThemeColors, bases: DerivedAnsiBases): string[] {
+  const declared = colors.ansi;
+  if (declared && declared.length === 16) return [...declared];
+  const { dark, accent, danger } = bases;
+  const channels = dark
+    ? {
+        red: danger,
+        green: '#a6e3a1',
+        yellow: '#f9e2af',
+        blue: accent,
+        magenta: '#f5c2e7',
+        cyan: '#94e2d5'
+      }
+    : {
+        red: danger,
+        green: '#40a02b',
+        yellow: '#df8e1d',
+        blue: accent,
+        magenta: '#ea76cb',
+        cyan: '#179299'
+      };
+  const gray = (weight: number): string => mix(colors.background, colors.foreground, weight);
+  const darkGray = dark ? gray(0.16) : gray(0.28);
+  return [
+    darkGray,
+    channels.red,
+    channels.green,
+    channels.yellow,
+    channels.blue,
+    channels.magenta,
+    channels.cyan,
+    dark ? colors.foreground : gray(0.25),
+    dark ? gray(0.38) : gray(0.45),
+    channels.red,
+    channels.green,
+    channels.yellow,
+    channels.blue,
+    channels.magenta,
+    channels.cyan,
+    dark ? mix(colors.foreground, '#ffffff', 0.35) : colors.foreground
+  ];
+}
+
 /**
  * Fills every palette slot from a user theme's declared colors, deriving the
  * undeclared UI slots from background/foreground/accent so partial JSON files
@@ -352,6 +416,7 @@ export function derivePalette(colors: ThemeColors): Palette {
   const dark = isDark(colors.background);
   const accent = colors.accent ?? colors.bright ?? (dark ? '#89b4fa' : '#1e66f5');
   const bright = colors.bright ?? accent;
+  const danger = colors.danger ?? (dark ? '#f38ba8' : '#d20f39');
   const neutral = dark ? '#000000' : '#ffffff';
   const searchYellow = dark ? '#f9e2af' : '#df8e1d';
   const searchPeach = dark ? '#fab387' : '#fe640b';
@@ -362,7 +427,7 @@ export function derivePalette(colors: ThemeColors): Palette {
     selection: colors.selection ?? mix(colors.background, accent, dark ? 0.28 : 0.35),
     accent,
     bright,
-    danger: colors.danger ?? (dark ? '#f38ba8' : '#d20f39'),
+    danger,
     shell: colors.shell ?? mix(colors.background, neutral, dark ? 0.45 : 0.06),
     panel: colors.panel ?? mix(colors.background, colors.foreground, 0.03),
     panelAlt: colors.panelAlt ?? mix(colors.panel ?? colors.background, colors.foreground, 0.05),
@@ -376,14 +441,17 @@ export function derivePalette(colors: ThemeColors): Palette {
     textMuted: colors.textMuted ?? mix(colors.foreground, colors.background, 0.4),
     searchMatch: colors.searchMatch ?? mix(colors.background, searchYellow, 0.3),
     searchMatchActive: colors.searchMatchActive ?? mix(colors.background, searchPeach, 0.55),
-    ansi: colors.ansi ?? []
+    ansi: deriveAnsi(colors, { dark, accent, danger })
   };
 }
 
 export function resolvePalette(name: string, userThemes: UserTheme[]): Palette {
   const base = builtinThemes[name];
   const user = userThemes.find((theme) => theme.name === name);
-  if (user) return derivePalette({ ...(base ? { ...base } : {}), ...user.colors } as ThemeColors);
+  if (user) {
+    const merged = derivePalette({ ...(base ?? {}), ...user.colors } as ThemeColors);
+    return base?.extendedAnsi ? { ...merged, extendedAnsi: base.extendedAnsi } : merged;
+  }
   return base ?? (builtinThemes['Geared Dark'] as Palette);
 }
 
@@ -408,7 +476,8 @@ const paletteCssVariables: Record<keyof Palette, string> = {
   textMuted: '--gt-text-muted',
   searchMatch: '--gt-search-match',
   searchMatchActive: '--gt-search-match-active',
-  ansi: '--gt-ansi'
+  ansi: '--gt-ansi',
+  extendedAnsi: '--gt-ansi-extended'
 };
 
 /**
@@ -419,7 +488,7 @@ const paletteCssVariables: Record<keyof Palette, string> = {
 export function paletteCssDeclarations(palette: Palette): Array<[string, string]> {
   const declarations: Array<[string, string]> = [];
   for (const key of Object.keys(paletteCssVariables) as (keyof Palette)[]) {
-    if (key === 'ansi') continue;
+    if (key === 'ansi' || key === 'extendedAnsi') continue;
     declarations.push([paletteCssVariables[key] as string, palette[key] as string]);
   }
   const ansi = palette.ansi;
@@ -475,14 +544,38 @@ export function buildSearchDecorations(palette: Palette): ISearchDecorationOptio
   };
 }
 
-export function buildXtermTheme(palette: Palette): Record<string, unknown> {
-  const theme: Record<string, unknown> = {
+export function buildXtermTheme(palette: Palette): ITheme {
+  const theme: ITheme = {
     background: palette.background,
     foreground: palette.foreground,
     cursor: palette.cursor,
     selectionBackground: palette.selection,
     selectionForeground: palette.foreground
   };
-  if (palette.ansi.length === 16) theme.ansi = palette.ansi;
+  // xterm's ITheme only accepts the sixteen named slots; an `ansi` array key
+  // would be silently ignored and leave the stock dark ANSI colors in place.
+  if (palette.ansi.length === 16) {
+    [
+      theme.black,
+      theme.red,
+      theme.green,
+      theme.yellow,
+      theme.blue,
+      theme.magenta,
+      theme.cyan,
+      theme.white
+    ] = palette.ansi.slice(0, 8);
+    [
+      theme.brightBlack,
+      theme.brightRed,
+      theme.brightGreen,
+      theme.brightYellow,
+      theme.brightBlue,
+      theme.brightMagenta,
+      theme.brightCyan,
+      theme.brightWhite
+    ] = palette.ansi.slice(8, 16);
+  }
+  if (palette.extendedAnsi) theme.extendedAnsi = palette.extendedAnsi;
   return theme;
 }
