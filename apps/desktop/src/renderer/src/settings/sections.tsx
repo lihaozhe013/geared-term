@@ -71,6 +71,16 @@ export function GeneralSection({
         />
         <span>{t('allowRiskyRun')}</span>
       </label>
+      <label className="settings-check">
+        <input
+          type="checkbox"
+          checked={settings.keepRunningInBackground}
+          onChange={(event) =>
+            void onSave({ keepRunningInBackground: event.target.checked }).catch(() => undefined)
+          }
+        />
+        <span>{t('keepRunningInBackground')}</span>
+      </label>
     </Section>
   );
 }

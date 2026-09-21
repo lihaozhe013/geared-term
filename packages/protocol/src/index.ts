@@ -151,6 +151,9 @@ export const SettingsRecordSchema = z
     defaultTerm: z.enum(['xterm-256color', 'xterm', 'vt520', 'linux', 'screen']),
     splitCommandPresentation: z.boolean(),
     allowRiskyRun: z.boolean().default(false),
+    /** False (default for upgraded configs) keeps the historical quit-on-close
+     *  behavior; fresh installs seed true via defaultSettings. */
+    keepRunningInBackground: z.boolean().default(false),
     terminalContextPrecedingLines: z.number().int().min(0).max(2000),
     remoteFileCommands: z.string().max(4096).default('cat\nless\nvim'),
     uiFontFamily: z.string().max(256).default(''),

@@ -133,6 +133,31 @@ describe('protocol schemas', () => {
     ).toBe(false);
   });
 
+  it('keeps quit-on-close for records saved before keepRunningInBackground existed', () => {
+    const legacy = {
+      schemaVersion: 1,
+      language: 'zh-CN',
+      theme: 'Catppuccin Mocha',
+      terminalFontSize: 14,
+      terminalLineHeight: 1.2,
+      terminalCursor: 'bar',
+      defaultTerm: 'xterm-256color',
+      splitCommandPresentation: true,
+      allowRiskyRun: false,
+      terminalContextPrecedingLines: 100
+    };
+    expect(SettingsRecordSchema.parse(legacy).keepRunningInBackground).toBe(false);
+    expect(SettingsRecordSchema.parse({ ...legacy, keepRunningInBackground: true })).toMatchObject({
+      keepRunningInBackground: true
+    });
+    expect(
+      SettingsRecordSchema.safeParse({
+        ...legacy,
+        keepRunningInBackground: 'yes'
+      }).success
+    ).toBe(false);
+  });
+
   it('normalizes ligature sequences and orders them longest-first', () => {
     expect(normalizeLigatureSequences(['=>', '=>', '<', 'a', '!=', '->>', '   ', '=>!!'])).toEqual([
       '=>!!',

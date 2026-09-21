@@ -52,6 +52,7 @@ const defaultSettings: SettingsRecord = {
   defaultTerm: 'xterm-256color',
   splitCommandPresentation: true,
   allowRiskyRun: false,
+  keepRunningInBackground: false,
   terminalContextPrecedingLines: 100,
   remoteFileCommands: 'cat\nless\nvim',
   uiFontFamily: '',

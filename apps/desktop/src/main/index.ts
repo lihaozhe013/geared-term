@@ -103,6 +103,7 @@ import { TransferManager } from './sftp/transfers';
 import { buildApplicationMenu, executeApplicationMenuAction, type MenuLocale } from './menu';
 import { HistoryWindowManager } from './history-window';
 import { SettingsWindowManager, type SettingsCategory } from './settings-window';
+import { TrayController } from './tray';
 import {
   forwardWindowControlState,
   hideNativeMenuBar,
@@ -123,9 +124,16 @@ let keyCaptureDepth = 0;
 // profile storage away from the machine-wide default location.
 const userDataOverride = process.env.GEARED_USER_DATA?.trim();
 if (userDataOverride) app.setPath('userData', userDataOverride);
+// Keyed on the userData directory, so the override above must land first.
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  app.on('second-instance', () => restoreMainWindow());
+}
 let logger: Logger;
 let mainWindow: BrowserWindow | undefined;
 let quitRequested = false;
+let trayController: TrayController | undefined;
 let settingsWindow: SettingsWindowManager;
 let historyWindow: HistoryWindowManager;
 let localTerminals: LocalTerminalManager;
@@ -141,6 +149,34 @@ function sendToRenderer(channel: string, payload: unknown): void {
   for (const window of BrowserWindow.getAllWindows()) {
     if (!window.isDestroyed()) window.webContents.send(channel, payload);
   }
+}
+
+function backgroundModeEnabled(): boolean {
+  return storage !== undefined && storage.settingsSnapshot().keepRunningInBackground;
+}
+
+function restoreMainWindow(): void {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    mainWindow = createWindow();
+    return;
+  }
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+function toggleMainWindow(): void {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    mainWindow = createWindow();
+    return;
+  }
+  if (mainWindow.isVisible() && mainWindow.isFocused()) {
+    mainWindow.hide();
+    return;
+  }
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
 }
 
 function resolveMenuLocale(language: 'system' | 'en-US' | 'zh-CN'): MenuLocale {
@@ -327,11 +363,19 @@ function createWindow(): BrowserWindow {
         });
       })
       .finally(() => {
-        window.close();
         // Preventing the first close canceled the in-flight quit cycle, and on
         // macOS window-all-closed does not re-issue it, which would leave the
         // app running without windows until a second quit is requested.
-        if (quitRequested) app.quit();
+        if (quitRequested || !backgroundModeEnabled()) {
+          window.close();
+          if (quitRequested) app.quit();
+          return;
+        }
+        // Background mode keeps the whole renderer (tabs, PTYs, scrollback)
+        // alive behind a hidden window; rearm the interception for the next
+        // real close.
+        window.hide();
+        persistingWindowState = false;
       });
   });
   window.webContents.setWindowOpenHandler(({ url }) => {
@@ -476,6 +520,7 @@ function registerIpc(): void {
     const settings = SettingsRecordSchema.parse(input);
     const saved = SettingsRecordSchema.parse(await storage.saveSettings(settings));
     await rebuildApplicationMenu();
+    trayController?.sync(saved.keepRunningInBackground, resolveMenuLocale(saved.language));
     sendToRenderer('settings:changed', saved);
     return saved;
   });
@@ -1109,6 +1154,15 @@ void app.whenReady().then(async () => {
   });
   historyWindow = new HistoryWindowManager(logger, isDevelopment);
   await rebuildApplicationMenu();
+  trayController = new TrayController(
+    logger,
+    () => toggleMainWindow(),
+    () => app.quit()
+  );
+  trayController.sync(
+    storage.settingsSnapshot().keepRunningInBackground,
+    resolveMenuLocale(storage.settingsSnapshot().language)
+  );
   mainWindow = createWindow();
   logger.info('app', 'Application ready', { packaged: app.isPackaged });
 });
@@ -1119,14 +1173,18 @@ app.on('before-quit', () => {
   sshSessions?.closeAll();
 });
 
+app.on('will-quit', () => {
+  trayController?.destroy();
+});
+
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  if (process.platform === 'darwin') return;
+  // Background mode intentionally keeps the process resident with no windows;
+  // the tray icon (or a fresh single-instance launch) restores it.
+  if (backgroundModeEnabled()) return;
+  app.quit();
 });
 
 app.on('activate', () => {
-  if (!mainWindow || mainWindow.isDestroyed()) {
-    mainWindow = createWindow();
-  }
+  restoreMainWindow();
 });

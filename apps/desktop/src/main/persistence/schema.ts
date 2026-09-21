@@ -68,6 +68,7 @@ export const defaultSettings: Settings = {
   defaultTerm: 'xterm-256color',
   splitCommandPresentation: true,
   allowRiskyRun: false,
+  keepRunningInBackground: true,
   terminalContextPrecedingLines: 100,
   remoteFileCommands: 'cat\nless\nvim',
   uiFontFamily: '',
