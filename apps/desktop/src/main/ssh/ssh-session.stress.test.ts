@@ -267,6 +267,63 @@ describe('SSH session stress and fault tolerance', () => {
     }
   );
 
+  it(
+    'opens the shell at the latest size when resizes land before the channel exists',
+    { timeout: 20_000 },
+    async () => {
+      const root = await fs.mkdtemp(join(tmpdir(), 'geared-ssh-race-'));
+      const logger = createLogger(join(root, 'logs'));
+      const gateManager = new SshSessionManager(
+        logger,
+        new KnownHostsStore(join(root, 'known-hosts.json'), logger)
+      );
+      const id = `race-${++sessionCounter}`;
+      const { port1, port2 } = new MessageChannel();
+      const messages: TerminalPortMessage[] = [];
+      const handle: SessionHandle = {
+        id,
+        messages,
+        output: '',
+        send: (message: unknown) => port1.postMessage(message),
+        dispose: () => port1.close()
+      };
+      openSessions.push(handle);
+      port1.on('message', (value: unknown) => messages.push(value as TerminalPortMessage));
+      port1.start();
+      gateManager.create(
+        {
+          sessionId: id,
+          host: '127.0.0.1',
+          port: server.port,
+          username: 'tester',
+          password: 'geared-secret',
+          cols: 80,
+          rows: 24,
+          term: 'xterm-256color'
+        },
+        adaptPort(port2) as unknown as MessagePortMain
+      );
+      // The unknown host key parks the handshake in the approval prompt, so
+      // the resize below is guaranteed to arrive before any shell channel
+      // exists — the exact race that left remote ptys at 80x24.
+      await waitForMessage(messages, (message) => message.kind === 'prompt');
+      handle.send({ kind: 'resize', cols: 132, rows: 43 });
+      handle.send({ kind: 'host-key-decision', decision: 'approve' });
+      await waitForMessage(
+        messages,
+        (message) => message.kind === 'state' && message.state === 'running'
+      );
+      expect(server.trace.pty).toEqual({ cols: 132, rows: 43, term: 'xterm-256color' });
+      gateManager.closeAll();
+      await waitForMessage(
+        messages,
+        (message) => message.kind === 'state' && message.state === 'closed'
+      );
+      handle.dispose();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  );
+
   it('runs concurrent sessions without cross-talk', { timeout: 30_000 }, async () => {
     const sessions = await Promise.all([openSession(), openSession(), openSession()]);
     sessions.forEach((session, index) => {

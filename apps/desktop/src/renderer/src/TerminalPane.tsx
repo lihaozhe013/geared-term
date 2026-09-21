@@ -226,6 +226,10 @@ export function TerminalPane({
     fit.fit();
     fitRef.current = fit;
     terminalRef.current = terminal;
+    // Requests are built before any xterm exists and carry 80x24 placeholders;
+    // the pty must be created at the measured viewport size instead (the
+    // size-first pattern used by ttyd and VS Code).
+    const measuredRequest = { ...request, cols: terminal.cols, rows: terminal.rows };
 
     let disposed = false;
     let client: TerminalClient | undefined;
@@ -298,6 +302,10 @@ export function TerminalPane({
           terminal.writeln(`\r\n[terminal error] ${message.detail ?? 'unknown error'}`);
         } else if (message.state === 'exited') {
           terminal.writeln(`\r\n[process exited] ${message.detail ?? ''}`);
+        } else if (message.state === 'running') {
+          // Shell just became writable; resizes pushed while it was still
+          // connecting were dropped by the main process, so re-sync now.
+          client?.resize(terminal.cols, terminal.rows);
         }
       } else if (message.kind === 'prompt' && client) {
         onHostKeyPromptRef.current(message, client);
@@ -305,11 +313,11 @@ export function TerminalPane({
     };
 
     try {
-      client = isSavedSshRequest(request)
-        ? window.geared.createSavedSshTerminal(request, onMessage)
-        : isSshRequest(request)
-          ? window.geared.createSshTerminal(request, onMessage)
-          : window.geared.createLocalTerminal(request, onMessage);
+      client = isSavedSshRequest(measuredRequest)
+        ? window.geared.createSavedSshTerminal(measuredRequest, onMessage)
+        : isSshRequest(measuredRequest)
+          ? window.geared.createSshTerminal(measuredRequest, onMessage)
+          : window.geared.createLocalTerminal(measuredRequest, onMessage);
       clientRef.current = client;
       if (!disposed) {
         // Single funnel for every keystroke that reaches the shell (xterm's

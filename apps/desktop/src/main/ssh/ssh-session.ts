@@ -35,6 +35,7 @@ type SshSession = {
   closed: boolean;
   pendingHostKey?: PendingHostKey;
   follow: CdFollowState | null;
+  size: { cols: number; rows: number };
 };
 
 export type SshSessionHooks = {
@@ -80,7 +81,8 @@ export class SshSessionManager {
       rejectSftp,
       sequence: 0,
       closed: false,
-      follow: null
+      follow: null,
+      size: { cols: request.cols, rows: request.rows }
     };
     // Seed the directory tracker with the real home as soon as SFTP is up so
     // `cd` typed before the panel ever opens is still followed.
@@ -99,7 +101,7 @@ export class SshSessionManager {
     client.on('ready', () => {
       if (session.closed) return;
       client.shell(
-        { term: request.term, cols: request.cols, rows: request.rows },
+        { term: request.term, cols: session.size.cols, rows: session.size.rows },
         (error, channel) => {
           if (error) {
             this.fail(session, `PTY request failed: ${error.message}`);
@@ -330,9 +332,14 @@ export class SshSessionManager {
       session.follow = result.state;
       if (result.effect.kind === 'move') this.hooks.onSftpCd?.(session.id, result.effect.directory);
       else if (result.effect.kind === 'unsynced') this.hooks.onSftpCd?.(session.id, null);
-    } else if (message.kind === 'resize')
+    } else if (message.kind === 'resize') {
+      // Resizes can arrive before the shell channel exists (the connection is
+      // still handshaking); setWindow would silently no-op and the remote pty
+      // would stay at the request's placeholder size, so the latest size is
+      // remembered and applied when the shell opens.
+      session.size = { cols: message.cols, rows: message.rows };
       session.channel?.setWindow(message.rows, message.cols, 0, 0);
-    else if (message.kind === 'host-key-decision')
+    } else if (message.kind === 'host-key-decision')
       void this.resolveHostKey(session, message.decision === 'approve');
     else if (message.kind === 'close') this.close(session, 'renderer-requested');
   }
