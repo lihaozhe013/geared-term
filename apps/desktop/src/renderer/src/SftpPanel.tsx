@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
-  LocalEntry,
   SettingsRecord,
   SftpCdEvent,
   SftpRemoteEntry,
@@ -18,13 +17,11 @@ import {
 } from 'lucide-react';
 import { translate, type MessageKey } from './i18n';
 import { ContextMenu, type ContextMenuItem } from './sftp/context-menu';
-import { SftpEntryRow, localMeta, remoteMeta } from './sftp/entry-row';
+import { SftpEntryRow, remoteMeta } from './sftp/entry-row';
 import { SftpTransferList } from './sftp/transfer-list';
+import { LocalFilePane, type UploadChoice } from './LocalFilePane';
 import {
-  entrySide,
-  joinLocal,
   joinRemote,
-  localDirname,
   posixDirname,
   validateEntryName,
   ZOOM_MAX,
@@ -40,13 +37,10 @@ type SftpPanelProps = {
   onClose: () => void;
 };
 
-type Side = 'remote' | 'local';
-
 type ContextMenuState = {
   x: number;
   y: number;
-  side: Side;
-  entry: SftpRemoteEntry | LocalEntry | null;
+  entry: SftpRemoteEntry | null;
 };
 
 type PanelMessage = {
@@ -73,33 +67,28 @@ export function SftpPanel({
     entries: []
   });
   const [remoteDraft, setRemoteDraft] = useState('.');
-  const [localDirectory, setLocalDirectory] = useState<string | null>(null);
-  const [localEntries, setLocalEntries] = useState<LocalEntry[]>([]);
   const [remoteSelected, setRemoteSelected] = useState<Set<string>>(new Set());
-  const [localSelected, setLocalSelected] = useState<Set<string>>(new Set());
   const [transfers, setTransfers] = useState<SftpTransfer[]>([]);
   const [message, setMessage] = useState<PanelMessage | null>(null);
   const [detached, setDetached] = useState(false);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
-  const [editing, setEditing] = useState<{
-    side: Side;
-    mode: 'create' | 'rename';
-    path: string;
-  } | null>(null);
+  const [editing, setEditing] = useState<{ mode: 'create' | 'rename'; path: string } | null>(null);
   const [editValue, setEditValue] = useState('');
   const [zoom, setZoom] = useState(12);
-  const anchorRemote = useRef<string | null>(null);
-  const anchorLocal = useRef<string | null>(null);
+  const [localRefreshSignal, setLocalRefreshSignal] = useState(0);
   const remoteRef = useRef(remote);
   remoteRef.current = remote;
-  const localRef = useRef(localDirectory);
-  localRef.current = localDirectory;
   const syncRef = useRef({ detached, alternateScreen });
   syncRef.current = { detached, alternateScreen };
   const pendingResyncRef = useRef(false);
   const healingRef = useRef<string | null>(null);
   const remoteRefreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const localRefreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const anchorRemote = useRef<string | null>(null);
+  const localDirectoryRef = useRef<string | null>(null);
+  const handleLocalDirectoryChange = useCallback((directory: string | null): void => {
+    localDirectoryRef.current = directory;
+  }, []);
 
   const setError = useCallback((text: string): void => setMessage({ text, tone: 'error' }), []);
   const setNotice = useCallback((text: string): void => setMessage({ text, tone: 'info' }), []);
@@ -121,7 +110,9 @@ export function SftpPanel({
         setRemoteSelected((current) =>
           current.size === 0
             ? current
-            : new Set(result.entries.filter((entry) => current.has(entry.path)).map((e) => e.path))
+            : new Set(
+                result.entries.filter((entry) => current.has(entry.path)).map((entry) => entry.path)
+              )
         );
         healingRef.current = null;
         setMessage((current) => (current?.tone === 'error' ? null : current));
@@ -135,29 +126,6 @@ export function SftpPanel({
       }
     },
     [sessionId, setError, ta]
-  );
-
-  const refreshLocal = useCallback(
-    async (directory: string | null): Promise<void> => {
-      try {
-        const entries = await window.geared.listLocalFiles(directory);
-        setLocalEntries(entries);
-        setLocalDirectory(directory);
-        setLocalSelected((current) =>
-          current.size === 0
-            ? current
-            : new Set(entries.filter((entry) => current.has(entry.path)).map((e) => e.path))
-        );
-        setMessage((current) => (current?.tone === 'error' ? null : current));
-      } catch (reason) {
-        setError(
-          reason instanceof Error
-            ? ta('sftpLocalUnavailable', { detail: reason.message })
-            : t('sftpLocalUnavailablePlain')
-        );
-      }
-    },
-    [setError, ta, t]
   );
 
   const probeAndList = useCallback(
@@ -178,8 +146,8 @@ export function SftpPanel({
     [probeDirectory, refreshRemote, setError, t]
   );
 
-  // Self-heal a failed optimistic `cd` (SFTP-010): learn the shell's real
-  // directory with the quiet probe and list it instead of chasing the guess.
+  // Self-heal a failed optimistic `cd` by asking the shell for its authoritative
+  // directory instead of leaving the remote pane on a guessed path.
   const healAfterFailure = useCallback(
     async (failedDirectory: string): Promise<void> => {
       if (syncRef.current.detached || syncRef.current.alternateScreen) return;
@@ -195,8 +163,8 @@ export function SftpPanel({
     async (directory: string): Promise<void> => {
       const synced = !syncRef.current.detached && !syncRef.current.alternateScreen;
       if (synced) {
-        // Panel navigation moves the shell too (bidirectional sync); when the
-        // panel browses on its own (detached/paused) only the listing moves.
+        // Panel navigation moves the shell too; detached and paused views only
+        // change the remote listing.
         try {
           await window.geared.sftpSendCd({ sessionId, directory });
         } catch (reason) {
@@ -208,7 +176,7 @@ export function SftpPanel({
         if (synced) void healAfterFailure(directory);
       });
     },
-    [sessionId, refreshRemote, healAfterFailure, setError, t]
+    [healAfterFailure, refreshRemote, sessionId, setError, t]
   );
 
   const handleCd = useCallback(
@@ -228,7 +196,7 @@ export function SftpPanel({
         void healAfterFailure(target);
       });
     },
-    [sessionId, refreshRemote, probeAndList, healAfterFailure, setError, t]
+    [healAfterFailure, probeAndList, refreshRemote, sessionId, setError, t]
   );
 
   const scheduleRemoteRefresh = useCallback((): void => {
@@ -241,30 +209,35 @@ export function SftpPanel({
   const scheduleLocalRefresh = useCallback((): void => {
     if (localRefreshTimer.current) clearTimeout(localRefreshTimer.current);
     localRefreshTimer.current = setTimeout(() => {
-      void refreshLocal(localRef.current);
+      setLocalRefreshSignal((current) => current + 1);
     }, 250);
-  }, [refreshLocal]);
+  }, []);
 
   useEffect(() => {
     setRemote({ directory: '.', entries: [] });
     setRemoteDraft('.');
     setRemoteSelected(new Set());
-    setLocalSelected(new Set());
+    anchorRemote.current = null;
     setDetached(false);
     setContextMenu(null);
     setEditing(null);
     setMessage(null);
+    setLocalRefreshSignal(0);
+    localDirectoryRef.current = null;
     healingRef.current = null;
     pendingResyncRef.current = false;
     void (async () => {
-      // Open where the shell is, not at home: the main process keeps tracking
-      // `cd` even while the panel is closed.
+      // Open where the shell is, not at home: the main process tracks the
+      // authoritative remote directory while the panel is closed.
       const tracked = await window.geared.sftpTrackedDirectory(sessionId).catch(() => null);
       await refreshRemote(tracked ?? '.', tracked !== null).catch(() => undefined);
     })();
-    void refreshLocal(localRef.current);
     void window.geared.listSftpTransfers(sessionId).then((list) => setTransfers(list.slice(-80)));
-  }, [sessionId, refreshRemote, refreshLocal]);
+    return () => {
+      if (remoteRefreshTimer.current) clearTimeout(remoteRefreshTimer.current);
+      if (localRefreshTimer.current) clearTimeout(localRefreshTimer.current);
+    };
+  }, [refreshRemote, sessionId]);
 
   useEffect(() => {
     const offTransfer = window.geared.onSftpTransferEvent((event) => {
@@ -290,21 +263,20 @@ export function SftpPanel({
       offTransfer();
       offCd();
     };
-  }, [sessionId, handleCd, scheduleRemoteRefresh, scheduleLocalRefresh]);
+  }, [handleCd, scheduleLocalRefresh, scheduleRemoteRefresh, sessionId]);
 
-  // A re-sync requested while a full-screen program owns the terminal runs as
-  // soon as the primary screen returns.
+  // A re-sync requested during a full-screen program runs after the primary
+  // terminal screen returns.
   useEffect(() => {
     if (alternateScreen || !pendingResyncRef.current) return;
     pendingResyncRef.current = false;
     void probeAndList(true);
   }, [alternateScreen, probeAndList]);
 
-  // Collapse and clear finished transfers a few seconds after the last one,
-  // mirroring the automatic progress window dismissal.
   const activeTransfers = transfers.filter(
     (transfer) => transfer.status === 'active' || transfer.status === 'queued'
   );
+  // Keep completed transfer rows visible briefly so the result is observable.
   useEffect(() => {
     if (transfers.length === 0 || activeTransfers.length > 0) return;
     const timer = setTimeout(() => setTransfers([]), 3_000);
@@ -315,22 +287,17 @@ export function SftpPanel({
     if (!contextMenu) return;
     const close = (): void => setContextMenu(null);
     window.addEventListener('blur', close);
-    return () => {
-      window.removeEventListener('blur', close);
-    };
+    return () => window.removeEventListener('blur', close);
   }, [contextMenu]);
 
   const selectEntry = (
-    side: Side,
     path: string,
-    event: { ctrlKey: boolean; metaKey: boolean; shiftKey: boolean },
-    allPaths: string[]
+    event: { ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }
   ): void => {
-    const setSelected = side === 'remote' ? setRemoteSelected : setLocalSelected;
-    const anchorRef = side === 'remote' ? anchorRemote : anchorLocal;
-    setSelected((current) => {
-      if (event.shiftKey && anchorRef.current) {
-        const from = allPaths.indexOf(anchorRef.current);
+    const allPaths = remote.entries.map((entry) => entry.path);
+    setRemoteSelected((current) => {
+      if (event.shiftKey) {
+        const from = anchorRemote.current ? allPaths.indexOf(anchorRemote.current) : -1;
         const to = allPaths.indexOf(path);
         if (from >= 0 && to >= 0) {
           const [start, end] = from <= to ? [from, to] : [to, from];
@@ -340,39 +307,24 @@ export function SftpPanel({
       const next = new Set(event.ctrlKey || event.metaKey ? current : []);
       if (next.has(path)) next.delete(path);
       else next.add(path);
-      anchorRef.current = path;
+      anchorRemote.current = path;
       return next;
     });
   };
 
-  // Right-clicking an entry outside the selection re-anchors the selection to
-  // it, so menu actions always operate on the intended selection (augur rule).
-  const openMenu = (
-    event: React.MouseEvent,
-    side: Side,
-    entry: SftpRemoteEntry | LocalEntry | null
-  ): void => {
+  const openMenu = (event: React.MouseEvent, entry: SftpRemoteEntry | null): void => {
     event.preventDefault();
     event.stopPropagation();
-    if (entry) {
-      const setSelected = side === 'remote' ? setRemoteSelected : setLocalSelected;
-      const current = side === 'remote' ? remoteSelected : localSelected;
-      if (!current.has(entry.path)) {
-        setSelected(new Set([entry.path]));
-        (side === 'remote' ? anchorRemote : anchorLocal).current = entry.path;
-      }
-    } else {
-      (side === 'remote' ? setRemoteSelected : setLocalSelected)(new Set());
+    if (entry && !remoteSelected.has(entry.path)) {
+      setRemoteSelected(new Set([entry.path]));
+      anchorRemote.current = entry.path;
     }
-    setContextMenu({ x: event.clientX, y: event.clientY, side, entry });
+    if (!entry) setRemoteSelected(new Set());
+    setContextMenu({ x: event.clientX, y: event.clientY, entry });
   };
 
-  const selectionOf = (side: Side): string[] => [
-    ...(side === 'remote' ? remoteSelected : localSelected)
-  ];
-
   const confirmLabel = (paths: string[]): string => {
-    const names = paths.map((path) => path.split(/[\\/]/u).pop() ?? path);
+    const names = paths.map((path) => path.split('/').pop() ?? path);
     if (names.length <= 4) return names.map((name) => `"${name}"`).join(', ');
     return `${names
       .slice(0, 4)
@@ -393,31 +345,12 @@ export function SftpPanel({
     }
   };
 
-  const deleteLocal = async (paths: string[]): Promise<void> => {
-    const label =
-      paths.length === 1 ? (paths[0] ?? '') : ta('sftpItemCount', { count: `${paths.length}` });
-    if (!window.confirm(ta('sftpDeleteConfirmLocal', { label }))) return;
-    try {
-      await window.geared.deleteLocalPaths(paths);
-      setLocalSelected(new Set());
-      await refreshLocal(localRef.current);
-      clearMessage();
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : t('sftpDeleteLocalFailed'));
-    }
-  };
-
-  const startCreate = (side: Side): void => {
-    const parent = side === 'remote' ? remoteRef.current.directory : localRef.current;
-    if (side === 'local' && !parent) {
-      setError(t('sftpOpenLocalFolderFirst'));
-      return;
-    }
-    setEditing({ side, mode: 'create', path: parent as string });
+  const startCreateRemote = (): void => {
+    setEditing({ mode: 'create', path: remoteRef.current.directory });
     setEditValue('');
   };
 
-  const submitEdit = async (): Promise<void> => {
+  const submitRemoteEdit = async (): Promise<void> => {
     if (!editing) return;
     const value = editValue.trim();
     if (!value) return;
@@ -427,28 +360,15 @@ export function SftpPanel({
     }
     try {
       if (editing.mode === 'create') {
-        if (editing.side === 'remote') {
-          await window.geared.sftpMkdir({ sessionId, path: joinRemote(editing.path, value) });
-          await refreshRemote(remoteRef.current.directory, false);
-        } else {
-          await window.geared.makeLocalDirectory({ parent: editing.path, name: value });
-          await refreshLocal(localRef.current);
-        }
+        await window.geared.sftpMkdir({ sessionId, path: joinRemote(editing.path, value) });
       } else {
-        const parent =
-          editing.side === 'remote'
-            ? posixDirname(editing.path)
-            : (localDirname(editing.path) ?? editing.path);
-        const destination =
-          editing.side === 'remote' ? joinRemote(parent, value) : joinLocal(parent, value);
-        if (editing.side === 'remote') {
-          await window.geared.sftpRename({ sessionId, source: editing.path, destination });
-          await refreshRemote(remoteRef.current.directory, false);
-        } else {
-          await window.geared.renameLocalPath({ source: editing.path, destination });
-          await refreshLocal(localRef.current);
-        }
+        await window.geared.sftpRename({
+          sessionId,
+          source: editing.path,
+          destination: joinRemote(posixDirname(editing.path), value)
+        });
       }
+      await refreshRemote(remoteRef.current.directory, false);
       setEditing(null);
       clearMessage();
     } catch (reason) {
@@ -456,10 +376,7 @@ export function SftpPanel({
     }
   };
 
-  const uploadLocal = async (
-    paths: string[],
-    choose: 'files' | 'folders' | 'both' = 'both'
-  ): Promise<void> => {
+  const uploadLocal = async (paths: string[], choose: UploadChoice = 'both'): Promise<void> => {
     try {
       if (paths.length > 0) {
         const started = await window.geared.uploadPathsSftp({
@@ -488,7 +405,8 @@ export function SftpPanel({
       return;
     }
     try {
-      if (!localRef.current && paths.length === 1) {
+      const localDirectory = localDirectoryRef.current;
+      if (!localDirectory && paths.length === 1) {
         const single = remoteRef.current.entries.find((entry) => entry.path === paths[0]);
         if (single && single.kind !== 'directory') {
           const result = await window.geared.downloadSftp({
@@ -502,7 +420,7 @@ export function SftpPanel({
         }
       }
       // With no local folder open, fall back to the system Downloads directory.
-      const target = localRef.current ?? (await window.geared.getDownloadsDirectory());
+      const target = localDirectory ?? (await window.geared.getDownloadsDirectory());
       const started = await window.geared.downloadPathsSftp({
         sessionId,
         remotePaths: paths,
@@ -510,21 +428,15 @@ export function SftpPanel({
       });
       setTransfers((current) => [...current, ...started]);
       scheduleLocalRefresh();
-      if (!localRef.current) setNotice(ta('sftpDownloadedToDownloads', { directory: target }));
+      if (!localDirectory) setNotice(ta('sftpDownloadedToDownloads', { directory: target }));
       else clearMessage();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : t('sftpDownloadFailed'));
     }
   };
 
-  const copyPaths = (side: Side, paths: string[]): void => {
-    const text =
-      paths.length > 0
-        ? paths.join('\n')
-        : side === 'remote'
-          ? remoteRef.current.directory
-          : (localRef.current ?? '');
-    if (!text) return;
+  const copyPaths = (paths: string[]): void => {
+    const text = paths.length > 0 ? paths.join('\n') : remoteRef.current.directory;
     void navigator.clipboard.writeText(text);
   };
 
@@ -537,24 +449,11 @@ export function SftpPanel({
     }
   };
 
-  const openLocalEntry = async (entry: LocalEntry): Promise<void> => {
-    if (entry.kind === 'directory' || entry.kind === 'drive') {
-      await refreshLocal(entry.path);
-      return;
-    }
-    try {
-      await window.geared.openLocalPath(entry.path);
-      clearMessage();
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : t('sftpOpenLocalFailed'));
-    }
-  };
-
   const toggleDetached = (): void => {
     const next = !detached;
     setDetached(next);
     if (!next && !alternateScreen) {
-      // Re-attaching re-aligns the panel with the shell's tracked directory.
+      // Re-attaching re-aligns the remote pane with the shell's tracked path.
       void (async () => {
         const tracked = await window.geared.sftpTrackedDirectory(sessionId).catch(() => null);
         if (tracked) await refreshRemote(tracked, true).catch(() => undefined);
@@ -572,135 +471,66 @@ export function SftpPanel({
   };
 
   const buildMenuItems = (state: ContextMenuState): ContextMenuItem[] => {
-    const selectedPaths = selectionOf(state.side);
+    const selectedPaths = [...remoteSelected];
     const single = selectedPaths.length === 1;
     if (!state.entry) {
-      return state.side === 'remote'
-        ? [
-            {
-              id: 'refresh',
-              label: t('refresh'),
-              run: () =>
-                void refreshRemote(remoteRef.current.directory, false).catch(() => undefined)
-            },
-            { id: 'copy', label: t('sftpCopyPath'), run: () => copyPaths('remote', []) },
-            {
-              id: 'mkdir',
-              label: t('sftpNewFolder'),
-              separatorBefore: true,
-              run: () => startCreate('remote')
-            },
-            {
-              id: 'upload-files',
-              label: t('sftpUploadFiles'),
-              run: () => void uploadLocal([], 'files')
-            },
-            {
-              id: 'upload-folder',
-              label: t('sftpUploadFolder'),
-              run: () => void uploadLocal([], 'folders')
-            }
-          ]
-        : [
-            { id: 'refresh', label: t('refresh'), run: () => void refreshLocal(localRef.current) },
-            {
-              id: 'copy',
-              label: t('sftpCopyPath'),
-              disabled: !localRef.current,
-              run: () => copyPaths('local', [])
-            },
-            {
-              id: 'mkdir',
-              label: t('sftpNewFolder'),
-              separatorBefore: true,
-              run: () => startCreate('local')
-            },
-            {
-              id: 'open-location',
-              label: t('sftpOpenLocation'),
-              disabled: !localRef.current,
-              run: () => {
-                if (localRef.current) void window.geared.openLocalPath(localRef.current);
-              }
-            }
-          ];
-    }
-    const entry = entrySide(state.entry);
-    const guarded = 'guarded' in state.entry && state.entry.guarded;
-    if (state.side === 'remote') {
       return [
-        {
-          id: 'open',
-          label: t('sftpOpen'),
-          disabled: !entry.isDirectory || !single,
-          run: () => void navigateRemote(entry.path)
-        },
-        {
-          id: 'run',
-          label: t('sftpRunInTerminal'),
-          disabled: entry.isDirectory || !single,
-          submenu: remoteFileCommands.map((command) => ({
-            id: `run-${command}`,
-            label: command,
-            run: () => void runRemoteCommand(command, entry.path)
-          }))
-        },
-        {
-          id: 'download',
-          label: t('sftpDownload'),
-          separatorBefore: true,
-          disabled: selectedPaths.length === 0,
-          run: () => void downloadRemote(selectedPaths)
-        },
-        {
-          id: 'rename',
-          label: t('sftpRename'),
-          disabled: !single,
-          run: () => {
-            setEditing({ side: 'remote', mode: 'rename', path: entry.path });
-            setEditValue('');
-          }
-        },
-        {
-          id: 'delete',
-          label: t('sftpDelete'),
-          danger: true,
-          disabled: selectedPaths.length === 0,
-          run: () => void deleteRemote(selectedPaths)
-        },
-        {
-          id: 'copy',
-          label: t('sftpCopyPath'),
-          separatorBefore: true,
-          run: () => copyPaths('remote', selectedPaths)
-        },
         {
           id: 'refresh',
           label: t('refresh'),
           run: () => void refreshRemote(remoteRef.current.directory, false).catch(() => undefined)
+        },
+        { id: 'copy', label: t('sftpCopyPath'), run: () => copyPaths([]) },
+        {
+          id: 'mkdir',
+          label: t('sftpNewFolder'),
+          separatorBefore: true,
+          run: startCreateRemote
+        },
+        {
+          id: 'upload-files',
+          label: t('sftpUploadFiles'),
+          run: () => void uploadLocal([], 'files')
+        },
+        {
+          id: 'upload-folder',
+          label: t('sftpUploadFolder'),
+          run: () => void uploadLocal([], 'folders')
         }
       ];
     }
+
+    const entry = state.entry;
     return [
       {
         id: 'open',
         label: t('sftpOpen'),
-        disabled: !single,
-        run: () => void openLocalEntry(state.entry as LocalEntry)
+        disabled: entry.kind !== 'directory' || !single,
+        run: () => void navigateRemote(entry.path)
       },
       {
-        id: 'upload',
-        label: t('sftpUpload'),
-        disabled: guarded || selectedPaths.length === 0,
-        run: () => void uploadLocal(selectedPaths)
+        id: 'run',
+        label: t('sftpRunInTerminal'),
+        disabled: entry.kind === 'directory' || !single,
+        submenu: remoteFileCommands.map((command) => ({
+          id: `run-${command}`,
+          label: command,
+          run: () => void runRemoteCommand(command, entry.path)
+        }))
+      },
+      {
+        id: 'download',
+        label: t('sftpDownload'),
+        separatorBefore: true,
+        disabled: selectedPaths.length === 0,
+        run: () => void downloadRemote(selectedPaths)
       },
       {
         id: 'rename',
         label: t('sftpRename'),
-        separatorBefore: true,
-        disabled: guarded || !single,
+        disabled: !single,
         run: () => {
-          setEditing({ side: 'local', mode: 'rename', path: entry.path });
+          setEditing({ mode: 'rename', path: entry.path });
           setEditValue('');
         }
       },
@@ -708,21 +538,19 @@ export function SftpPanel({
         id: 'delete',
         label: t('sftpDelete'),
         danger: true,
-        disabled: guarded || selectedPaths.length === 0,
-        run: () => void deleteLocal(selectedPaths)
+        disabled: selectedPaths.length === 0,
+        run: () => void deleteRemote(selectedPaths)
       },
       {
         id: 'copy',
         label: t('sftpCopyPath'),
         separatorBefore: true,
-        run: () => copyPaths('local', selectedPaths)
+        run: () => copyPaths(selectedPaths)
       },
-      { id: 'refresh', label: t('refresh'), run: () => void refreshLocal(localRef.current) },
       {
-        id: 'open-location',
-        label: t('sftpOpenLocation'),
-        disabled: guarded,
-        run: () => void window.geared.revealLocalPath(entry.path)
+        id: 'refresh',
+        label: t('refresh'),
+        run: () => void refreshRemote(remoteRef.current.directory, false).catch(() => undefined)
       }
     ];
   };
@@ -736,7 +564,6 @@ export function SftpPanel({
     );
   };
   const remotePaths = remote.entries.map((entry) => entry.path);
-  const localPaths = localEntries.map((entry) => entry.path);
   const statusText = detached
     ? t('sftpDetached')
     : alternateScreen
@@ -744,13 +571,18 @@ export function SftpPanel({
       : t('sftpFollowing');
 
   return (
-    <aside className="sftp-panel" aria-label="SFTP browser">
+    <aside className="sftp-panel" aria-label={t('filesPanelLabel')}>
       <div className="sftp-header">
         <div>
-          <p className="section-label">SFTP</p>
+          <p className="section-label">{t('filesPanelLabel')}</p>
           <h2>{t('sftpFiles')}</h2>
         </div>
-        <button type="button" className="icon-button" onClick={onClose} aria-label={t('sftpClose')}>
+        <button
+          type="button"
+          className="icon-button"
+          onClick={onClose}
+          aria-label={t('filesClose')}
+        >
           <X size={14} aria-hidden="true" />
         </button>
       </div>
@@ -798,7 +630,7 @@ export function SftpPanel({
             <button
               type="button"
               className="icon-button"
-              onClick={() => startCreate('remote')}
+              onClick={startCreateRemote}
               title={t('sftpNewFolder')}
               aria-label={t('sftpNewFolder')}
             >
@@ -807,7 +639,7 @@ export function SftpPanel({
             <button
               type="button"
               className="icon-button"
-              onClick={() => void uploadLocal([])}
+              onClick={() => void uploadLocal([], 'both')}
               title={t('sftpUploadHint')}
               aria-label={t('sftpUpload')}
             >
@@ -825,7 +657,7 @@ export function SftpPanel({
             <button
               type="button"
               className="toolbar-button"
-              onClick={() => copyPaths('remote', [...remoteSelected])}
+              onClick={() => copyPaths([...remoteSelected])}
             >
               {t('sftpCopyPaths')}
             </button>
@@ -835,8 +667,7 @@ export function SftpPanel({
           className="sftp-path"
           onSubmit={(event) => {
             event.preventDefault();
-            const target = remoteDraft.trim() || '.';
-            void navigateRemote(target).catch(() => undefined);
+            void navigateRemote(remoteDraft.trim() || '.');
           }}
         >
           <input
@@ -857,14 +688,12 @@ export function SftpPanel({
             type="button"
             className="toolbar-button"
             aria-label="Remote parent directory"
-            onClick={() =>
-              void navigateRemote(posixDirname(remote.directory)).catch(() => undefined)
-            }
+            onClick={() => void navigateRemote(posixDirname(remote.directory))}
           >
             <ArrowUp size={14} aria-hidden="true" />
           </button>
         </form>
-        {editing?.side === 'remote' ? (
+        {editing ? (
           <div className="sftp-edit">
             <input
               autoFocus
@@ -875,11 +704,15 @@ export function SftpPanel({
               }
               aria-label={editing.mode === 'create' ? 'New remote folder name' : 'New remote name'}
               onKeyDown={(event) => {
-                if (event.key === 'Enter') void submitEdit();
+                if (event.key === 'Enter') void submitRemoteEdit();
                 if (event.key === 'Escape') setEditing(null);
               }}
             />
-            <button type="button" className="toolbar-button" onClick={() => void submitEdit()}>
+            <button
+              type="button"
+              className="toolbar-button"
+              onClick={() => void submitRemoteEdit()}
+            >
               {editing.mode === 'create' ? t('sftpCreate') : t('sftpRename')}
             </button>
             <button type="button" className="toolbar-button" onClick={() => setEditing(null)}>
@@ -892,7 +725,7 @@ export function SftpPanel({
           role="list"
           style={paneStyle}
           onWheel={onPaneWheel}
-          onContextMenu={(event) => openMenu(event, 'remote', null)}
+          onContextMenu={(event) => openMenu(event, null)}
         >
           {remote.entries.map((entry) => (
             <SftpEntryRow
@@ -902,12 +735,11 @@ export function SftpPanel({
               selected={remoteSelected.has(entry.path)}
               title={entry.longName}
               meta={remoteMeta(entry)}
-              onClick={(event) => selectEntry('remote', entry.path, event, remotePaths)}
+              onClick={(event) => selectEntry(entry.path, event)}
               onDoubleClick={() => {
-                if (entry.kind === 'directory')
-                  void navigateRemote(entry.path).catch(() => undefined);
+                if (entry.kind === 'directory') void navigateRemote(entry.path);
               }}
-              onContextMenu={(event) => openMenu(event, 'remote', entry)}
+              onContextMenu={(event) => openMenu(event, entry)}
             />
           ))}
           {remote.entries.length === 0 ? <p className="muted">{t('sftpEmpty')}</p> : null}
@@ -922,109 +754,19 @@ export function SftpPanel({
         <ArrowDownUp size={12} aria-hidden="true" />
       </div>
 
-      <section className="sftp-pane" aria-label="Local files">
-        <div className="sftp-pane-header">
-          <span className="section-label">{t('sftpLocal')}</span>
-          <div className="sftp-actions">
-            <button
-              type="button"
-              className="icon-button"
-              onClick={() => void refreshLocal(localDirectory)}
-              title={t('refresh')}
-              aria-label={t('refresh')}
-            >
-              <RefreshCw size={14} aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              className="icon-button"
-              onClick={() => startCreate('local')}
-              title={t('sftpNewFolder')}
-              aria-label={t('sftpNewFolder')}
-            >
-              <FolderPlus size={14} aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              className="icon-button"
-              onClick={() => void uploadLocal([...localSelected])}
-              disabled={localSelected.size === 0}
-              title={t('sftpUpload')}
-              aria-label={t('sftpUpload')}
-            >
-              <Upload size={14} aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              className="icon-button"
-              onClick={() =>
-                void refreshLocal(localDirectory ? localDirname(localDirectory) : null)
-              }
-              disabled={!localDirectory}
-              title={localDirectory ? t('sftpParent') : t('sftpOpenFolderFirst')}
-              aria-label={localDirectory ? t('sftpParent') : t('sftpOpenFolderFirst')}
-            >
-              <ArrowUp size={14} aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              className="toolbar-button"
-              onClick={() => copyPaths('local', [...localSelected])}
-            >
-              {t('sftpCopyPaths')}
-            </button>
-          </div>
-        </div>
-        <p className="sftp-path-display">{localDirectory ?? t('sftpThisPc')}</p>
-        {editing?.side === 'local' ? (
-          <div className="sftp-edit">
-            <input
-              autoFocus
-              value={editValue}
-              onChange={(event) => setEditValue(event.target.value)}
-              placeholder={
-                editing.mode === 'create' ? t('sftpNewFolderName') : t('sftpRenamePlaceholder')
-              }
-              aria-label={editing.mode === 'create' ? 'New local folder name' : 'New local name'}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') void submitEdit();
-                if (event.key === 'Escape') setEditing(null);
-              }}
-            />
-            <button type="button" className="toolbar-button" onClick={() => void submitEdit()}>
-              {editing.mode === 'create' ? t('sftpCreate') : t('sftpRename')}
-            </button>
-            <button type="button" className="toolbar-button" onClick={() => setEditing(null)}>
-              {t('cancel')}
-            </button>
-          </div>
-        ) : null}
-        <div
-          className="sftp-list"
-          role="list"
-          style={paneStyle}
-          onWheel={onPaneWheel}
-          onContextMenu={(event) => openMenu(event, 'local', null)}
-        >
-          {localEntries.map((entry) => (
-            <SftpEntryRow
-              key={entry.path}
-              entry={entry}
-              side="local"
-              selected={localSelected.has(entry.path)}
-              title={`${entry.path} · ${entry.permissions}`}
-              meta={localMeta(entry)}
-              onClick={(event) => selectEntry('local', entry.path, event, localPaths)}
-              onDoubleClick={() => void openLocalEntry(entry)}
-              onContextMenu={(event) => openMenu(event, 'local', entry)}
-            />
-          ))}
-          {localEntries.length === 0 ? <p className="muted">{t('sftpNoLocalItems')}</p> : null}
-        </div>
-        <div className="sftp-footer">
-          <span>{ta('sftpItemCount', { count: `${localEntries.length}` })}</span>
-        </div>
-      </section>
+      <LocalFilePane
+        language={language}
+        sectionLabel={t('sftpLocal')}
+        initialDirectory={null}
+        zoom={zoom}
+        onZoomChange={(delta) =>
+          setZoom((current) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, current + delta)))
+        }
+        refreshSignal={localRefreshSignal}
+        onDirectoryChange={handleLocalDirectoryChange}
+        onUploadSelected={(paths) => void uploadLocal(paths)}
+        onUploadPicker={(choose) => void uploadLocal([], choose)}
+      />
 
       {contextMenu ? (
         <ContextMenu

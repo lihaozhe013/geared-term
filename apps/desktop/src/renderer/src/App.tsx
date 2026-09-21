@@ -34,12 +34,14 @@ import { SftpPanel } from './SftpPanel';
 import { TerminalPane, type SftpTerminalControl } from './TerminalPane';
 import { TabBar } from './terminal/tab-bar';
 import { tabShortcutsFor } from './terminal/tab-context-menu';
+import { filePanelMode } from './terminal/file-panel';
 import {
   insertTabAfter,
   moveTabById,
   nextCopyName,
   tabDisplayLabel
 } from './terminal/tab-ordering';
+import { LocalFilesPanel } from './LocalFilesPanel';
 import { VaultGate } from './VaultGate';
 import { WindowTitleBar } from './WindowTitleBar';
 
@@ -142,10 +144,6 @@ function profileToRequest(profile: SessionProfileRecord): TerminalRequest | unde
 
 function clampWidth(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, Math.round(value)));
-}
-
-function supportsSftp(request: TerminalRequest | undefined): boolean {
-  return Boolean(request && ('host' in request || 'profileId' in request));
 }
 
 function environmentTarget(
@@ -553,8 +551,8 @@ export function App(): React.JSX.Element {
   }, []);
 
   const toggleSftp = useCallback((): void => {
-    if (!supportsSftp(activeTab?.request)) {
-      setError(t('sftpRequiresSsh'));
+    if (!filePanelMode(activeTab?.request)) {
+      setError(t('filesUnavailable'));
       return;
     }
     const next: UiStateRecord = {
@@ -890,13 +888,13 @@ export function App(): React.JSX.Element {
                 className="right-panel-pill"
                 role="tab"
                 aria-selected={uiState.rightPanel === 'sftp'}
-                disabled={!supportsSftp(activeTab?.request)}
+                disabled={!filePanelMode(activeTab?.request)}
                 title={
-                  supportsSftp(activeTab?.request) ? 'SFTP files' : 'SFTP requires an SSH session'
+                  filePanelMode(activeTab?.request) ? t('filesPanelLabel') : t('filesUnavailable')
                 }
                 onClick={toggleSftp}
               >
-                <FolderSync size={13} aria-hidden="true" /> SFTP
+                <FolderSync size={13} aria-hidden="true" /> {t('filesPanelLabel')}
               </button>
               <button
                 type="button"
@@ -958,7 +956,9 @@ export function App(): React.JSX.Element {
                 onPendingChatTextConsumed={() => setPendingChatText(null)}
               />
             ) : null}
-            {uiState.rightPanel === 'sftp' && activeTab && supportsSftp(activeTab.request) ? (
+            {uiState.rightPanel === 'sftp' &&
+            activeTab &&
+            filePanelMode(activeTab.request) === 'sftp' ? (
               <SftpPanel
                 sessionId={activeTab.id}
                 language={settings.language}
@@ -969,6 +969,24 @@ export function App(): React.JSX.Element {
                 }
                 onClose={toggleSftp}
               />
+            ) : null}
+            {uiState.rightPanel === 'sftp' &&
+            activeTab &&
+            filePanelMode(activeTab.request) === 'local' ? (
+              <LocalFilesPanel
+                sessionId={activeTab.id}
+                fallbackDirectory={'cwd' in activeTab.request ? activeTab.request.cwd : undefined}
+                sessionReady={
+                  activeTab.status !== 'starting' && activeTab.status !== 'awaiting-user'
+                }
+                language={settings.language}
+                onClose={toggleSftp}
+              />
+            ) : null}
+            {uiState.rightPanel === 'sftp' && filePanelMode(activeTab?.request) === null ? (
+              <div className="panel-unavailable" role="status">
+                <p>{t('filesUnavailable')}</p>
+              </div>
             ) : null}
             {uiState.rightPanel === 'environment' &&
             activeTab &&

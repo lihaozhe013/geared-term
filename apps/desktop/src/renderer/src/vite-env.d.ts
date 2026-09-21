@@ -157,6 +157,7 @@ declare global {
       sftpTrackedDirectory: (sessionId: string) => Promise<string | null>;
       getDownloadsDirectory: () => Promise<string>;
       listLocalFiles: (directory: string | null) => Promise<LocalEntry[]>;
+      getLocalWorkingDirectory: (sessionId: string) => Promise<string | null>;
       makeLocalDirectory: (input: LocalMkdirRequest) => Promise<SftpOperationResult>;
       renameLocalPath: (input: LocalRenameRequest) => Promise<SftpOperationResult>;
       deleteLocalPaths: (paths: string[]) => Promise<SftpOperationResult>;

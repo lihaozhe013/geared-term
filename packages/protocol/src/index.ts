@@ -741,6 +741,14 @@ export const LocalListRequestSchema = z
   })
   .strict();
 
+export const LocalSessionRequestSchema = z
+  .object({
+    sessionId: IdSchema
+  })
+  .strict();
+
+export const LocalWorkingDirectorySchema = z.string().min(1).max(4096).nullable();
+
 export const LocalEntrySchema = z
   .object({
     name: z.string().min(1).max(4096),
@@ -945,6 +953,8 @@ export type SftpTransferEvent = z.infer<typeof SftpTransferEventSchema>;
 export type SftpRemoteCommandRequest = z.infer<typeof SftpRemoteCommandRequestSchema>;
 export type SftpCdEvent = z.infer<typeof SftpCdEventSchema>;
 export type LocalListRequest = z.infer<typeof LocalListRequestSchema>;
+export type LocalSessionRequest = z.infer<typeof LocalSessionRequestSchema>;
+export type LocalWorkingDirectory = z.infer<typeof LocalWorkingDirectorySchema>;
 export type LocalEntry = z.infer<typeof LocalEntrySchema>;
 export type LocalMkdirRequest = z.infer<typeof LocalMkdirRequestSchema>;
 export type LocalRenameRequest = z.infer<typeof LocalRenameRequestSchema>;

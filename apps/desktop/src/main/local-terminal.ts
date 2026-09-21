@@ -17,6 +17,7 @@ const maxQueuedBytes = 4 * 1024 * 1024;
 type LocalSession = {
   id: string;
   pty: IPty;
+  cwd: string;
   port: MessagePortMain;
   sequence: number;
   outstandingBytes: number;
@@ -133,6 +134,7 @@ export class LocalTerminalManager {
     const session: LocalSession = {
       id: request.sessionId,
       pty: terminal,
+      cwd,
       port,
       sequence: 0,
       outstandingBytes: 0,
@@ -178,6 +180,11 @@ export class LocalTerminalManager {
     const session = this.sessions.get(sessionId);
     if (!session || session.closed) throw new Error('Local terminal is not available');
     session.pty.write(data);
+  }
+
+  public workingDirectory(sessionId: string): string | null {
+    const session = this.sessions.get(sessionId);
+    return session && !session.closed ? session.cwd : null;
   }
 
   private onClientMessage(session: LocalSession, rawMessage: unknown): void {

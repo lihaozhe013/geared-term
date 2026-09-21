@@ -2,7 +2,7 @@
 
 > Status: In progress; foundation milestone implemented
 >
-> Last updated: 2026-09-19
+> Last updated: 2026-09-21
 >
 > Governing specification: [`SPEC.md`](SPEC.md)
 
@@ -37,6 +37,12 @@ environment-context attachment with a renderer-visible preview; a session profil
 WSL, and SSH targets with vault lifecycle controls; a non-persistent SSH connection dialog;
 main-owned local file dialogs for SFTP transfers; the persisted split-command presentation setting;
 and named/ungrouped profile sidebar sections.
+
+The Files panel checkpoint adds capability-based routing at the existing `rightPanel: 'sftp'` state
+boundary: SSH keeps the dual-pane SFTP browser, ordinary Local Shell sessions use a single local
+pane, and WSL remains unavailable. The local pane is shared with the SFTP local side and starts from
+the main process' resolved terminal cwd before browsing independently. Its filesystem actions use
+the existing validated local IPC and Electron file-manager APIs; no shell `cd` is injected.
 
 ## 2. Delivery rules
 
@@ -168,7 +174,8 @@ running -> exited -> closed
 ```
 
 `awaiting-user` covers host-key and private-key-passphrase prompts. Every transition is idempotent,
-sequenced, and testable. SFTP capability is attached only after an SSH session is ready.
+sequenced, and testable. Remote SFTP capability is attached only after an SSH session is ready;
+local file browsing is available only for ordinary local shell requests.
 
 ### 4.4 Runtime validation
 
@@ -444,8 +451,16 @@ No workstream may invent its own identifier, error, cancellation, or persistence
 
 ### Work
 
-- Complete the local pane (Windows drive overview, guarded roots), transfer list with stable IDs and
-  byte progress, and cancellation.
+- Complete the shared local pane (Windows drive overview, guarded roots), transfer list with stable
+  IDs and byte progress, and cancellation.
+- Route the Files entry by session type: SSH keeps the dual-pane SFTP view, Local Shell gets a
+  single local pane, and WSL shows an unavailable state without host filesystem access. Preserve the
+  persisted `rightPanel: 'sftp'` value and `toggle-sftp` command for compatibility.
+- Store each Local Shell's resolved startup cwd and expose it through read-only IPC. The local pane
+  must use that cwd only for first load, then navigate independently without shell synchronization.
+- Reuse the local pane for refresh, navigation, selection, local mutations, default-app opening,
+  path copying, and file-manager open/reveal actions. Keep upload/download, remote commands,
+  transfers, detach, re-sync, and alternate-screen state out of the Local Shell view.
 - Port optimistic `cd` tracking as a pure state machine with shell-line fixtures; pause sync in the
   alternate screen and support detach/re-sync (SFTP-008 through SFTP-010).
 - Implement configurable remote-file commands with shell-appropriate quoting and control-character

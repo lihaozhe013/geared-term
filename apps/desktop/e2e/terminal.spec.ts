@@ -91,7 +91,7 @@ test('opens, switches, and closes terminal tabs in isolation', async () => {
 
   await tabs.nth(1).click();
   await expect(tabs.nth(1)).toHaveAttribute('aria-selected', 'true');
-  await page.getByRole('button', { name: 'Close Local Shell' }).nth(1).click();
+  await page.locator('.terminal-tab.active .tab-close').click();
   await expect(terminalTabs(page)).toHaveCount(1);
   await expect(tabs.nth(0)).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('.terminal-surface')).toHaveAttribute('data-active-status', 'running');
@@ -106,7 +106,7 @@ test('starts with no tabs and supports closing the last one', async () => {
   await waitForRunning(page);
   await expect(terminalTabs(page)).toHaveCount(1);
 
-  await page.getByRole('button', { name: 'Close Local Shell' }).click();
+  await page.locator('.terminal-tab.active .tab-close').click();
   await expect(terminalTabs(page)).toHaveCount(0);
   await expect(page.locator('.terminal-empty')).toBeVisible();
 });

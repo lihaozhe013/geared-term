@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { launchApp, type AppSession } from './fixtures';
+import { launchApp, openLocalTab, type AppSession } from './fixtures';
 
 let session: AppSession;
 
@@ -72,6 +72,7 @@ test('exposes exactly the documented preload surface', async () => {
       'getAppInfo',
       'getAutoUnlockStatus',
       'getDownloadsDirectory',
+      'getLocalWorkingDirectory',
       'getRuntimeInfo',
       'getSettings',
       'getTerminalLigatureSequences',
@@ -90,6 +91,7 @@ test('exposes exactly the documented preload surface', async () => {
       'lockVault',
       'makeLocalDirectory',
       'onAiHistoryContinue',
+      'onAiConnectionsChanged',
       'onEnvironmentUpdated',
       'onMenuCommand',
       'onSettingsChanged',
@@ -152,6 +154,42 @@ test('reports application information from the main process', async () => {
   expect(info.platform).toBe(process.platform);
   expect(info.isPackaged).toBe(false);
   expect(info.version).toMatch(/^\d+\.\d+\.\d+/);
+});
+
+test('opens Files as a single local pane at the shell startup cwd', async () => {
+  const { page, app } = session;
+  await openLocalTab(app);
+  const terminal = page.locator('.terminal-wrapper:not([hidden])');
+  await expect(terminal).toHaveAttribute('data-session-id', /.+/u);
+  const sessionId = await terminal.getAttribute('data-session-id');
+  if (!sessionId) throw new Error('Local terminal session id is missing');
+
+  await page.evaluate(() => {
+    const api = (
+      window as unknown as { geared: { executeMenuAction: (action: string) => Promise<void> } }
+    ).geared;
+    return api.executeMenuAction('toggle-sftp');
+  });
+
+  await expect(page.locator('.local-files-panel')).toBeVisible();
+  await expect(page.locator('.local-file-pane')).toHaveCount(1);
+  await expect(page.locator('.sftp-divider')).toHaveCount(0);
+  await expect(page.locator('.sftp-sync')).toHaveCount(0);
+  await expect(page.getByRole('tab', { name: 'Files' })).toHaveAttribute('aria-selected', 'true');
+
+  const startupDirectory = await page.evaluate((id) => {
+    const api = (
+      window as unknown as {
+        geared: { getLocalWorkingDirectory: (sessionId: string) => Promise<string | null> };
+      }
+    ).geared;
+    return api.getLocalWorkingDirectory(id);
+  }, sessionId);
+  expect(startupDirectory).toBeTruthy();
+  await expect(page.locator('.local-file-pane input[aria-label="Local directory"]')).toHaveValue(
+    startupDirectory!
+  );
+  await expect(page.getByRole('button', { name: 'Open in file manager' })).toBeVisible();
 });
 
 test('renders and executes the virtual menu on non-macOS platforms', async () => {

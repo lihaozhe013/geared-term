@@ -403,6 +403,34 @@ body.panel-resizing {
   min-height: 0;
 }
 
+.local-files-panel .local-file-pane {
+  flex: 1 1 auto;
+}
+
+.local-files-panel > .sftp-hint {
+  display: grid;
+  flex: 1;
+  align-content: center;
+  margin: 0;
+  text-align: center;
+}
+
+.panel-unavailable {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  place-items: center;
+  padding: 24px;
+  color: var(--gt-text-dim, #d8e0ee);
+  text-align: center;
+}
+
+.panel-unavailable p {
+  max-width: 240px;
+  margin: 0;
+}
+
 .environment-panel {
   display: grid;
   min-width: 0;
@@ -532,9 +560,14 @@ body.panel-resizing {
   gap: 6px;
 }
 
+.local-file-pane .sftp-actions {
+  min-width: 0;
+}
+
 .sftp-actions .toolbar-button {
   margin-left: 0;
   padding: 3px 8px;
+  overflow-wrap: anywhere;
 }
 
 .sftp-divider {

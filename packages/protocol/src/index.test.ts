@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   AppInfoSchema,
   DEFAULT_TERMINAL_LIGATURE_SEQUENCES,
+  LocalSessionRequestSchema,
+  LocalWorkingDirectorySchema,
   normalizeLigatureSequences,
   normalizeTerminalLineEndings,
   SftpDownloadRequestSchema,
@@ -65,6 +67,18 @@ describe('protocol schemas', () => {
       }).success
     ).toBe(true);
     expect(SftpOperationResultSchema.parse({ accepted: false })).toEqual({ accepted: false });
+  });
+
+  it('validates local session directory requests and nullable responses', () => {
+    expect(LocalSessionRequestSchema.parse({ sessionId: 'local-1' })).toEqual({
+      sessionId: 'local-1'
+    });
+    expect(LocalWorkingDirectorySchema.parse('/workspaces/geared-term')).toBe(
+      '/workspaces/geared-term'
+    );
+    expect(LocalWorkingDirectorySchema.parse(null)).toBeNull();
+    expect(LocalSessionRequestSchema.safeParse({ sessionId: '../escape' }).success).toBe(false);
+    expect(LocalWorkingDirectorySchema.safeParse('').success).toBe(false);
   });
 
   it('requires an explicit shell and revision for command actions', () => {

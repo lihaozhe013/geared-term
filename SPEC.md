@@ -38,7 +38,8 @@ The initial release MUST:
 
 - provide a dependable daily-use terminal for local shells, WSL, and SSH;
 - preserve saved sessions, groups, authentication choices, terminal settings, and host trust;
-- provide the integrated SFTP and AI assistant workflows;
+- provide the integrated Files and AI assistant workflows, with SFTP for SSH and a local browser for
+  ordinary local shells;
 - keep terminal I/O independent from React rendering and AI availability;
 - keep secrets and privileged resources outside the renderer;
 - provide the keyboard, focus, selection, and panel behavior defined in this specification unless an
@@ -99,11 +100,13 @@ is not supported until its packaged application passes the same smoke tests.
 
 - **APP-001**: The main window MUST contain custom application chrome, a collapsible session
   sidebar, a terminal tab strip, the active terminal, and a collapsible right panel.
-- **APP-002**: The right panel MUST switch between SFTP and AI Assistant views.
+- **APP-002**: The right panel MUST switch between Files and AI Assistant views. Files MUST render a
+  dual-pane SFTP browser for SSH sessions and a single-pane local browser for ordinary local shells.
 - **APP-003**: The divider between the terminal and right panel MUST be draggable and MUST preserve
   its last usable ratio.
-- **APP-004**: The right panel MUST only expose SFTP operations when the active session has SFTP
-  capability. Local and WSL sessions do not have that capability.
+- **APP-004**: The Files entry MUST classify the active session as SFTP for SSH, local for an
+  ordinary local shell, and unavailable for WSL or when no session is active. WSL MUST show an
+  unavailable state and MUST NOT perform host filesystem operations.
 - **APP-005**: Multiple tabs MUST hold independent terminal sessions, terminal display state,
   environment context, and AI conversations.
 - **APP-006**: Activating a tab MUST atomically update the visible terminal and every action target.
@@ -309,7 +312,8 @@ When terminal focus is active, the following behavior is required:
   Windows process cwd.
 - **WSL-008**: WSL environment detection MUST execute the POSIX probe inside the selected
   distribution.
-- **WSL-009**: WSL sessions MUST NOT advertise SFTP capability in the initial release.
+- **WSL-009**: WSL sessions MUST NOT advertise a usable Files capability in the initial release; the
+  Files entry MAY remain visible as an unavailable state but MUST NOT access the host file system.
 
 ## 13. SSH sessions
 
@@ -363,6 +367,21 @@ When terminal focus is active, the following behavior is required:
 - **SFTP-012**: File names containing unsupported terminal control characters MUST be rejected
   rather than injected.
 - **SFTP-013**: `Ctrl+wheel` in either file pane MUST zoom both pane lists within bounded limits.
+- **LOCAL-FILES-001**: Ordinary local shell sessions MUST expose a single local file pane through
+  the Files entry. WSL sessions MUST NOT reuse this pane.
+- **LOCAL-FILES-002**: The local pane MUST initially use the main process' resolved terminal startup
+  cwd, fall back to the request cwd while the session is starting, and otherwise show the existing
+  local overview. Later navigation MUST be independent and MUST NOT inject `cd` or follow shell
+  navigation.
+- **LOCAL-FILES-003**: The local pane MUST support path input, refresh, parent navigation, folder
+  creation, single/multi/range selection, folder entry, default-app opening, rename, confirmed
+  recursive deletion, path copying, opening the current directory in the file manager, and revealing
+  selected items in the file manager.
+- **LOCAL-FILES-004**: The local pane MUST NOT show upload/download, remote commands, transfer
+  lists, detach/re-sync controls, or alternate-screen synchronization state.
+- **LOCAL-FILES-005**: Local filesystem operations MUST use the existing validated local IPC
+  operations and the platform file-manager entry points; no shell command may be synthesized for
+  browsing or mutation.
 
 ## 15. Terminal environment context
 
@@ -643,6 +662,8 @@ At minimum, automated tests MUST cover:
 - known-host unknown/matching/changed/rejected/temporary behavior;
 - password and private-key authentication paths;
 - SFTP path handling, recursive operations, progress, sync state, and quoting;
+- local file listing, guarded-root protection, startup-cwd lookup, rename, recursive deletion, and
+  file-manager open/reveal operations;
 - snapshot selection, viewport, wrapped lines, alternate screen, bounds, and truncation;
 - Chat Completions and Responses endpoint building, stream parsing, cancellation, limits, sources,
   usage, continuation, and error classification;
@@ -661,6 +682,8 @@ The suite MUST exercise:
 - main/preload/renderer request and stream boundaries;
 - Insert sending no Enter and Run sending exactly one submission to the validated target;
 - tab switching and closing while data, AI, or transfers are in flight;
+- Files routing for Local Shell, SSH, WSL, and no-session states, including independent local-pane
+  navigation and startup-cwd initialization;
 - vault create/unlock/lock/change-password/auto-unlock;
 - transactional database mutations, migration, and corruption recovery;
 - packaged-app launch and native module loading;

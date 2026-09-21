@@ -41,6 +41,8 @@ import {
   SftpRemoteCommandRequestSchema,
   SftpCdEventSchema,
   LocalListRequestSchema,
+  LocalSessionRequestSchema,
+  LocalWorkingDirectorySchema,
   LocalEntrySchema,
   LocalMkdirRequestSchema,
   LocalRenameRequestSchema,
@@ -411,6 +413,12 @@ const api = Object.freeze({
   listLocalFiles: async (directory: string | null) => {
     const request = LocalListRequestSchema.parse({ directory });
     return LocalEntrySchema.array().parse(await ipcRenderer.invoke('local:list', request));
+  },
+  getLocalWorkingDirectory: async (sessionId: string) => {
+    const request = LocalSessionRequestSchema.parse({ sessionId });
+    return LocalWorkingDirectorySchema.parse(
+      await ipcRenderer.invoke('local:working-directory', request)
+    );
   },
   makeLocalDirectory: async (input: LocalMkdirRequest) => {
     const request = LocalMkdirRequestSchema.parse(input);

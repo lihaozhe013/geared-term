@@ -54,6 +54,8 @@ import {
   SftpRemoteCommandRequestSchema,
   SftpCdEventSchema,
   LocalListRequestSchema,
+  LocalSessionRequestSchema,
+  LocalWorkingDirectorySchema,
   LocalEntrySchema,
   LocalMkdirRequestSchema,
   LocalRenameRequestSchema,
@@ -677,6 +679,10 @@ function registerIpc(): void {
   ipcMain.handle('local:list', async (_event, input: unknown) => {
     const request = LocalListRequestSchema.parse(input);
     return LocalEntrySchema.array().parse(await listLocalDirectory(request.directory));
+  });
+  ipcMain.handle('local:working-directory', (_event, input: unknown) => {
+    const request = LocalSessionRequestSchema.parse(input);
+    return LocalWorkingDirectorySchema.parse(localTerminals.workingDirectory(request.sessionId));
   });
   ipcMain.handle('local:mkdir', async (_event, input: unknown) => {
     const request = LocalMkdirRequestSchema.parse(input);
