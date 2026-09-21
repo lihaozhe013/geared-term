@@ -17,6 +17,7 @@ describe('SettingsRecordSchema keybindings', () => {
   it('defaults keybindings for records persisted before the field existed', () => {
     const parsed = SettingsRecordSchema.parse(baseSettings);
     expect(parsed.keybindings).toEqual({});
+    expect(parsed.defaultAiConnectionId).toBeNull();
   });
 
   it('keeps persisted overrides and rejects malformed values', () => {
@@ -33,5 +34,13 @@ describe('SettingsRecordSchema keybindings', () => {
     expect(
       SettingsRecordSchema.safeParse({ ...baseSettings, keybindings: { '': 'ctrl+c' } }).success
     ).toBe(false);
+  });
+
+  it('keeps the default AI connection ID', () => {
+    const parsed = SettingsRecordSchema.parse({
+      ...baseSettings,
+      defaultAiConnectionId: 'connection-primary'
+    });
+    expect(parsed.defaultAiConnectionId).toBe('connection-primary');
   });
 });

@@ -5,9 +5,15 @@ import type {
   AiModelProfile,
   AiResponsesModelDefaults,
   AiResponsesReasoningEffort,
-  AiResponsesVerbosity
+  AiResponsesVerbosity,
+  SettingsRecord
 } from '@geared-term/protocol';
-import { Bot, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Bot, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import {
+  moveArrayItem,
+  resolveActiveAiConnectionId,
+  resolveDefaultAiConnectionId
+} from '../ai/connection-selection';
 import { Row, Section } from './primitives';
 import type { Translate } from './sections';
 
@@ -89,8 +95,17 @@ function draftFrom(record: AiConnectionRecord): Draft {
   };
 }
 
-export function AiConnectionsSection({ t }: { t: Translate }): React.JSX.Element {
+export function AiConnectionsSection({
+  settings,
+  onSave,
+  t
+}: {
+  settings: SettingsRecord;
+  onSave: (patch: Partial<SettingsRecord>) => Promise<void>;
+  t: Translate;
+}): React.JSX.Element {
   const [connections, setConnections] = useState<AiConnectionRecord[]>([]);
+  const [connectionsLoaded, setConnectionsLoaded] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(() => createEmptyDraft(t('newConnection')));
   const [dirty, setDirty] = useState(false);
@@ -98,6 +113,7 @@ export function AiConnectionsSection({ t }: { t: Translate }): React.JSX.Element
   const [discovered, setDiscovered] = useState<string[]>([]);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pendingDefaultId, setPendingDefaultId] = useState<string | null | undefined>(undefined);
   const connectionsRef = useRef<AiConnectionRecord[]>([]);
   connectionsRef.current = connections;
 
@@ -106,15 +122,44 @@ export function AiConnectionsSection({ t }: { t: Translate }): React.JSX.Element
       .listAiConnections()
       .then((saved) => {
         setConnections(saved);
-        if (saved[0]) {
-          setSelectedId(saved[0].id);
-          setDraft(draftFrom(saved[0]));
+        setConnectionsLoaded(true);
+        const initialId = resolveActiveAiConnectionId(saved, null, settings.defaultAiConnectionId);
+        const initialRecord = saved.find((item) => item.id === initialId);
+        if (initialRecord) {
+          setSelectedId(initialRecord.id);
+          setDraft(draftFrom(initialRecord));
         }
       })
       .catch((reason: unknown) =>
         setError(reason instanceof Error ? reason.message : t('errLoadConnections'))
       );
+    return window.geared.onAiConnectionsChanged((saved) => {
+      setConnections(saved);
+      setConnectionsLoaded(true);
+    });
   }, []);
+
+  const configuredDefaultId =
+    pendingDefaultId === undefined ? settings.defaultAiConnectionId : pendingDefaultId;
+  const effectiveDefaultId = resolveDefaultAiConnectionId(connections, configuredDefaultId);
+
+  useEffect(() => {
+    if (!connectionsLoaded || pendingDefaultId !== undefined) return;
+    if (effectiveDefaultId === settings.defaultAiConnectionId) return;
+    void onSave({ defaultAiConnectionId: effectiveDefaultId });
+  }, [
+    connectionsLoaded,
+    effectiveDefaultId,
+    onSave,
+    pendingDefaultId,
+    settings.defaultAiConnectionId
+  ]);
+
+  useEffect(() => {
+    if (pendingDefaultId !== undefined && pendingDefaultId === settings.defaultAiConnectionId) {
+      setPendingDefaultId(undefined);
+    }
+  }, [pendingDefaultId, settings.defaultAiConnectionId]);
 
   const mutateDraft = (mutator: (current: Draft) => Draft): void => {
     setDraft((current) => mutator(current));
@@ -124,6 +169,13 @@ export function AiConnectionsSection({ t }: { t: Translate }): React.JSX.Element
 
   const patch = (value: Partial<Draft>): void => {
     mutateDraft((current) => ({ ...current, ...value }));
+  };
+
+  const moveModel = (index: number, direction: -1 | 1): void => {
+    mutateDraft((current) => ({
+      ...current,
+      models: moveArrayItem(current.models, index, direction)
+    }));
   };
 
   const select = (id: string | null): void => {
@@ -288,292 +340,337 @@ export function AiConnectionsSection({ t }: { t: Translate }): React.JSX.Element
   const selected = connections.find((item) => item.id === selectedId);
 
   return (
-    <div className="connection-layout">
-      <div className="connection-list" aria-label={t('groupAiConnections')}>
-        <div className="connection-list-header">
-          <span>{t('groupAiConnections')}</span>
-          <button
-            type="button"
-            className="icon-button"
-            aria-label={t('addConnection')}
-            onClick={() => select(null)}
+    <>
+      <Section title={t('defaultProvider')}>
+        <Row label={t('defaultProvider')} hint={t('defaultProviderHint')}>
+          <select
+            className="settings-select"
+            value={effectiveDefaultId ?? ''}
+            disabled={connections.length === 0}
+            onChange={(event) => {
+              const nextId = event.target.value || null;
+              setPendingDefaultId(nextId);
+              void onSave({ defaultAiConnectionId: nextId });
+            }}
           >
-            <Plus size={14} aria-hidden="true" />
-          </button>
-        </div>
-        {connections.map((connection) => (
-          <button
-            type="button"
-            key={connection.id}
-            className={`settings-nav-item ${connection.id === selectedId ? 'active' : ''}`}
-            onClick={() => select(connection.id)}
-          >
-            <Bot size={14} aria-hidden="true" />
-            <span className="connection-list-name">{connection.name}</span>
-          </button>
-        ))}
-        {connections.length === 0 ? <p className="settings-hint">{t('noConnections')}</p> : null}
-      </div>
-      <div className="connection-editor">
-        <Section title={draft.name || t('newConnection')}>
-          <div className="settings-card">
-            <p className="settings-card-title">
-              {t('connectionName')} · {t('protocol')}
-            </p>
-            <Row label={t('connectionName')}>
-              <input
-                className="settings-input"
-                value={draft.name}
-                onChange={(event) => patch({ name: event.target.value.slice(0, 160) })}
-                spellCheck={false}
-              />
-            </Row>
-            <Row label={t('protocol')}>
-              <select
-                className="settings-select"
-                value={draft.protocol}
-                onChange={(event) => changeProtocol(event.target.value as Draft['protocol'])}
-              >
-                <option value="responses">{t('protocolResponses')}</option>
-                <option value="chat-completions">{t('protocolChat')}</option>
-              </select>
-            </Row>
-            <Row label={t('baseUrl')} hint={t('baseUrlHint')}>
-              <input
-                className="settings-input"
-                value={draft.baseUrl}
-                onChange={(event) => patch({ baseUrl: event.target.value.slice(0, 2048) })}
-                placeholder="https://api.openai.com/v1"
-                spellCheck={false}
-              />
-            </Row>
-          </div>
-          <div className="settings-card">
-            <p className="settings-card-title">{t('apiKey')}</p>
-            <Row
-              label={t('apiKey')}
-              hint={
-                selected?.apiKeyRef
-                  ? draft.apiKey
-                    ? t('keyWillStore')
-                    : t('keyStored')
-                  : draft.apiKey
-                    ? t('keyWillStore')
-                    : t('noKeyStored')
-              }
-            >
-              <input
-                className="settings-input"
-                type="password"
-                value={draft.apiKey}
-                onChange={(event) => patch({ apiKey: event.target.value.slice(0, 4096) })}
-                autoComplete="off"
-              />
-            </Row>
-            <div className="settings-actions-row">
-              <button
-                type="button"
-                className="toolbar-button"
-                onClick={() => void test()}
-                disabled={discovering}
-              >
-                <RefreshCw size={13} aria-hidden="true" />{' '}
-                {discovering ? t('testing') : t('testConnection')}
-              </button>
-            </div>
-          </div>
-          <div className="settings-card">
-            <p className="settings-card-title">{t('models')}</p>
-            <p className="settings-hint">{t('modelsHint')}</p>
-            <div className="ai-model-list">
-              {draft.models.map((model, index) => (
-                <div className="ai-model-card" key={model.id}>
-                  <div className="ai-model-card-header">
-                    <strong>{t('modelNumber').replace('{index}', String(index + 1))}</strong>
-                    <button
-                      type="button"
-                      className="icon-button danger-button"
-                      aria-label={`Remove model ${model.model || index + 1}`}
-                      onClick={() => removeModel(index)}
-                    >
-                      <Trash2 size={13} aria-hidden="true" />
-                    </button>
-                  </div>
-                  <Row label={t('modelIdLabel')}>
-                    <input
-                      className="settings-input"
-                      value={model.model}
-                      onChange={(event) =>
-                        patchModel(index, { model: event.target.value.slice(0, 256) })
-                      }
-                      placeholder="model-name"
-                      spellCheck={false}
-                    />
-                  </Row>
-                  <Row label={t('displayNameLabel')}>
-                    <input
-                      className="settings-input"
-                      value={model.label}
-                      onChange={(event) =>
-                        patchModel(index, { label: event.target.value.slice(0, 256) })
-                      }
-                      placeholder={t('optionalPlaceholder')}
-                      spellCheck={false}
-                    />
-                  </Row>
-                  <label className="ai-model-default">
-                    <input
-                      type="radio"
-                      name="default-ai-model"
-                      checked={draft.defaultModel === model.model && model.model.length > 0}
-                      onChange={() => patch({ defaultModel: model.model })}
-                      disabled={!model.model}
-                    />
-                    {t('defaultModel')}
-                  </label>
-                  {draft.protocol === 'responses' ? (
-                    <div className="ai-model-options">
-                      <label>
-                        <span>R</span>
-                        <select
-                          className="settings-select"
-                          value={model.responses.reasoningEffort}
-                          onChange={(event) =>
-                            patchModel(index, {
-                              responses: {
-                                ...model.responses,
-                                reasoningEffort: event.target.value as AiResponsesReasoningEffort
-                              }
-                            })
-                          }
-                        >
-                          {reasoningEfforts.map((effort) => (
-                            <option value={effort} key={effort}>
-                              {effort}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <label>
-                        <span>V</span>
-                        <select
-                          className="settings-select"
-                          value={model.responses.verbosity}
-                          onChange={(event) =>
-                            patchModel(index, {
-                              responses: {
-                                ...model.responses,
-                                verbosity: event.target.value as AiResponsesVerbosity
-                              }
-                            })
-                          }
-                        >
-                          {verbosityValues.map((verbosity) => (
-                            <option value={verbosity} key={verbosity}>
-                              {verbosity}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <label className="ai-model-toggle">
-                        <input
-                          type="checkbox"
-                          checked={model.responses.reasoningSummary}
-                          onChange={(event) =>
-                            patchModel(index, {
-                              responses: {
-                                ...model.responses,
-                                reasoningSummary: event.target.checked
-                              }
-                            })
-                          }
-                        />
-                        {model.responses.reasoningSummary ? t('summaryOn') : t('summaryOff')}
-                      </label>
-                      <label className="ai-model-toggle">
-                        <input
-                          type="checkbox"
-                          checked={model.responses.webSearch}
-                          onChange={(event) =>
-                            patchModel(index, {
-                              responses: { ...model.responses, webSearch: event.target.checked }
-                            })
-                          }
-                        />
-                        {model.responses.webSearch ? t('webOn') : t('webOff')}
-                      </label>
-                    </div>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-            <div className="settings-actions-row">
-              <button type="button" className="toolbar-button" onClick={() => addModel()}>
-                <Plus size={13} aria-hidden="true" /> {t('addModel')}
-              </button>
-            </div>
-            {discovered.length > 0 ? (
-              <>
-                <p className="settings-hint">{t('discoveredModels')}</p>
-                <div className="chip-row">
-                  {discovered.map((model) => (
-                    <button
-                      type="button"
-                      key={model}
-                      className="chip"
-                      onClick={() => addModel(model)}
-                    >
-                      ＋ {model}
-                    </button>
-                  ))}
-                </div>
-              </>
-            ) : null}
-            <div className="settings-actions-row">
-              <button
-                type="button"
-                className="toolbar-button"
-                onClick={() => void test()}
-                disabled={discovering}
-              >
-                <RefreshCw size={13} aria-hidden="true" />{' '}
-                {discovering ? t('discovering') : t('discoverModels')}
-              </button>
-            </div>
-          </div>
-          {status ? <p className="settings-status status-ok">{status}</p> : null}
-          {error ? <p className="settings-status status-error">{error}</p> : null}
-          <div className="settings-actions-row connection-footer">
-            {draft.id && dirty ? (
-              <button
-                type="button"
-                className="toolbar-button"
-                onClick={() => {
-                  if (draft.id) select(draft.id);
-                }}
-              >
-                {t('revertChanges')}
-              </button>
-            ) : null}
+            {connections.length === 0 ? <option value="">{t('noConnections')}</option> : null}
+            {connections.map((connection) => (
+              <option value={connection.id} key={connection.id}>
+                {connection.name}
+              </option>
+            ))}
+          </select>
+        </Row>
+      </Section>
+      <div className="connection-layout">
+        <div className="connection-list" aria-label={t('groupAiConnections')}>
+          <div className="connection-list-header">
+            <span>{t('groupAiConnections')}</span>
             <button
               type="button"
-              className="primary-button settings-apply"
-              onClick={() => void save()}
+              className="icon-button"
+              aria-label={t('addConnection')}
+              onClick={() => select(null)}
             >
-              {t('saveConnection')}
+              <Plus size={14} aria-hidden="true" />
             </button>
-            {draft.id ? (
+          </div>
+          {connections.map((connection) => (
+            <button
+              type="button"
+              key={connection.id}
+              className={`settings-nav-item ${connection.id === selectedId ? 'active' : ''}`}
+              onClick={() => select(connection.id)}
+            >
+              <Bot size={14} aria-hidden="true" />
+              <span className="connection-list-name">{connection.name}</span>
+            </button>
+          ))}
+          {connections.length === 0 ? <p className="settings-hint">{t('noConnections')}</p> : null}
+        </div>
+        <div className="connection-editor">
+          <Section title={draft.name || t('newConnection')}>
+            <div className="settings-card">
+              <p className="settings-card-title">
+                {t('connectionName')} · {t('protocol')}
+              </p>
+              <Row label={t('connectionName')}>
+                <input
+                  className="settings-input"
+                  value={draft.name}
+                  onChange={(event) => patch({ name: event.target.value.slice(0, 160) })}
+                  spellCheck={false}
+                />
+              </Row>
+              <Row label={t('protocol')}>
+                <select
+                  className="settings-select"
+                  value={draft.protocol}
+                  onChange={(event) => changeProtocol(event.target.value as Draft['protocol'])}
+                >
+                  <option value="responses">{t('protocolResponses')}</option>
+                  <option value="chat-completions">{t('protocolChat')}</option>
+                </select>
+              </Row>
+              <Row label={t('baseUrl')} hint={t('baseUrlHint')}>
+                <input
+                  className="settings-input"
+                  value={draft.baseUrl}
+                  onChange={(event) => patch({ baseUrl: event.target.value.slice(0, 2048) })}
+                  placeholder="https://api.openai.com/v1"
+                  spellCheck={false}
+                />
+              </Row>
+            </div>
+            <div className="settings-card">
+              <p className="settings-card-title">{t('apiKey')}</p>
+              <Row
+                label={t('apiKey')}
+                hint={
+                  selected?.apiKeyRef
+                    ? draft.apiKey
+                      ? t('keyWillStore')
+                      : t('keyStored')
+                    : draft.apiKey
+                      ? t('keyWillStore')
+                      : t('noKeyStored')
+                }
+              >
+                <input
+                  className="settings-input"
+                  type="password"
+                  value={draft.apiKey}
+                  onChange={(event) => patch({ apiKey: event.target.value.slice(0, 4096) })}
+                  autoComplete="off"
+                />
+              </Row>
+              <div className="settings-actions-row">
+                <button
+                  type="button"
+                  className="toolbar-button"
+                  onClick={() => void test()}
+                  disabled={discovering}
+                >
+                  <RefreshCw size={13} aria-hidden="true" />{' '}
+                  {discovering ? t('testing') : t('testConnection')}
+                </button>
+              </div>
+            </div>
+            <div className="settings-card">
+              <p className="settings-card-title">{t('models')}</p>
+              <p className="settings-hint">{t('modelsHint')}</p>
+              <div className="ai-model-list">
+                {draft.models.map((model, index) => (
+                  <div className="ai-model-card" key={model.id}>
+                    <div className="ai-model-card-header">
+                      <strong>{t('modelNumber').replace('{index}', String(index + 1))}</strong>
+                      <div className="ai-model-card-actions">
+                        <button
+                          type="button"
+                          className="icon-button"
+                          aria-label={t('moveUp')}
+                          title={t('moveUp')}
+                          disabled={index === 0}
+                          onClick={() => moveModel(index, -1)}
+                        >
+                          <ArrowUp size={13} aria-hidden="true" />
+                        </button>
+                        <button
+                          type="button"
+                          className="icon-button"
+                          aria-label={t('moveDown')}
+                          title={t('moveDown')}
+                          disabled={index === draft.models.length - 1}
+                          onClick={() => moveModel(index, 1)}
+                        >
+                          <ArrowDown size={13} aria-hidden="true" />
+                        </button>
+                        <button
+                          type="button"
+                          className="icon-button danger-button"
+                          aria-label={`${t('remove')} ${model.model || index + 1}`}
+                          onClick={() => removeModel(index)}
+                        >
+                          <Trash2 size={13} aria-hidden="true" />
+                        </button>
+                      </div>
+                    </div>
+                    <Row label={t('modelIdLabel')}>
+                      <input
+                        className="settings-input"
+                        value={model.model}
+                        onChange={(event) =>
+                          patchModel(index, { model: event.target.value.slice(0, 256) })
+                        }
+                        placeholder="model-name"
+                        spellCheck={false}
+                      />
+                    </Row>
+                    <Row label={t('displayNameLabel')}>
+                      <input
+                        className="settings-input"
+                        value={model.label}
+                        onChange={(event) =>
+                          patchModel(index, { label: event.target.value.slice(0, 256) })
+                        }
+                        placeholder={t('optionalPlaceholder')}
+                        spellCheck={false}
+                      />
+                    </Row>
+                    <label className="ai-model-default">
+                      <input
+                        type="radio"
+                        name="default-ai-model"
+                        checked={draft.defaultModel === model.model && model.model.length > 0}
+                        onChange={() => patch({ defaultModel: model.model })}
+                        disabled={!model.model}
+                      />
+                      {t('defaultModel')}
+                    </label>
+                    {draft.protocol === 'responses' ? (
+                      <div className="ai-model-options">
+                        <label>
+                          <span>R</span>
+                          <select
+                            className="settings-select"
+                            value={model.responses.reasoningEffort}
+                            onChange={(event) =>
+                              patchModel(index, {
+                                responses: {
+                                  ...model.responses,
+                                  reasoningEffort: event.target.value as AiResponsesReasoningEffort
+                                }
+                              })
+                            }
+                          >
+                            {reasoningEfforts.map((effort) => (
+                              <option value={effort} key={effort}>
+                                {effort}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label>
+                          <span>V</span>
+                          <select
+                            className="settings-select"
+                            value={model.responses.verbosity}
+                            onChange={(event) =>
+                              patchModel(index, {
+                                responses: {
+                                  ...model.responses,
+                                  verbosity: event.target.value as AiResponsesVerbosity
+                                }
+                              })
+                            }
+                          >
+                            {verbosityValues.map((verbosity) => (
+                              <option value={verbosity} key={verbosity}>
+                                {verbosity}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="ai-model-toggle">
+                          <input
+                            type="checkbox"
+                            checked={model.responses.reasoningSummary}
+                            onChange={(event) =>
+                              patchModel(index, {
+                                responses: {
+                                  ...model.responses,
+                                  reasoningSummary: event.target.checked
+                                }
+                              })
+                            }
+                          />
+                          {model.responses.reasoningSummary ? t('summaryOn') : t('summaryOff')}
+                        </label>
+                        <label className="ai-model-toggle">
+                          <input
+                            type="checkbox"
+                            checked={model.responses.webSearch}
+                            onChange={(event) =>
+                              patchModel(index, {
+                                responses: { ...model.responses, webSearch: event.target.checked }
+                              })
+                            }
+                          />
+                          {model.responses.webSearch ? t('webOn') : t('webOff')}
+                        </label>
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+              <div className="settings-actions-row">
+                <button type="button" className="toolbar-button" onClick={() => addModel()}>
+                  <Plus size={13} aria-hidden="true" /> {t('addModel')}
+                </button>
+              </div>
+              {discovered.length > 0 ? (
+                <>
+                  <p className="settings-hint">{t('discoveredModels')}</p>
+                  <div className="chip-row">
+                    {discovered.map((model) => (
+                      <button
+                        type="button"
+                        key={model}
+                        className="chip"
+                        onClick={() => addModel(model)}
+                      >
+                        ＋ {model}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : null}
+              <div className="settings-actions-row">
+                <button
+                  type="button"
+                  className="toolbar-button"
+                  onClick={() => void test()}
+                  disabled={discovering}
+                >
+                  <RefreshCw size={13} aria-hidden="true" />{' '}
+                  {discovering ? t('discovering') : t('discoverModels')}
+                </button>
+              </div>
+            </div>
+            {status ? <p className="settings-status status-ok">{status}</p> : null}
+            {error ? <p className="settings-status status-error">{error}</p> : null}
+            <div className="settings-actions-row connection-footer">
+              {draft.id && dirty ? (
+                <button
+                  type="button"
+                  className="toolbar-button"
+                  onClick={() => {
+                    if (draft.id) select(draft.id);
+                  }}
+                >
+                  {t('revertChanges')}
+                </button>
+              ) : null}
               <button
                 type="button"
-                className="toolbar-button danger-button"
-                onClick={() => void remove()}
+                className="primary-button settings-apply"
+                onClick={() => void save()}
               >
-                <Trash2 size={13} aria-hidden="true" /> {t('deleteConnection')}
+                {t('saveConnection')}
               </button>
-            ) : null}
-          </div>
-        </Section>
+              {draft.id ? (
+                <button
+                  type="button"
+                  className="toolbar-button danger-button"
+                  onClick={() => void remove()}
+                >
+                  <Trash2 size={13} aria-hidden="true" /> {t('deleteConnection')}
+                </button>
+              ) : null}
+            </div>
+          </Section>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

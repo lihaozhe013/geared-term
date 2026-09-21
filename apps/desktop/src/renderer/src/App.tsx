@@ -75,6 +75,7 @@ const defaultSettings: SettingsRecord = {
   terminalFontFamily: 'Cascadia Code',
   terminalFontLigatures: true,
   terminalFontFallbacks: [],
+  defaultAiConnectionId: null,
   globalAiInstructions: '',
   keybindings: {}
 };

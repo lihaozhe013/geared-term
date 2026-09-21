@@ -173,6 +173,7 @@ export const SettingsRecordSchema = z
       )
       .max(8)
       .default([]),
+    defaultAiConnectionId: IdSchema.nullable().default(null),
     globalAiInstructions: z.string().max(8192).default('')
   })
   .strict();

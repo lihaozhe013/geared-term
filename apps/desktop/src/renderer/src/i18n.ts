@@ -46,6 +46,9 @@ const messages = {
     baseUrlHint:
       'Paste an API root such as https://api.openai.com/v1. Bare hosts gain /v1 automatically; full /chat/completions or /responses links are converted.',
     apiKey: 'API key',
+    defaultProvider: 'Default provider',
+    defaultProviderHint:
+      'Used when the assistant starts or when the current provider is no longer available.',
     defaultModel: 'Default model',
     discoverModels: 'Discover models',
     discovering: 'Discovering…',
@@ -443,7 +446,7 @@ const messages = {
     errConnectionTest: 'Connection test failed',
     modelsFound: '{count} models',
     modelsHint:
-      'Choose the default model and, for Responses connections, the defaults used for new chats.',
+      'Choose the default model and use the arrows to set the model menu order. Responses options are used for new chats.',
     modelNumber: 'Model {index}',
     modelIdLabel: 'Model ID',
     displayNameLabel: 'Display name',
@@ -499,6 +502,8 @@ const messages = {
     baseUrlHint:
       '粘贴 API 根地址（如 https://api.openai.com/v1）。裸域名自动补 /v1；完整的 /chat/completions 或 /responses 链接会自动转换。',
     apiKey: 'API 密钥',
+    defaultProvider: '默认 Provider',
+    defaultProviderHint: '用于助手启动时，或当前 Provider 不再可用时的回退选择。',
     defaultModel: '默认模型',
     discoverModels: '发现模型',
     discovering: '正在发现模型…',
@@ -888,7 +893,7 @@ const messages = {
     errDeleteConnection: '无法删除 AI 连接',
     errConnectionTest: '连接测试失败',
     modelsFound: '{count} 个模型',
-    modelsHint: '选择默认模型；对 Responses 连接，还会作为新会话的默认值。',
+    modelsHint: '选择默认模型，并用箭头设置模型菜单顺序。Responses 选项会用于新会话。',
     modelNumber: '模型 {index}',
     modelIdLabel: '模型 ID',
     displayNameLabel: '显示名称',

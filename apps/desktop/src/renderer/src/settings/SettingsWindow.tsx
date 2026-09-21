@@ -238,7 +238,9 @@ export function SettingsWindow(): React.JSX.Element {
               <ShortcutsSection settings={settings} onSave={save} t={t} />
             ) : null}
             {category === 'sftp' ? <SftpSection settings={settings} onSave={save} t={t} /> : null}
-            {category === 'ai-connections' ? <AiConnectionsSection t={t} /> : null}
+            {category === 'ai-connections' ? (
+              <AiConnectionsSection settings={settings} onSave={save} t={t} />
+            ) : null}
             {category === 'ai-assistant' ? (
               <AiAssistantSection settings={settings} onSave={save} t={t} />
             ) : null}

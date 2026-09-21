@@ -77,6 +77,7 @@ export const defaultSettings: Settings = {
   terminalFontLigatures: true,
   keybindings: {},
   terminalFontFallbacks: [],
+  defaultAiConnectionId: null,
   globalAiInstructions: ''
 };
 

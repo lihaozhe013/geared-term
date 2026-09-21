@@ -2366,6 +2366,12 @@ button:disabled {
   font-size: var(--gt-fs-sm);
 }
 
+.ai-model-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .ai-model-default,
 .ai-model-toggle {
   display: flex;

@@ -163,6 +163,35 @@ describe('profile database', () => {
     reopened.close();
   });
 
+  it('preserves AI model order independently from the default model', () => {
+    const database = new ProfileDatabase(root, logger);
+    database.upsertAiConnection(
+      {
+        id: 'ordered-connection',
+        name: 'Ordered assistant',
+        protocol: 'responses',
+        baseUrl: 'https://api.example.test/v1',
+        models: [
+          { id: 'second-model', model: 'second-model' },
+          { id: 'first-model', model: 'first-model' }
+        ],
+        defaultModel: 'first-model'
+      },
+      '2026-01-01T00:00:00.000Z'
+    );
+    database.close();
+
+    const reopened = new ProfileDatabase(root, logger);
+    expect(reopened.listAiConnections()[0]).toMatchObject({
+      defaultModel: 'first-model',
+      models: [
+        { id: 'second-model', model: 'second-model' },
+        { id: 'first-model', model: 'first-model' }
+      ]
+    });
+    reopened.close();
+  });
+
   it('rolls back the whole transaction when a mutation fails mid-flight', () => {
     const database = new ProfileDatabase(root, logger);
     database.putSecret('s1', secret);

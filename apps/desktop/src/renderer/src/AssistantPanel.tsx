@@ -33,6 +33,7 @@ import {
   SquarePlus,
   X
 } from 'lucide-react';
+import { resolveActiveAiConnectionId } from './ai/connection-selection';
 import { MarkdownView } from './assistant/MarkdownView';
 import { buildHistoryEntry } from './assistant/history-save';
 import { translate } from './i18n';
@@ -326,6 +327,7 @@ export function AssistantPanel({
 }: AssistantPanelProps): React.JSX.Element {
   const [connections, setConnections] = useState<AiConnectionRecord[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [defaultConnectionId, setDefaultConnectionId] = useState<string | null>(null);
   const [model, setModel] = useState('');
   const [responseOptions, setResponseOptions] = useState<AiResponsesModelDefaults | null>(null);
   const [reasoningMenuOpen, setReasoningMenuOpen] = useState(false);
@@ -383,14 +385,18 @@ export function AssistantPanel({
   } | null>(null);
 
   useEffect(() => {
-    void window.geared
-      .listAiConnections()
-      .then((saved) => {
+    void Promise.all([window.geared.getSettings(), window.geared.listAiConnections()])
+      .then(([settings, saved]) => {
+        setDefaultConnectionId(settings.defaultAiConnectionId);
         setConnections(saved);
-        const first = saved[0];
-        if (first) {
-          setSelectedId(first.id);
-          setModel(first.defaultModel);
+        const initialId = resolveActiveAiConnectionId(saved, null, settings.defaultAiConnectionId);
+        const initial = saved.find((connection) => connection.id === initialId);
+        if (initial) {
+          setSelectedId(initial.id);
+          setModel(initial.defaultModel);
+        } else {
+          setSelectedId(null);
+          setModel('');
         }
       })
       .catch((reason: unknown) =>
@@ -399,10 +405,20 @@ export function AssistantPanel({
     return () => streamRef.current?.cancel();
   }, []);
 
-  useEffect(() => window.geared.onAiConnectionsChanged(setConnections), []);
+  useEffect(() => {
+    const offConnections = window.geared.onAiConnectionsChanged(setConnections);
+    const offSettings = window.geared.onSettingsChanged((settings) => {
+      setDefaultConnectionId(settings.defaultAiConnectionId);
+    });
+    return () => {
+      offConnections();
+      offSettings();
+    };
+  }, []);
 
   useEffect(() => {
-    const connection = connections.find((item) => item.id === selectedId) ?? connections[0];
+    const activeId = resolveActiveAiConnectionId(connections, selectedId, defaultConnectionId);
+    const connection = connections.find((item) => item.id === activeId);
     const nextModel = connection?.models.some((item) => item.model === model)
       ? model
       : (connection?.defaultModel ?? connection?.models[0]?.model ?? '');
