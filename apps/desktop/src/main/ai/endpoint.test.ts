@@ -34,6 +34,22 @@ describe('AI endpoint safety', () => {
     );
   });
 
+  it('detects OpenRouter without matching lookalike hostnames', () => {
+    expect(normalizeEndpoint('https://openrouter.ai/api/v1', 'responses')).toMatchObject({
+      adapter: 'openrouter',
+      requestUrl: 'https://openrouter.ai/api/v1/responses'
+    });
+    expect(normalizeEndpoint('https://api.openrouter.ai/api/v1', 'responses').adapter).toBe(
+      'openrouter'
+    );
+    expect(normalizeEndpoint('https://openrouter.ai.evil.test/v1', 'responses').adapter).toBe(
+      'openai-compatible'
+    );
+    expect(normalizeEndpoint('https://gateway.example.test/v1', 'responses').adapter).toBe(
+      'openai-compatible'
+    );
+  });
+
   it('keeps custom path prefixes and exposes the models URL', () => {
     const endpoint = normalizeEndpoint('https://gateway.example.test/llm/', 'responses');
     expect(endpoint.baseUrl).toBe('https://gateway.example.test/llm');
@@ -97,6 +113,25 @@ describe('AI endpoint safety', () => {
       tools: [{ type: 'web_search' }],
       include: ['reasoning.encrypted_content', 'web_search_call.action.sources']
     });
+  });
+
+  it('maps OpenRouter web search without OpenAI-only source includes', () => {
+    const payload = buildResponsesPayload(
+      'openrouter-model',
+      [{ role: 'user', content: 'research this' }],
+      {
+        reasoningEffort: 'default',
+        verbosity: 'default',
+        reasoningSummary: true,
+        webSearch: true
+      },
+      undefined,
+      'openrouter'
+    );
+
+    expect(payload.tools).toEqual([{ type: 'openrouter:web_search' }]);
+    expect(payload.include).toEqual(['reasoning.encrypted_content']);
+    expect(payload.include).not.toContain('web_search_call.action.sources');
   });
 
   it('maps an explicit no-summary default without inventing an effort', () => {

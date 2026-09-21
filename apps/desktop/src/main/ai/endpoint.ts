@@ -2,12 +2,14 @@ import { URL } from 'node:url';
 import type { AiResponsesModelDefaults } from '@geared-term/protocol';
 
 export type AiProtocol = 'responses' | 'chat-completions';
+export type AiEndpointAdapter = 'openai-compatible' | 'openrouter';
 
 export type NormalizedEndpoint = {
   baseUrl: string;
   requestUrl: string;
   modelsUrl: string;
   protocol: AiProtocol;
+  adapter: AiEndpointAdapter;
   identity: string;
 };
 
@@ -20,8 +22,29 @@ export const defaultResponsesOptions: AiResponsesModelDefaults = {
 
 const terminalSuffixes = ['/chat/completions', '/responses', '/models'] as const;
 
+const responsesAdapters: Record<
+  AiEndpointAdapter,
+  { webSearchToolType: 'web_search' | 'openrouter:web_search'; includeWebSearchSources: boolean }
+> = {
+  'openai-compatible': {
+    webSearchToolType: 'web_search',
+    includeWebSearchSources: true
+  },
+  openrouter: {
+    webSearchToolType: 'openrouter:web_search',
+    includeWebSearchSources: false
+  }
+};
+
 function isLoopback(hostname: string): boolean {
   return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]';
+}
+
+export function detectEndpointAdapter(hostname: string): AiEndpointAdapter {
+  const normalizedHostname = hostname.toLowerCase().replace(/\.$/u, '');
+  return normalizedHostname === 'openrouter.ai' || normalizedHostname.endsWith('.openrouter.ai')
+    ? 'openrouter'
+    : 'openai-compatible';
 }
 
 export function normalizeEndpoint(input: string, protocol: AiProtocol): NormalizedEndpoint {
@@ -51,6 +74,7 @@ export function normalizeEndpoint(input: string, protocol: AiProtocol): Normaliz
     requestUrl: `${baseUrl}${requestPath}`,
     modelsUrl: `${baseUrl}/models`,
     protocol,
+    adapter: detectEndpointAdapter(url.hostname),
     identity: `${protocol}:${baseUrl}`
   };
 }
@@ -78,7 +102,8 @@ export function buildResponsesPayload(
     continuation?: { connectionId: string; model: string; items: Array<Record<string, unknown>> };
   }>,
   options: AiResponsesModelDefaults = defaultResponsesOptions,
-  connectionId?: string
+  connectionId?: string,
+  adapter: AiEndpointAdapter = 'openai-compatible'
 ): Record<string, unknown> {
   const instructions = messages
     .filter((message) => message.role === 'system')
@@ -114,8 +139,11 @@ export function buildResponsesPayload(
     payload.text = { verbosity: options.verbosity };
   }
   if (options.webSearch) {
-    payload.tools = [{ type: 'web_search' }];
-    payload.include = ['reasoning.encrypted_content', 'web_search_call.action.sources'];
+    const responsesAdapter = responsesAdapters[adapter];
+    payload.tools = [{ type: responsesAdapter.webSearchToolType }];
+    if (responsesAdapter.includeWebSearchSources) {
+      payload.include = ['reasoning.encrypted_content', 'web_search_call.action.sources'];
+    }
   }
   return payload;
 }

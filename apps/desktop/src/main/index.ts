@@ -1008,7 +1008,8 @@ function registerIpc(): void {
                 connection.model,
                 context.messages,
                 responseOptions,
-                connection.connectionId
+                connection.connectionId,
+                endpoint.adapter
               )
             : buildChatCompletionsPayload(connection.model, context.messages);
         const providerResult = await streamAiRequest({

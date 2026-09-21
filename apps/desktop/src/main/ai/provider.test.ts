@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { buildResponsesPayload } from './endpoint';
 import { streamAiRequest } from './provider';
 
 describe('AI provider adapter', () => {
@@ -34,7 +35,7 @@ describe('AI provider adapter', () => {
     fetchMock.mockRestore();
   });
 
-  it('maps Responses continuation and deduplicates web sources', async () => {
+  it('maps OpenRouter Responses continuation and deduplicates web sources', async () => {
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValue(
@@ -57,13 +58,34 @@ describe('AI provider adapter', () => {
         )
       );
     const events: unknown[] = [];
+    const payload = buildResponsesPayload(
+      'model',
+      [{ role: 'user', content: 'research this' }],
+      {
+        reasoningEffort: 'default',
+        verbosity: 'default',
+        reasoningSummary: true,
+        webSearch: true
+      },
+      undefined,
+      'openrouter'
+    );
     await streamAiRequest({
       connectionId: 'connection-1',
-      endpoint: 'https://api.example.test/v1',
+      endpoint: 'https://openrouter.ai/api/v1',
       protocol: 'responses',
       model: 'model',
-      payload: { model: 'model', stream: true },
+      payload,
       onEvent: (event) => events.push(event)
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://openrouter.ai/api/v1/responses',
+      expect.objectContaining({ method: 'POST' })
+    );
+    const [, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(requestInit.body))).toMatchObject({
+      tools: [{ type: 'openrouter:web_search' }],
+      include: ['reasoning.encrypted_content']
     });
     expect(events).toContainEqual({ kind: 'reasoning', text: 'think' });
     expect(events).toContainEqual({
