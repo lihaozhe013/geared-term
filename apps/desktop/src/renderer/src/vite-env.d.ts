@@ -107,6 +107,7 @@ declare global {
       enableAutoUnlock: () => Promise<AutoUnlockStatus>;
       disableAutoUnlock: () => Promise<AutoUnlockStatus>;
       listAiConnections: () => Promise<AiConnectionRecord[]>;
+      onAiConnectionsChanged: (listener: (connections: AiConnectionRecord[]) => void) => () => void;
       saveAiConnection: (input: AiConnectionInput) => Promise<AiConnectionRecord[]>;
       deleteAiConnection: (id: string) => Promise<AiConnectionRecord[]>;
       acceptAiEndpoint: (input: {

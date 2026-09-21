@@ -399,9 +399,16 @@ export function AssistantPanel({
     return () => streamRef.current?.cancel();
   }, []);
 
+  useEffect(() => window.geared.onAiConnectionsChanged(setConnections), []);
+
   useEffect(() => {
-    const connection = connections.find((item) => item.id === selectedId);
-    const profile = connection?.models.find((item) => item.model === model);
+    const connection = connections.find((item) => item.id === selectedId) ?? connections[0];
+    const nextModel = connection?.models.some((item) => item.model === model)
+      ? model
+      : (connection?.defaultModel ?? connection?.models[0]?.model ?? '');
+    if (connection?.id !== selectedId) setSelectedId(connection?.id ?? null);
+    if (nextModel !== model) setModel(nextModel);
+    const profile = connection?.models.find((item) => item.model === nextModel);
     setResponseOptions(
       profile?.responses ?? {
         reasoningEffort: 'default',

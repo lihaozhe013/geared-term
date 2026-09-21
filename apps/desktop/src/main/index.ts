@@ -789,17 +789,27 @@ function registerIpc(): void {
   );
   ipcMain.handle('ai:save', async (_event, input: unknown) => {
     const connection = AiConnectionInputSchema.parse(input);
-    return AiConnectionRecordSchema.array().parse(await storage.saveAiConnection(connection));
+    const saved = AiConnectionRecordSchema.array().parse(
+      await storage.saveAiConnection(connection)
+    );
+    sendToRenderer('ai:connections-changed', saved);
+    return saved;
   });
   ipcMain.handle('ai:accept-endpoint', async (_event, input: unknown) => {
     const request = AiEndpointConsentRequestSchema.parse(input);
-    return AiConnectionRecordSchema.array().parse(
+    const saved = AiConnectionRecordSchema.array().parse(
       await storage.acceptAiEndpoint(request.connectionId, request.identity)
     );
+    sendToRenderer('ai:connections-changed', saved);
+    return saved;
   });
   ipcMain.handle('ai:delete', async (_event, input: unknown) => {
     const request = AiConnectionDeleteRequestSchema.parse(input);
-    return AiConnectionRecordSchema.array().parse(await storage.deleteAiConnection(request.id));
+    const saved = AiConnectionRecordSchema.array().parse(
+      await storage.deleteAiConnection(request.id)
+    );
+    sendToRenderer('ai:connections-changed', saved);
+    return saved;
   });
 
   ipcMain.on('terminal:create-local', (event, input: unknown) => {

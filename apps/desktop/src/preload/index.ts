@@ -65,6 +65,7 @@ import {
   WslDistributionSchema,
   type LocalTerminalRequest,
   type AiConnectionInput,
+  type AiConnectionRecord,
   type AiStreamRequest,
   type AiDiscoverModelsRequest,
   type AiHistoryLoadRequest,
@@ -214,6 +215,14 @@ const api = Object.freeze({
     AutoUnlockStatusSchema.parse(await ipcRenderer.invoke('vault:disable-auto-unlock')),
   listAiConnections: async () =>
     AiConnectionRecordSchema.array().parse(await ipcRenderer.invoke('ai:list')),
+  onAiConnectionsChanged: (listener: (connections: AiConnectionRecord[]) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, payload: unknown): void => {
+      const result = AiConnectionRecordSchema.array().safeParse(payload);
+      if (result.success) listener(result.data);
+    };
+    ipcRenderer.on('ai:connections-changed', handler);
+    return () => ipcRenderer.removeListener('ai:connections-changed', handler);
+  },
   saveAiConnection: async (input: AiConnectionInput) => {
     const connection = AiConnectionInputSchema.parse(input);
     return AiConnectionRecordSchema.array().parse(await ipcRenderer.invoke('ai:save', connection));
