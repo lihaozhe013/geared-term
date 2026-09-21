@@ -7,6 +7,7 @@ export type TabMenuLabels = {
   newTab: string;
   close: string;
   closeOthers: string;
+  closeAll: string;
 };
 
 export type TabMenuShortcuts = {
@@ -20,6 +21,7 @@ export type TabMenuActions = {
   newTab: () => void;
   close: () => void;
   closeOthers: () => void;
+  closeAll: () => void;
 };
 
 /** Hint chords shown in the menu, derived from the resolved keybinding map
@@ -55,6 +57,11 @@ export function buildTabContextMenu(input: {
       disabled: tabCount < 2,
       separatorBefore: true,
       run: actions.closeOthers
+    },
+    {
+      id: 'tab-menu-close-all',
+      label: labels.closeAll,
+      run: actions.closeAll
     }
   ];
 }

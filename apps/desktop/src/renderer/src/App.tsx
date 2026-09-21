@@ -393,6 +393,11 @@ export function App(): React.JSX.Element {
     setActiveTabId(id);
   }, []);
 
+  const closeAllTabs = useCallback((): void => {
+    setTabs([]);
+    setActiveTabId(null);
+  }, []);
+
   const openProfile = useCallback(
     (profile: SessionProfileRecord): void => {
       const request = profileToRequest(profile);
@@ -821,7 +826,8 @@ export function App(): React.JSX.Element {
               duplicate: t('tabDuplicate'),
               newTab: t('shortcutTabNew'),
               close: t('shortcutTabClose'),
-              closeOthers: t('tabCloseOthers')
+              closeOthers: t('tabCloseOthers'),
+              closeAll: t('tabCloseAll')
             }}
             shortcuts={tabMenuShortcuts}
             onActivate={setActiveTabId}
@@ -831,6 +837,7 @@ export function App(): React.JSX.Element {
             onDuplicate={duplicateTab}
             onNewTab={addLocalTab}
             onCloseOthers={closeOtherTabs}
+            onCloseAll={closeAllTabs}
           />
           <div className="terminal-surface" data-active-status={activeTab?.status ?? 'none'}>
             {tabs.map((tab) => (

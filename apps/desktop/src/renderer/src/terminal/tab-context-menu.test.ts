@@ -7,7 +7,8 @@ const labels = {
   duplicate: 'Duplicate tab',
   newTab: 'New local terminal',
   close: 'Close tab',
-  closeOthers: 'Close other tabs'
+  closeOthers: 'Close other tabs',
+  closeAll: 'Close all tabs'
 };
 const shortcuts = { newTab: 'Ctrl+T', closeTab: 'Ctrl+Shift+W' };
 const actions = {
@@ -15,7 +16,8 @@ const actions = {
   duplicate: () => undefined,
   newTab: () => undefined,
   close: () => undefined,
-  closeOthers: () => undefined
+  closeOthers: () => undefined,
+  closeAll: () => undefined
 };
 
 describe('tabShortcutsFor', () => {
@@ -44,10 +46,12 @@ describe('buildTabContextMenu', () => {
       'tab-menu-duplicate',
       'tab-menu-new-tab',
       'tab-menu-close',
-      'tab-menu-close-others'
+      'tab-menu-close-others',
+      'tab-menu-close-all'
     ]);
     expect(items.find((item) => item.id === 'tab-menu-new-tab')?.separatorBefore).toBe(true);
     expect(items.find((item) => item.id === 'tab-menu-close-others')?.separatorBefore).toBe(true);
+    expect(items.find((item) => item.id === 'tab-menu-close-all')?.separatorBefore).toBeUndefined();
     expect(items.find((item) => item.id === 'tab-menu-rename')?.separatorBefore).toBeUndefined();
   });
 

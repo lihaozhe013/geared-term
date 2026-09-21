@@ -19,6 +19,7 @@ type TabBarProps = {
   onDuplicate: (id: string) => void;
   onNewTab: () => void;
   onCloseOthers: (id: string) => void;
+  onCloseAll: () => void;
 };
 
 export function TabBar({
@@ -32,7 +33,8 @@ export function TabBar({
   onRename,
   onDuplicate,
   onNewTab,
-  onCloseOthers
+  onCloseOthers,
+  onCloseAll
 }: TabBarProps): React.JSX.Element {
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<{ id: string; after: boolean } | null>(null);
@@ -81,7 +83,8 @@ export function TabBar({
           duplicate: () => onDuplicate(menu.id),
           newTab: onNewTab,
           close: () => onClose(menu.id),
-          closeOthers: () => onCloseOthers(menu.id)
+          closeOthers: () => onCloseOthers(menu.id),
+          closeAll: onCloseAll
         }
       })
     : [];
