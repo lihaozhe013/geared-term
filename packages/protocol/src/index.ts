@@ -735,6 +735,70 @@ export const SftpCdEventSchema = z
   })
   .strict();
 
+export const SFTP_EDITOR_MAX_BYTES = 3 * 1024 * 1024;
+
+export const SftpEditorOpenRequestSchema = z
+  .object({
+    sessionId: IdSchema,
+    remotePath: z.string().min(1).max(8192)
+  })
+  .strict();
+
+export const SftpEditorOpenResultSchema = z
+  .object({
+    status: z.enum(['opened', 'focused', 'busy']),
+    activePath: z.string().min(1).max(8192)
+  })
+  .strict();
+
+export const SftpEditorLineEndingSchema = z.enum(['lf', 'crlf', 'mixed']);
+
+export const SftpEditorDocumentSchema = z
+  .object({
+    name: z.string().min(1).max(4096),
+    remotePath: z.string().min(1).max(8192),
+    content: z.string().max(SFTP_EDITOR_MAX_BYTES),
+    byteLength: z.number().int().nonnegative().max(SFTP_EDITOR_MAX_BYTES),
+    modifiedAt: z.number().int().nonnegative().nullable(),
+    hasBom: z.boolean(),
+    lineEnding: SftpEditorLineEndingSchema
+  })
+  .strict();
+
+export const SftpEditorSaveRequestSchema = z
+  .object({
+    content: z.string().max(SFTP_EDITOR_MAX_BYTES),
+    overwriteConflict: z.boolean().default(false)
+  })
+  .strict();
+
+export const SftpEditorSaveResultSchema = z.discriminatedUnion('status', [
+  z
+    .object({
+      status: z.literal('saved'),
+      byteLength: z.number().int().nonnegative().max(SFTP_EDITOR_MAX_BYTES),
+      modifiedAt: z.number().int().nonnegative().nullable()
+    })
+    .strict(),
+  z
+    .object({
+      status: z.literal('conflict'),
+      reason: z.enum(['modified', 'missing', 'not-file']),
+      currentByteLength: z.number().int().nonnegative().optional(),
+      currentModifiedAt: z.number().int().nonnegative().nullable().optional()
+    })
+    .strict()
+]);
+
+export const SftpEditorDirtyRequestSchema = z.object({ dirty: z.boolean() }).strict();
+
+export const SftpEditorSavedEventSchema = z
+  .object({
+    sessionId: IdSchema,
+    remotePath: z.string().min(1).max(8192)
+  })
+  .strict();
+
 export const LocalListRequestSchema = z
   .object({
     directory: z.string().max(4096).nullable().default(null)
@@ -952,6 +1016,14 @@ export type SftpTransfer = z.infer<typeof SftpTransferSchema>;
 export type SftpTransferEvent = z.infer<typeof SftpTransferEventSchema>;
 export type SftpRemoteCommandRequest = z.infer<typeof SftpRemoteCommandRequestSchema>;
 export type SftpCdEvent = z.infer<typeof SftpCdEventSchema>;
+export type SftpEditorOpenRequest = z.infer<typeof SftpEditorOpenRequestSchema>;
+export type SftpEditorOpenResult = z.infer<typeof SftpEditorOpenResultSchema>;
+export type SftpEditorLineEnding = z.infer<typeof SftpEditorLineEndingSchema>;
+export type SftpEditorDocument = z.infer<typeof SftpEditorDocumentSchema>;
+export type SftpEditorSaveRequest = z.infer<typeof SftpEditorSaveRequestSchema>;
+export type SftpEditorSaveResult = z.infer<typeof SftpEditorSaveResultSchema>;
+export type SftpEditorDirtyRequest = z.infer<typeof SftpEditorDirtyRequestSchema>;
+export type SftpEditorSavedEvent = z.infer<typeof SftpEditorSavedEventSchema>;
 export type LocalListRequest = z.infer<typeof LocalListRequestSchema>;
 export type LocalSessionRequest = z.infer<typeof LocalSessionRequestSchema>;
 export type LocalWorkingDirectory = z.infer<typeof LocalWorkingDirectorySchema>;

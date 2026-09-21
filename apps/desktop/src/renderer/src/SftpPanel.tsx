@@ -206,6 +206,29 @@ export function SftpPanel({
     }, 250);
   }, [refreshRemote]);
 
+  const openRemoteEditor = useCallback(
+    async (entry: SftpRemoteEntry): Promise<void> => {
+      if (entry.kind !== 'file' && entry.kind !== 'symlink') {
+        setError(t('sftpEditorNotFile'));
+        return;
+      }
+      try {
+        const result = await window.geared.openSftpEditor({
+          sessionId,
+          remotePath: entry.path
+        });
+        if (result.status === 'busy') {
+          setNotice(ta('sftpEditorBusy', { path: result.activePath }));
+        } else {
+          setMessage(null);
+        }
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : t('sftpEditorOpenFailed'));
+      }
+    },
+    [sessionId, setError, setNotice, t, ta]
+  );
+
   const scheduleLocalRefresh = useCallback((): void => {
     if (localRefreshTimer.current) clearTimeout(localRefreshTimer.current);
     localRefreshTimer.current = setTimeout(() => {
@@ -258,9 +281,13 @@ export function SftpPanel({
         else scheduleLocalRefresh();
       }
     });
+    const offEditorSaved = window.geared.onSftpEditorSaved((event) => {
+      if (event.sessionId === sessionId) scheduleRemoteRefresh();
+    });
     const offCd = window.geared.onSftpCd(handleCd);
     return () => {
       offTransfer();
+      offEditorSaved();
       offCd();
     };
   }, [handleCd, scheduleLocalRefresh, scheduleRemoteRefresh, sessionId]);
@@ -503,6 +530,12 @@ export function SftpPanel({
     const entry = state.entry;
     return [
       {
+        id: 'edit',
+        label: t('sftpEdit'),
+        disabled: !single || (entry.kind !== 'file' && entry.kind !== 'symlink'),
+        run: () => void openRemoteEditor(entry)
+      },
+      {
         id: 'open',
         label: t('sftpOpen'),
         disabled: entry.kind !== 'directory' || !single,
@@ -738,6 +771,7 @@ export function SftpPanel({
               onClick={(event) => selectEntry(entry.path, event)}
               onDoubleClick={() => {
                 if (entry.kind === 'directory') void navigateRemote(entry.path);
+                else void openRemoteEditor(entry);
               }}
               onContextMenu={(event) => openMenu(event, entry)}
             />

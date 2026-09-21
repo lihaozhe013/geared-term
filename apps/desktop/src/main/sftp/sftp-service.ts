@@ -1,5 +1,5 @@
 import { posix } from 'node:path';
-import type { SFTPWrapper, FileEntryWithStats } from 'ssh2';
+import type { SFTPWrapper, FileEntryWithStats, Stats } from 'ssh2';
 
 export type RemoteEntry = {
   name: string;
@@ -9,6 +9,20 @@ export type RemoteEntry = {
   size: number;
   modifiedAt: number | null;
 };
+
+export type RemoteFileStats = {
+  size: number;
+  modifiedAt: number | null;
+  isFile: boolean;
+  isDirectory: boolean;
+};
+
+export class RemoteFileLimitError extends Error {
+  public constructor(public readonly maximumBytes: number) {
+    super(`Remote file exceeds the ${maximumBytes}-byte editor limit`);
+    this.name = 'RemoteFileLimitError';
+  }
+}
 
 function call<T>(
   operation: (callback: (error: Error | null | undefined, value: T) => void) => void
@@ -83,6 +97,60 @@ export class SftpService {
         });
       });
     });
+  }
+
+  public async fileStats(path: string): Promise<RemoteFileStats> {
+    const stats = await call<Stats>((callback) => this.sftp.stat(path, callback));
+    return {
+      size: stats.size,
+      modifiedAt: Number.isFinite(stats.mtime) ? stats.mtime * 1000 : null,
+      isFile: stats.isFile(),
+      isDirectory: stats.isDirectory()
+    };
+  }
+
+  public async readFileLimited(path: string, maximumBytes: number): Promise<Buffer> {
+    const stream = this.sftp.createReadStream(path, { highWaterMark: 64 * 1024 });
+    const chunks: Buffer[] = [];
+    let byteLength = 0;
+    try {
+      for await (const chunk of stream) {
+        const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+        byteLength += buffer.length;
+        if (byteLength > maximumBytes) {
+          stream.destroy();
+          throw new RemoteFileLimitError(maximumBytes);
+        }
+        chunks.push(buffer);
+      }
+    } catch (error) {
+      stream.destroy();
+      throw error;
+    }
+    return Buffer.concat(chunks, byteLength);
+  }
+
+  public async overwriteExisting(path: string, content: Buffer): Promise<void> {
+    const handle = await call<Buffer>((callback) => this.sftp.open(path, 'r+', callback));
+    let failure: unknown;
+    try {
+      await callVoid((callback) => this.sftp.fsetstat(handle, { size: 0 }, callback));
+      const chunkSize = 32 * 1024;
+      for (let offset = 0; offset < content.length; offset += chunkSize) {
+        const length = Math.min(chunkSize, content.length - offset);
+        await callVoid((callback) =>
+          this.sftp.write(handle, content, offset, length, offset, callback)
+        );
+      }
+    } catch (error) {
+      failure = error;
+    }
+    try {
+      await callVoid((callback) => this.sftp.close(handle, callback));
+    } catch (error) {
+      failure ??= error;
+    }
+    if (failure) throw failure;
   }
 
   public createRemoteReadStream(path: string): ReturnType<SFTPWrapper['createReadStream']> {

@@ -54,6 +54,13 @@ import {
   SftpTransferEventSchema,
   SftpRemoteCommandRequestSchema,
   SftpCdEventSchema,
+  SftpEditorDirtyRequestSchema,
+  SftpEditorDocumentSchema,
+  SftpEditorOpenRequestSchema,
+  SftpEditorOpenResultSchema,
+  SftpEditorSaveRequestSchema,
+  SftpEditorSaveResultSchema,
+  SftpEditorSavedEventSchema,
   LocalListRequestSchema,
   LocalSessionRequestSchema,
   LocalWorkingDirectorySchema,
@@ -105,6 +112,7 @@ import { buildRemoteFileCommand, quoteRemotePath } from './sftp/remote-commands'
 import { TransferManager } from './sftp/transfers';
 import { buildApplicationMenu, executeApplicationMenuAction, type MenuLocale } from './menu';
 import { HistoryWindowManager } from './history-window';
+import { RemoteEditorWindowManager } from './remote-editor-window';
 import { SettingsWindowManager, type SettingsCategory } from './settings-window';
 import { TrayController } from './tray';
 import {
@@ -144,6 +152,7 @@ let quitRequested = false;
 let trayController: TrayController | undefined;
 let settingsWindow: SettingsWindowManager;
 let historyWindow: HistoryWindowManager;
+let remoteEditorWindow: RemoteEditorWindowManager;
 let localTerminals: LocalTerminalManager;
 let storage: AppStorage;
 let environmentManager: EnvironmentManager;
@@ -682,6 +691,30 @@ function registerIpc(): void {
     sshSessions.sendInput(request.sessionId, `${line}\r`);
     return SftpOperationResultSchema.parse({ accepted: true });
   });
+  ipcMain.handle('sftp:editor-open', async (event, input: unknown) => {
+    if (BrowserWindow.fromWebContents(event.sender) !== mainWindow) {
+      throw new Error('Only the main window can open a remote editor');
+    }
+    const request = SftpEditorOpenRequestSchema.parse(input);
+    return SftpEditorOpenResultSchema.parse(await remoteEditorWindow.open(request));
+  });
+  ipcMain.handle('sftp:editor-document', (event, input: unknown) => {
+    EmptyRequestSchema.parse(input ?? {});
+    return SftpEditorDocumentSchema.parse(remoteEditorWindow.document(event.sender));
+  });
+  ipcMain.handle('sftp:editor-reload', async (event, input: unknown) => {
+    EmptyRequestSchema.parse(input ?? {});
+    return SftpEditorDocumentSchema.parse(await remoteEditorWindow.reload(event.sender));
+  });
+  ipcMain.handle('sftp:editor-save', async (event, input: unknown) => {
+    const request = SftpEditorSaveRequestSchema.parse(input);
+    return SftpEditorSaveResultSchema.parse(await remoteEditorWindow.save(event.sender, request));
+  });
+  ipcMain.handle('sftp:editor-dirty', (event, input: unknown) => {
+    const request = SftpEditorDirtyRequestSchema.parse(input);
+    remoteEditorWindow.setDirty(event.sender, request.dirty);
+    return SftpOperationResultSchema.parse({ accepted: true });
+  });
   ipcMain.handle('local:list', async (_event, input: unknown) => {
     const request = LocalListRequestSchema.parse(input);
     return LocalEntrySchema.array().parse(await listLocalDirectory(request.directory));
@@ -1176,6 +1209,14 @@ if (hasSingleInstanceLock) {
         transferManager.cancelForSession(sessionId);
       }
     });
+    remoteEditorWindow = new RemoteEditorWindowManager({
+      logger,
+      isDevelopment,
+      getLanguage: () => storage.settingsSnapshot().language,
+      getSftp: (sessionId) => sshSessions.sftpService(sessionId),
+      onSaved: (event) =>
+        sendToRenderer('sftp:editor-saved', SftpEditorSavedEventSchema.parse(event))
+    });
     process.on('uncaughtException', (error) =>
       logger.error('system', 'Uncaught exception', { error: error.message })
     );
@@ -1212,7 +1253,11 @@ if (hasSingleInstanceLock) {
   });
 }
 
-app.on('before-quit', () => {
+app.on('before-quit', (event) => {
+  if (remoteEditorWindow && !remoteEditorWindow.confirmBeforeQuit()) {
+    event.preventDefault();
+    return;
+  }
   quitRequested = true;
   localTerminals?.closeAll();
   sshSessions?.closeAll();

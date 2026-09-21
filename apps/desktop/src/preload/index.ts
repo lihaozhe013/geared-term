@@ -40,6 +40,13 @@ import {
   SftpTransferEventSchema,
   SftpRemoteCommandRequestSchema,
   SftpCdEventSchema,
+  SftpEditorDirtyRequestSchema,
+  SftpEditorDocumentSchema,
+  SftpEditorOpenRequestSchema,
+  SftpEditorOpenResultSchema,
+  SftpEditorSaveRequestSchema,
+  SftpEditorSaveResultSchema,
+  SftpEditorSavedEventSchema,
   LocalListRequestSchema,
   LocalSessionRequestSchema,
   LocalWorkingDirectorySchema,
@@ -91,6 +98,9 @@ import {
   type SftpTransferEvent,
   type SftpRemoteCommandRequest,
   type SftpCdEvent,
+  type SftpEditorOpenRequest,
+  type SftpEditorSaveRequest,
+  type SftpEditorSavedEvent,
   type LocalMkdirRequest,
   type LocalRenameRequest,
   type TerminalCommandAction,
@@ -397,6 +407,30 @@ const api = Object.freeze({
     return SftpOperationResultSchema.parse(
       await ipcRenderer.invoke('sftp:remote-command', request)
     );
+  },
+  openSftpEditor: async (input: SftpEditorOpenRequest) => {
+    const request = SftpEditorOpenRequestSchema.parse(input);
+    return SftpEditorOpenResultSchema.parse(await ipcRenderer.invoke('sftp:editor-open', request));
+  },
+  getSftpEditorDocument: async () =>
+    SftpEditorDocumentSchema.parse(await ipcRenderer.invoke('sftp:editor-document', {})),
+  reloadSftpEditor: async () =>
+    SftpEditorDocumentSchema.parse(await ipcRenderer.invoke('sftp:editor-reload', {})),
+  saveSftpEditor: async (input: SftpEditorSaveRequest) => {
+    const request = SftpEditorSaveRequestSchema.parse(input);
+    return SftpEditorSaveResultSchema.parse(await ipcRenderer.invoke('sftp:editor-save', request));
+  },
+  setSftpEditorDirty: async (dirty: boolean) => {
+    const request = SftpEditorDirtyRequestSchema.parse({ dirty });
+    return SftpOperationResultSchema.parse(await ipcRenderer.invoke('sftp:editor-dirty', request));
+  },
+  onSftpEditorSaved: (listener: (event: SftpEditorSavedEvent) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, payload: unknown): void => {
+      const result = SftpEditorSavedEventSchema.safeParse(payload);
+      if (result.success) listener(result.data);
+    };
+    ipcRenderer.on('sftp:editor-saved', handler);
+    return () => ipcRenderer.removeListener('sftp:editor-saved', handler);
   },
   sftpSendCd: async (input: SftpSendCdRequest) => {
     const request = SftpSendCdRequestSchema.parse(input);

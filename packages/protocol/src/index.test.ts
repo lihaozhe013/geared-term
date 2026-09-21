@@ -7,6 +7,10 @@ import {
   normalizeLigatureSequences,
   normalizeTerminalLineEndings,
   SftpDownloadRequestSchema,
+  SftpEditorDocumentSchema,
+  SftpEditorOpenResultSchema,
+  SftpEditorSaveRequestSchema,
+  SftpEditorSaveResultSchema,
   SftpListRequestSchema,
   SftpOperationResultSchema,
   SftpRemoteEntrySchema,
@@ -67,6 +71,38 @@ describe('protocol schemas', () => {
       }).success
     ).toBe(true);
     expect(SftpOperationResultSchema.parse({ accepted: false })).toEqual({ accepted: false });
+  });
+
+  it('validates remote editor documents and discriminated results', () => {
+    expect(
+      SftpEditorDocumentSchema.parse({
+        name: 'app.yaml',
+        remotePath: '/etc/app.yaml',
+        content: 'enabled: true\n',
+        byteLength: 14,
+        modifiedAt: 1_700_000_000_000,
+        hasBom: false,
+        lineEnding: 'lf'
+      }).lineEnding
+    ).toBe('lf');
+    expect(
+      SftpEditorOpenResultSchema.parse({ status: 'busy', activePath: '/tmp/current.conf' })
+    ).toEqual({ status: 'busy', activePath: '/tmp/current.conf' });
+    expect(SftpEditorSaveRequestSchema.parse({ content: '{}' })).toEqual({
+      content: '{}',
+      overwriteConflict: false
+    });
+    expect(
+      SftpEditorSaveResultSchema.safeParse({
+        status: 'conflict',
+        reason: 'modified',
+        currentByteLength: 20,
+        currentModifiedAt: null
+      }).success
+    ).toBe(true);
+    expect(
+      SftpEditorSaveResultSchema.safeParse({ status: 'saved', reason: 'modified' }).success
+    ).toBe(false);
   });
 
   it('validates local session directory requests and nullable responses', () => {

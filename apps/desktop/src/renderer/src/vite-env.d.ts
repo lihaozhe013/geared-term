@@ -31,6 +31,12 @@ import type {
   SftpRemoteCommandRequest,
   SftpCdEvent,
   SftpOperationResult,
+  SftpEditorDocument,
+  SftpEditorOpenRequest,
+  SftpEditorOpenResult,
+  SftpEditorSaveRequest,
+  SftpEditorSaveResult,
+  SftpEditorSavedEvent,
   SftpUploadRequest,
   LocalEntry,
   LocalMkdirRequest,
@@ -153,6 +159,12 @@ declare global {
       listSftpTransfers: (sessionId?: string) => Promise<SftpTransfer[]>;
       cancelSftpTransfer: (transferId: string) => Promise<SftpOperationResult>;
       runRemoteFileCommand: (input: SftpRemoteCommandRequest) => Promise<SftpOperationResult>;
+      openSftpEditor: (input: SftpEditorOpenRequest) => Promise<SftpEditorOpenResult>;
+      getSftpEditorDocument: () => Promise<SftpEditorDocument>;
+      reloadSftpEditor: () => Promise<SftpEditorDocument>;
+      saveSftpEditor: (input: SftpEditorSaveRequest) => Promise<SftpEditorSaveResult>;
+      setSftpEditorDirty: (dirty: boolean) => Promise<SftpOperationResult>;
+      onSftpEditorSaved: (listener: (event: SftpEditorSavedEvent) => void) => () => void;
       sftpSendCd: (input: SftpSendCdRequest) => Promise<SftpOperationResult>;
       sftpTrackedDirectory: (sessionId: string) => Promise<string | null>;
       getDownloadsDirectory: () => Promise<string>;

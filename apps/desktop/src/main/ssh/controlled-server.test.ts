@@ -8,6 +8,13 @@ import type { SftpTransfer, SftpTransferEvent } from '@geared-term/protocol';
 import { fingerprintSha256 } from './known-hosts';
 import { startControlledServer, type ControlledServer } from './controlled-server';
 import { SftpService } from '../sftp/sftp-service';
+import {
+  RemoteEditorNotFileError,
+  RemoteEditorTextError,
+  readRemoteEditorFile,
+  saveRemoteEditorFile
+} from '../sftp/editor-file';
+import { RemoteFileLimitError } from '../sftp/sftp-service';
 import { TransferManager } from '../sftp/transfers';
 
 const { Client } = ssh2;
@@ -289,4 +296,117 @@ describe('controlled SFTP subsystem', () => {
     await service.remove(remoteFile);
     client.end();
   });
+
+  it('reads and saves UTF-8 text while preserving the existing inode and mode', async () => {
+    const { client, service } = await connectSftp();
+    const remoteFile = '/home/tester/editor-crlf.txt';
+    const original = Buffer.from('\ufefffirst\r\nsecond\r\n', 'utf8');
+    await fs.writeFile(server.remoteFsPath(remoteFile), original, { mode: 0o640 });
+    const before = await fs.stat(server.remoteFsPath(remoteFile));
+
+    const snapshot = await readRemoteEditorFile(service, remoteFile);
+    expect(snapshot.document).toMatchObject({
+      content: 'first\nsecond\n',
+      byteLength: original.length,
+      hasBom: true,
+      lineEnding: 'crlf'
+    });
+    const emptyFile = '/home/tester/editor-empty.txt';
+    await fs.writeFile(server.remoteFsPath(emptyFile), Buffer.alloc(0));
+    await expect(readRemoteEditorFile(service, emptyFile)).resolves.toMatchObject({
+      document: { content: '', byteLength: 0, hasBom: false, lineEnding: 'lf' }
+    });
+
+    const outcome = await saveRemoteEditorFile(
+      service,
+      remoteFile,
+      'x\n',
+      snapshot.document,
+      snapshot.revision,
+      false
+    );
+    expect(outcome.result.status).toBe('saved');
+    const after = await fs.stat(server.remoteFsPath(remoteFile));
+    expect(after.ino).toBe(before.ino);
+    expect(after.mode & 0o777).toBe(before.mode & 0o777);
+    await expect(fs.readFile(server.remoteFsPath(remoteFile))).resolves.toEqual(
+      Buffer.from('\ufeffx\r\n', 'utf8')
+    );
+    expect(server.trace.sftpOps).toContain('FSETSTAT');
+    client.end();
+  });
+
+  it('rejects unsafe content, enforces the size limit, and detects save conflicts', async () => {
+    const { client, service } = await connectSftp();
+    const conflictFile = '/home/tester/editor-conflict.txt';
+    await fs.writeFile(server.remoteFsPath(conflictFile), 'before', 'utf8');
+    const snapshot = await readRemoteEditorFile(service, conflictFile);
+    await fs.writeFile(server.remoteFsPath(conflictFile), 'outside', 'utf8');
+    await expect(
+      saveRemoteEditorFile(
+        service,
+        conflictFile,
+        'local',
+        snapshot.document,
+        snapshot.revision,
+        false
+      )
+    ).resolves.toMatchObject({ result: { status: 'conflict', reason: 'modified' } });
+    await expect(fs.readFile(server.remoteFsPath(conflictFile), 'utf8')).resolves.toBe('outside');
+    await expect(
+      saveRemoteEditorFile(
+        service,
+        conflictFile,
+        'forced',
+        snapshot.document,
+        snapshot.revision,
+        true
+      )
+    ).resolves.toMatchObject({ result: { status: 'saved' } });
+    await expect(fs.readFile(server.remoteFsPath(conflictFile), 'utf8')).resolves.toBe('forced');
+
+    const missingFile = '/home/tester/editor-missing.txt';
+    await fs.writeFile(server.remoteFsPath(missingFile), 'present', 'utf8');
+    const missingSnapshot = await readRemoteEditorFile(service, missingFile);
+    await fs.rm(server.remoteFsPath(missingFile));
+    await expect(
+      saveRemoteEditorFile(
+        service,
+        missingFile,
+        'recreate',
+        missingSnapshot.document,
+        missingSnapshot.revision,
+        true
+      )
+    ).resolves.toMatchObject({ result: { status: 'conflict', reason: 'missing' } });
+    await expect(fs.access(server.remoteFsPath(missingFile))).rejects.toThrow();
+
+    const exactLimitFile = '/home/tester/editor-limit.txt';
+    await fs.writeFile(server.remoteFsPath(exactLimitFile), Buffer.alloc(3 * 1024 * 1024, 0x61));
+    await expect(readRemoteEditorFile(service, exactLimitFile)).resolves.toMatchObject({
+      document: { byteLength: 3 * 1024 * 1024 }
+    });
+    await fs.writeFile(
+      server.remoteFsPath(exactLimitFile),
+      Buffer.alloc(3 * 1024 * 1024 + 1, 0x61)
+    );
+    await expect(readRemoteEditorFile(service, exactLimitFile)).rejects.toBeInstanceOf(
+      RemoteFileLimitError
+    );
+
+    const invalidFile = '/home/tester/editor-invalid.txt';
+    await fs.writeFile(server.remoteFsPath(invalidFile), Buffer.from([0xc3, 0x28]));
+    await expect(readRemoteEditorFile(service, invalidFile)).rejects.toBeInstanceOf(
+      RemoteEditorTextError
+    );
+    const nulFile = '/home/tester/editor-nul.txt';
+    await fs.writeFile(server.remoteFsPath(nulFile), Buffer.from('ok\0nope'));
+    await expect(readRemoteEditorFile(service, nulFile)).rejects.toBeInstanceOf(
+      RemoteEditorTextError
+    );
+    await expect(readRemoteEditorFile(service, '/home/tester')).rejects.toBeInstanceOf(
+      RemoteEditorNotFileError
+    );
+    client.end();
+  }, 30_000);
 });

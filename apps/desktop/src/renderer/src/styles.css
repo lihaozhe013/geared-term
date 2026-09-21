@@ -1837,6 +1837,158 @@ button:disabled {
   background: var(--gt-background, #0d1117);
 }
 
+/* Remote editor window */
+
+.remote-editor-window-shell {
+  display: grid;
+  height: 100vh;
+  min-width: 0;
+  grid-template-rows: calc(40px * var(--gt-ui-scale, 1)) minmax(0, 1fr);
+  overflow: hidden;
+  background: var(--gt-background, #0d1117);
+}
+
+.remote-editor-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--gt-background, #0d1117);
+}
+
+.remote-editor-loading {
+  display: grid;
+  min-height: 0;
+  place-items: center;
+  padding: 24px;
+  color: var(--gt-text-muted, #71809a);
+  text-align: center;
+}
+
+.remote-editor-toolbar {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--gt-divider, #202a39);
+}
+
+.remote-editor-file {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.remote-editor-file strong,
+.remote-editor-file span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.remote-editor-file strong {
+  color: var(--gt-text, #e4eaf3);
+  font-size: var(--gt-fs-md);
+}
+
+.remote-editor-file span {
+  color: var(--gt-text-muted, #71809a);
+  font-size: var(--gt-fs-xs);
+}
+
+.remote-editor-actions {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.remote-editor-actions .toolbar-button,
+.remote-editor-conflict-actions .toolbar-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.remote-editor-actions .toolbar-button.active {
+  border-color: var(--gt-accent, #5c8ea5);
+  color: var(--gt-text, #e4eaf3);
+  background: var(--gt-hover, #1a2332);
+}
+
+.remote-editor-conflict {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--gt-danger, #f4a5a5);
+  color: var(--gt-text, #e4eaf3);
+  background: color-mix(in srgb, var(--gt-danger, #f4a5a5) 12%, var(--gt-panel-alt, #161e2a));
+}
+
+.remote-editor-conflict strong,
+.remote-editor-conflict p {
+  margin: 0;
+}
+
+.remote-editor-conflict p {
+  margin-top: 2px;
+  color: var(--gt-text-muted, #71809a);
+  font-size: var(--gt-fs-sm);
+}
+
+.remote-editor-conflict-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+}
+
+.remote-editor-message {
+  margin: 0;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--gt-divider, #202a39);
+  font-size: var(--gt-fs-sm);
+  overflow-wrap: anywhere;
+}
+
+.remote-editor-message.error {
+  color: var(--gt-danger, #f4a5a5);
+}
+
+.remote-editor-surface {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--gt-code-bg, #1a2332);
+}
+
+.remote-code-editor {
+  height: 100%;
+}
+
+.remote-editor-status {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 5px 12px;
+  border-top: 1px solid var(--gt-divider, #202a39);
+  color: var(--gt-text-muted, #71809a);
+  background: var(--gt-panel-alt, #161e2a);
+  font-size: var(--gt-fs-xs);
+}
+
+.remote-editor-status span {
+  white-space: nowrap;
+}
+
 .settings-window {
   display: flex;
   min-width: 0;
