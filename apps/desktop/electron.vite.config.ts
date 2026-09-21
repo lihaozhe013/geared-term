@@ -26,6 +26,7 @@ const commitHash = resolveCommitHash();
 export default defineConfig({
   main: {
     resolve: { alias: aliases },
+    define: { __APP_COMMIT__: JSON.stringify(commitHash) },
     build: { externalizeDeps: { exclude: bundledDependencies } }
   },
   preload: {

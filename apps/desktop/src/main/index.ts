@@ -4,6 +4,7 @@ import {
   Menu,
   dialog,
   ipcMain,
+  nativeImage,
   safeStorage,
   screen,
   session,
@@ -203,10 +204,15 @@ function showAboutDialog(locale: MenuLocale): void {
     'en-US': { title: 'About Geared Term', detail: 'A secure Electron terminal application.' },
     'zh-CN': { title: '关于 Geared Term', detail: '一个安全的 Electron 终端应用。' }
   } as const;
+  const iconPath = app.isPackaged
+    ? join(process.resourcesPath, 'icons', 'geared-term.png')
+    : join(__dirname, '../../resources/icons/geared-term.png');
+  const icon = nativeImage.createFromPath(iconPath);
   void dialog.showMessageBox({
     type: 'info',
     title: aboutLabels[locale].title,
-    message: `Geared Term ${app.getVersion()}`,
+    message: `Geared Term ${app.getVersion()} (${__APP_COMMIT__})`,
+    ...(icon.isEmpty() ? {} : { icon }),
     detail: `${aboutLabels[locale].detail}\nElectron ${process.versions.electron} · Chromium ${process.versions.chrome} · Node ${process.versions.node}`
   });
 }
