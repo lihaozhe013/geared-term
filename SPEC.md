@@ -159,11 +159,11 @@ When terminal focus is active, the following behavior is required:
 - **APP-021**: Keyboard handling MUST preserve terminal control, Alt/Meta, navigation, function-key,
   Enter, Shift+Enter, Alt+Enter, Backspace, and backtab sequences expected by xterm-compatible
   applications.
-- **APP-022**: On Windows/Linux the hidden application menu MUST NOT register Edit-role
-  accelerators (`Ctrl+C/V/X/Z/A`), because registered accelerators consume these keys before the
-  terminal receives them; text fields keep native editing behavior. The terminal MUST offer a
-  right-click context menu with copy, paste, select all, search, and clear actions, where copy is
-  enabled only while a selection exists.
+- **APP-022**: On Windows/Linux the hidden application menu MUST NOT register Edit-role accelerators
+  (`Ctrl+C/V/X/Z/A`), because registered accelerators consume these keys before the terminal
+  receives them; text fields keep native editing behavior. The terminal MUST offer a right-click
+  context menu with copy, paste, select all, search, and clear actions, where copy is enabled only
+  while a selection exists.
 
 ## 8. Sessions and profiles
 

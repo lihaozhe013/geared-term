@@ -522,9 +522,7 @@ export class AppStorage {
       const previous = current?.models.find((candidate) => candidate.model === model.model);
       const responses =
         input.protocol === 'responses'
-          ? AiResponsesModelDefaultsSchema.parse(
-              model.responses ?? previous?.responses ?? {}
-            )
+          ? AiResponsesModelDefaultsSchema.parse(model.responses ?? previous?.responses ?? {})
           : undefined;
       return { ...model, responses };
     });
@@ -586,8 +584,7 @@ export class AppStorage {
       protocol: connection.protocol,
       model: selected.model,
       apiKey,
-      responseOptions:
-        selected.responses ?? AiResponsesModelDefaultsSchema.parse({}),
+      responseOptions: selected.responses ?? AiResponsesModelDefaultsSchema.parse({}),
       acceptedEndpoint: connection.acceptedEndpoint
     };
   }

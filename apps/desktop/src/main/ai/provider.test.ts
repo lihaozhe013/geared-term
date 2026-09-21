@@ -35,25 +35,27 @@ describe('AI provider adapter', () => {
   });
 
   it('maps Responses continuation and deduplicates web sources', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(
-        [
-          'data: {"type":"response.reasoning_summary_text.delta","delta":"think"}',
-          '',
-          'data: {"type":"response.web_search_call.searching","id":"search-1","action":{"query":"docs"}}',
-          '',
-          'data: {"type":"response.web_search_call.completed","id":"search-1","action":{"query":"docs","sources":[{"url":"https://example.com","title":"Example"}]}}',
-          '',
-          'data: {"type":"response.output_item.added","item":{"url":"https://example.com","title":"Example"}}',
-          '',
-          'data: {"type":"response.completed","response":{"model":"model","usage":{"input_tokens":3,"output_tokens":4,"output_tokens_details":{"reasoning_tokens":2}},"output":[{"type":"reasoning","encrypted_content":"opaque"}]}}',
-          '',
-          'data: [DONE]',
-          ''
-        ].join('\n'),
-        { status: 200, headers: { 'content-type': 'text/event-stream' } }
-      )
-    );
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        new Response(
+          [
+            'data: {"type":"response.reasoning_summary_text.delta","delta":"think"}',
+            '',
+            'data: {"type":"response.web_search_call.searching","id":"search-1","action":{"query":"docs"}}',
+            '',
+            'data: {"type":"response.web_search_call.completed","id":"search-1","action":{"query":"docs","sources":[{"url":"https://example.com","title":"Example"}]}}',
+            '',
+            'data: {"type":"response.output_item.added","item":{"url":"https://example.com","title":"Example"}}',
+            '',
+            'data: {"type":"response.completed","response":{"model":"model","usage":{"input_tokens":3,"output_tokens":4,"output_tokens_details":{"reasoning_tokens":2}},"output":[{"type":"reasoning","encrypted_content":"opaque"}]}}',
+            '',
+            'data: [DONE]',
+            ''
+          ].join('\n'),
+          { status: 200, headers: { 'content-type': 'text/event-stream' } }
+        )
+      );
     const events: unknown[] = [];
     await streamAiRequest({
       connectionId: 'connection-1',

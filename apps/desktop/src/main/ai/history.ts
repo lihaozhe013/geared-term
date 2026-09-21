@@ -51,8 +51,7 @@ type HistoryMetadata = {
 
 const metadataPattern = /<!-- geared-term-history\n([\s\S]*?)\n-->/u;
 const sectionPattern = /\n## (user|assistant)\n\n/u;
-const messageMetadataPattern =
-  /^<!-- geared-term-message-base64\n([A-Za-z0-9+/=\r\n]+)\n-->\n*/u;
+const messageMetadataPattern = /^<!-- geared-term-message-base64\n([A-Za-z0-9+/=\r\n]+)\n-->\n*/u;
 
 /**
  * Human-readable Markdown conversation history (AI-020): a metadata comment
@@ -91,25 +90,23 @@ export class AiHistoryStore {
     const document = [
       `<!-- geared-term-history\n${JSON.stringify(metadata, null, 2)}\n-->`,
       '',
-      ...entry.messages.map(
-        (message) => {
-          const messageMetadata = {
-            ...(message.reasoning !== undefined ? { reasoning: message.reasoning } : {}),
-            ...(message.usage ? { usage: message.usage } : {}),
-            ...(message.snapshot ? { snapshot: message.snapshot } : {}),
-            ...(message.sources ? { sources: message.sources } : {}),
-            ...(message.continuation ? { continuation: message.continuation } : {})
-          };
-          const metadataComment =
-            Object.keys(messageMetadata).length === 0
-              ? ''
-              : `<!-- geared-term-message-base64\n${Buffer.from(
-                  JSON.stringify(messageMetadata),
-                  'utf8'
-                ).toString('base64')}\n-->\n\n`;
-          return `## ${message.role}\n\n${metadataComment}${message.content.replace(/\n+$/u, '')}\n`;
-        }
-      )
+      ...entry.messages.map((message) => {
+        const messageMetadata = {
+          ...(message.reasoning !== undefined ? { reasoning: message.reasoning } : {}),
+          ...(message.usage ? { usage: message.usage } : {}),
+          ...(message.snapshot ? { snapshot: message.snapshot } : {}),
+          ...(message.sources ? { sources: message.sources } : {}),
+          ...(message.continuation ? { continuation: message.continuation } : {})
+        };
+        const metadataComment =
+          Object.keys(messageMetadata).length === 0
+            ? ''
+            : `<!-- geared-term-message-base64\n${Buffer.from(
+                JSON.stringify(messageMetadata),
+                'utf8'
+              ).toString('base64')}\n-->\n\n`;
+        return `## ${message.role}\n\n${metadataComment}${message.content.replace(/\n+$/u, '')}\n`;
+      })
     ].join('\n');
     await writeFile(join(this.directory, `${id}.md`), document, {
       encoding: 'utf8',

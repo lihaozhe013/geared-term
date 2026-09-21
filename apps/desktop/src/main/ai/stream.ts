@@ -120,15 +120,14 @@ export function mapResponseEvent(payload: unknown): AiStreamEvent | AiStreamEven
     return { kind: 'delta', text: value.delta };
   }
   if (
-    (value.type === 'response.reasoning_summary_text.delta' ||
+    ((value.type === 'response.reasoning_summary_text.delta' ||
       value.type === 'response.reasoning_summary_part.added') &&
-    typeof value.delta === 'string' ||
+      typeof value.delta === 'string') ||
     typeof value.part?.text === 'string'
   ) {
     return {
       kind: 'reasoning',
-      text:
-        typeof value.delta === 'string' ? value.delta : (value.part?.text as string)
+      text: typeof value.delta === 'string' ? value.delta : (value.part?.text as string)
     };
   }
   if (value.type === 'response.completed') {
@@ -151,8 +150,8 @@ export function mapResponseEvent(payload: unknown): AiStreamEvent | AiStreamEven
       });
     }
     if (Array.isArray(value.response?.output)) {
-      const allItems = value.response.output.filter(
-        (item): item is Record<string, unknown> => Boolean(item && typeof item === 'object')
+      const allItems = value.response.output.filter((item): item is Record<string, unknown> =>
+        Boolean(item && typeof item === 'object')
       );
       const items = allItems.filter((item) => {
         if (!item || typeof item !== 'object') return false;

@@ -443,8 +443,7 @@ export function AiConnectionsSection({ t }: { t: Translate }): React.JSX.Element
                             patchModel(index, {
                               responses: {
                                 ...model.responses,
-                                reasoningEffort: event.target
-                                  .value as AiResponsesReasoningEffort
+                                reasoningEffort: event.target.value as AiResponsesReasoningEffort
                               }
                             })
                           }

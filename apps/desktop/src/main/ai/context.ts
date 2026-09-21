@@ -66,7 +66,8 @@ export function buildAssistantContext(input: AssistantContextInput): AssistantCo
       systemBlocks.push(`[Environment notes]\n${input.environment.notes.trim().slice(0, 8192)}`);
     }
     if (input.environment.instructions.trim()) {
-      if (!categories.includes('environment-instructions')) categories.push('environment-instructions');
+      if (!categories.includes('environment-instructions'))
+        categories.push('environment-instructions');
       systemBlocks.push(
         `[Environment-specific instructions]\n${input.environment.instructions.trim().slice(0, 8192)}`
       );
@@ -90,7 +91,10 @@ export function buildAssistantContext(input: AssistantContextInput): AssistantCo
     categories,
     systemBytes: Buffer.byteLength(messages[0]?.content ?? '', 'utf8'),
     inputBytes: Buffer.byteLength(
-      messages.slice(1).map((message) => message.content).join('\n'),
+      messages
+        .slice(1)
+        .map((message) => message.content)
+        .join('\n'),
       'utf8'
     )
   };

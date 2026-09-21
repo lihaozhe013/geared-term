@@ -40,7 +40,14 @@ describe('environment probes', () => {
   });
 
   it('uses the requested PowerShell executable for Windows local probes', () => {
-    expect(buildProbeInvocation('local', 'win32', undefined, 'C:\\Program Files\\PowerShell\\7\\pwsh.exe')).toEqual({
+    expect(
+      buildProbeInvocation(
+        'local',
+        'win32',
+        undefined,
+        'C:\\Program Files\\PowerShell\\7\\pwsh.exe'
+      )
+    ).toEqual({
       command: 'C:\\Program Files\\PowerShell\\7\\pwsh.exe',
       args: ['-NoLogo', '-NoProfile', '-Command', expect.any(String)]
     });

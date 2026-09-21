@@ -63,9 +63,7 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps): React.J
         }}
       >
         <span>{item.label}</span>
-        {item.shortcut ? (
-          <span className="sftp-menu-shortcut">{item.shortcut}</span>
-        ) : null}
+        {item.shortcut ? <span className="sftp-menu-shortcut">{item.shortcut}</span> : null}
         {item.submenu ? (
           <span className="sftp-menu-caret">
             <ChevronRight size={13} aria-hidden="true" />

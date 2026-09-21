@@ -217,7 +217,9 @@ export function EnvironmentPanel({ target, onClose }: EnvironmentPanelProps): Re
       {error ? <p className="sftp-error">{error}</p> : null}
       <p className="muted">
         {verified ? 'Environment verified.' : 'Environment needs confirmation.'}
-        {detectedAt ? ` Last detected ${new Date(detectedAt).toLocaleString()}.` : ' Not detected yet.'}
+        {detectedAt
+          ? ` Last detected ${new Date(detectedAt).toLocaleString()}.`
+          : ' Not detected yet.'}
       </p>
       <dl className="environment-facts">
         {factLabels.map(([key, label]) => (

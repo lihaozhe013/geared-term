@@ -145,10 +145,7 @@ describe('application storage', () => {
       reasoningSummary: false,
       webSearch: true
     });
-    const endpointIdentity = normalizeEndpoint(
-      'https://api.example.test/v1',
-      'responses'
-    ).identity;
+    const endpointIdentity = normalizeEndpoint('https://api.example.test/v1', 'responses').identity;
     await storage.acceptAiEndpoint(responsesConnection!.id, endpointIdentity);
     expect(
       storage.aiConnectionsSnapshot().find((item) => item.id === responsesConnection!.id)

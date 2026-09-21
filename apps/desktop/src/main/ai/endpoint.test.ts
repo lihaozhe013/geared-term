@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildChatCompletionsPayload, buildResponsesPayload, normalizeEndpoint } from './endpoint';
-import {
-  mapChatCompletionEvent,
-  mapResponseEvent,
-  parseSseFrame,
-  splitSseBuffer
-} from './stream';
+import { mapChatCompletionEvent, mapResponseEvent, parseSseFrame, splitSseBuffer } from './stream';
 
 describe('AI endpoint safety', () => {
   it('normalizes HTTPS endpoints and rejects unsafe remote HTTP', () => {
@@ -87,16 +82,12 @@ describe('AI endpoint safety', () => {
 
   it('maps non-default Responses options and web search sources', () => {
     expect(
-      buildResponsesPayload(
-        'reasoning-model',
-        [{ role: 'user', content: 'research this' }],
-        {
-          reasoningEffort: 'high',
-          verbosity: 'low',
-          reasoningSummary: false,
-          webSearch: true
-        }
-      )
+      buildResponsesPayload('reasoning-model', [{ role: 'user', content: 'research this' }], {
+        reasoningEffort: 'high',
+        verbosity: 'low',
+        reasoningSummary: false,
+        webSearch: true
+      })
     ).toMatchObject({
       model: 'reasoning-model',
       stream: true,
@@ -117,12 +108,14 @@ describe('AI endpoint safety', () => {
         webSearch: false
       })
     ).toMatchObject({ reasoning: { summary: 'none' } });
-    expect(buildResponsesPayload('model', [{ role: 'user', content: 'hello' }], {
-      reasoningEffort: 'default',
-      verbosity: 'default',
-      reasoningSummary: false,
-      webSearch: false
-    }).reasoning).not.toHaveProperty('effort');
+    expect(
+      buildResponsesPayload('model', [{ role: 'user', content: 'hello' }], {
+        reasoningEffort: 'default',
+        verbosity: 'default',
+        reasoningSummary: false,
+        webSearch: false
+      }).reasoning
+    ).not.toHaveProperty('effort');
   });
 
   it('does not put Responses-only fields on Chat Completions payloads', () => {
@@ -177,7 +170,10 @@ describe('SSE parsing', () => {
       mapResponseEvent({
         type: 'response.web_search_call.completed',
         id: 'search-1',
-        action: { query: 'terminal security', sources: [{ url: 'https://example.com', title: 'Example' }] }
+        action: {
+          query: 'terminal security',
+          sources: [{ url: 'https://example.com', title: 'Example' }]
+        }
       })
     ).toEqual([
       {

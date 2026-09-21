@@ -39,7 +39,10 @@ export class EnvironmentManager {
     const kind = distribution ? 'wsl' : 'local';
     const targetKey = `${kind}:${details.sessionId}`;
     const legacyTargetKeys = distribution ? [`wsl:${distribution}`] : ['local'];
-    this.logger.info('assistant', 'Environment probe requested', { kind, sessionId: details.sessionId });
+    this.logger.info('assistant', 'Environment probe requested', {
+      kind,
+      sessionId: details.sessionId
+    });
     void probeEnvironment(kind, distribution, process.platform, {
       shell: details.shell,
       cwd: details.cwd,
