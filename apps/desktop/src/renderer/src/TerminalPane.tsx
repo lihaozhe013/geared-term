@@ -285,9 +285,11 @@ export function TerminalPane({
     terminal.writeln(
       isSshRequest(request)
         ? isSavedSshRequest(request)
-          ? 'Connecting to saved SSH profile...'
-          : `Connecting to ${request.username}@${request.host}...`
-        : 'Starting local terminal...'
+          ? translate(settings.language, 'termConnectingSaved')
+          : translate(settings.language, 'termConnecting')
+              .replace('{user}', request.username)
+              .replace('{host}', request.host)
+        : translate(settings.language, 'termStarting')
     );
     const onMessage = (rawMessage: unknown): void => {
       const result = TerminalPortMessageSchema.safeParse(rawMessage);
@@ -582,7 +584,7 @@ export function TerminalPane({
           <input
             ref={searchInputRef}
             value={searchText}
-            placeholder="Search terminal"
+            placeholder={translate(settings.language, 'shortcutTerminalSearch')}
             aria-label="Search terminal"
             spellCheck={false}
             onChange={(event) => {

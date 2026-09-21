@@ -20,7 +20,7 @@ export function SecurityVaultSection({ t }: { t: Translate }): React.JSX.Element
       .getVaultStatus()
       .then(setVault)
       .catch((reason: unknown) =>
-        setError(reason instanceof Error ? reason.message : 'Unable to read vault status')
+        setError(reason instanceof Error ? reason.message : t('errVaultStatus'))
       );
     void window.geared
       .getAutoUnlockStatus()
@@ -37,7 +37,7 @@ export function SecurityVaultSection({ t }: { t: Translate }): React.JSX.Element
       setVault(next);
       setStatus(next.unlocked ? t('vaultUnlocked') : t('vaultLocked'));
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Vault operation failed');
+      setError(reason instanceof Error ? reason.message : t('errVaultOperation'));
     } finally {
       setBusy(false);
     }
@@ -183,7 +183,7 @@ export function SecurityVaultSection({ t }: { t: Translate }): React.JSX.Element
                 void action
                   .then(setAutoUnlock)
                   .catch((reason: unknown) =>
-                    setError(reason instanceof Error ? reason.message : 'Vault operation failed')
+                    setError(reason instanceof Error ? reason.message : t('errVaultOperation'))
                   )
                   .finally(() => setBusy(false));
               }}

@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import {
   mergeCommentParts,
   parseCommandBlock,
@@ -54,6 +54,15 @@ type ConsentRequest = {
   endpoint: string;
   identity: string;
   categories: string[];
+};
+
+const consentCategoryLabels: Record<string, Parameters<typeof translate>[1]> = {
+  'system-prompt': 'consentCatSystemPrompt',
+  'global-instructions': 'consentCatGlobalInstructions',
+  'environment-facts': 'consentCatEnvironmentFacts',
+  'environment-instructions': 'consentCatEnvironmentInstructions',
+  'conversation-history': 'consentCatConversationHistory',
+  'current-prompt': 'consentCatCurrentPrompt'
 };
 
 type ActivityStep = {
@@ -201,14 +210,20 @@ function CommandCard({
   targetSessionId,
   allowRiskyRun,
   disabled,
-  onError
+  onError,
+  language
 }: {
   candidate: CommandCandidate;
   targetSessionId?: string;
   allowRiskyRun: boolean;
   disabled: boolean;
   onError: (message: string) => void;
+  language: SettingsRecord['language'];
 }): React.JSX.Element {
+  const t = useCallback(
+    (key: Parameters<typeof translate>[1]): string => translate(language, key),
+    [language]
+  );
   const insertAllowed = Boolean(targetSessionId) && candidate.stability === 'stable';
   const runAllowed =
     Boolean(targetSessionId) &&
@@ -220,13 +235,13 @@ function CommandCard({
     try {
       await navigator.clipboard.writeText(candidate.exactText);
     } catch (reason) {
-      onError(reason instanceof Error ? reason.message : 'Unable to copy command');
+      onError(reason instanceof Error ? reason.message : t('errCopyCommand'));
     }
   };
 
   const execute = async (action: 'insert' | 'run'): Promise<void> => {
     if (!targetSessionId) {
-      onError('Select a visible terminal session before using this action.');
+      onError(t('errSelectVisibleTerminal'));
       return;
     }
     try {
@@ -238,7 +253,7 @@ function CommandCard({
         revision: candidate.revision
       });
     } catch (reason) {
-      onError(reason instanceof Error ? reason.message : 'Unable to submit command');
+      onError(reason instanceof Error ? reason.message : t('errSubmitCommand'));
     }
   };
 
@@ -246,7 +261,7 @@ function CommandCard({
     <div className="command-card">
       <div className="command-card-header">
         <small>
-          {candidate.shell} · {candidate.confidence} confidence
+          {candidate.shell} · {t('confidenceValue').replace('{value}', candidate.confidence)}
         </small>
         <small>
           {candidate.stability} · {candidate.risk}
@@ -260,7 +275,7 @@ function CommandCard({
           onClick={() => void copy()}
           disabled={disabled}
         >
-          <Copy size={12} aria-hidden="true" /> Copy
+          <Copy size={12} aria-hidden="true" /> {t('terminalCopy')}
         </button>
         <button
           type="button"
@@ -271,7 +286,7 @@ function CommandCard({
             insertAllowed ? 'Insert without submitting' : 'A stable visible terminal is required'
           }
         >
-          <SquareTerminal size={12} aria-hidden="true" /> Insert
+          <SquareTerminal size={12} aria-hidden="true" /> {t('cmdInsert')}
         </button>
         <button
           type="button"
@@ -284,7 +299,7 @@ function CommandCard({
               : 'Run is disabled until a stable shell block is available'
           }
         >
-          <SquarePlus size={12} aria-hidden="true" /> Run
+          <SquarePlus size={12} aria-hidden="true" /> {t('cmdRun')}
         </button>
       </div>
     </div>
@@ -329,6 +344,15 @@ export function AssistantPanel({
   const [showTimeline, setShowTimeline] = useState(true);
   const [consentRequest, setConsentRequest] = useState<ConsentRequest | null>(null);
   const [, setTick] = useState(0);
+  const t = useCallback(
+    (key: Parameters<typeof translate>[1]): string => translate(language, key),
+    [language]
+  );
+  const ta = useCallback(
+    (key: Parameters<typeof translate>[1], values: Record<string, string>): string =>
+      t(key).replace(/\{(\w+)\}/gu, (_match, name: string) => values[name] ?? ''),
+    [t]
+  );
   const streamRef = useRef<{ cancel: () => void } | null>(null);
   const messagesRef = useRef<Message[]>([]);
   messagesRef.current = messages;
@@ -370,7 +394,7 @@ export function AssistantPanel({
         }
       })
       .catch((reason: unknown) =>
-        setError(reason instanceof Error ? reason.message : 'Unable to load AI connections')
+        setError(reason instanceof Error ? reason.message : t('errLoadConnections'))
       );
     return () => streamRef.current?.cancel();
   }, []);
@@ -403,7 +427,7 @@ export function AssistantPanel({
         )
       )
       .catch((reason: unknown) =>
-        setError(reason instanceof Error ? reason.message : 'Unable to load AI environment context')
+        setError(reason instanceof Error ? reason.message : t('errLoadEnvironmentContext'))
       );
   }, [environmentTargetKey]);
 
@@ -417,7 +441,7 @@ export function AssistantPanel({
   useEffect(() => {
     if (!pendingHistoryId) return;
     if (streaming) {
-      setError('History cannot be loaded while a request is active.');
+      setError(t('errHistoryWhileActive'));
       onPendingHistoryConsumed?.();
       return;
     }
@@ -452,7 +476,7 @@ export function AssistantPanel({
         setError(null);
       })
       .catch((reason: unknown) =>
-        setError(reason instanceof Error ? reason.message : 'Unable to load conversation')
+        setError(reason instanceof Error ? reason.message : t('errLoadConversation'))
       )
       .finally(() => onPendingHistoryConsumed?.());
   }, [pendingHistoryId, streaming, onPendingHistoryConsumed]);
@@ -725,7 +749,7 @@ export function AssistantPanel({
 
   const openHistory = (): void => {
     if (streaming) {
-      setError('History cannot be loaded while a request is active.');
+      setError(t('errHistoryWhileActive'));
       return;
     }
     void window.geared.openHistoryWindow();
@@ -748,7 +772,7 @@ export function AssistantPanel({
       setConsentRequest(null);
       startStream(retry);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to save endpoint consent');
+      setError(reason instanceof Error ? reason.message : t('errSaveConsent'));
     }
   };
 
@@ -771,7 +795,7 @@ export function AssistantPanel({
       setStreaming(false);
       setReasoningLive(false);
       closeRunningActivities('failed');
-      setError(reason instanceof Error ? reason.message : 'Unable to start AI stream');
+      setError(reason instanceof Error ? reason.message : t('errStartStream'));
     }
   };
 
@@ -848,7 +872,7 @@ export function AssistantPanel({
       <div className="assistant-header">
         <Bot size={16} aria-hidden="true" className="assistant-header-icon" />
         <div className="assistant-header-titles">
-          <span className="assistant-header-title">AI Assistant</span>
+          <span className="assistant-header-title">{t('panelAssistant')}</span>
           {sessionLabel ? <span className="assistant-header-subtitle">{sessionLabel}</span> : null}
         </div>
         <div className="assistant-header-actions">
@@ -901,7 +925,7 @@ export function AssistantPanel({
           onClick={() => setModelMenuOpen((open) => !open)}
           title="Switch model for this chat"
         >
-          <span className="assistant-picker-label">{model || 'No model selected'}</span>
+          <span className="assistant-picker-label">{model || t('assistantNoModelSelected')}</span>
           <ChevronDown size={13} aria-hidden="true" />
         </button>
         {modelMenuOpen ? (
@@ -909,11 +933,11 @@ export function AssistantPanel({
             <div className="assistant-menu-backdrop" onClick={() => setModelMenuOpen(false)} />
             <div className="assistant-picker-menu" role="menu">
               {modelOptions.length === 0 ? (
-                <p className="settings-hint">No models on this connection yet.</p>
+                <p className="settings-hint">{t('assistantNoModels')}</p>
               ) : null}
               {connections.length > 1 ? (
                 <>
-                  <p className="assistant-menu-heading">Connections</p>
+                  <p className="assistant-menu-heading">{t('connections')}</p>
                   {connections.map((connection) => (
                     <button
                       type="button"
@@ -932,7 +956,9 @@ export function AssistantPanel({
                   <div className="assistant-menu-separator" />
                 </>
               ) : null}
-              {connections.length > 1 ? <p className="assistant-menu-heading">Models</p> : null}
+              {connections.length > 1 ? (
+                <p className="assistant-menu-heading">{t('models')}</p>
+              ) : null}
               {modelOptions.map((option) => (
                 <button
                   type="button"
@@ -956,7 +982,7 @@ export function AssistantPanel({
                   void window.geared.openSettings('ai-connections');
                 }}
               >
-                Manage connections…
+                {t('manageConnectionsEllipsis')}
               </button>
             </div>
           </>
@@ -1012,31 +1038,33 @@ export function AssistantPanel({
       >
         {attachedEnvironment ? (
           <div className="assistant-context-chip">
-            Environment context attached · {attachedEnvironment.facts.os ?? 'unknown OS'} ·{' '}
-            {attachedEnvironment.facts.hostname ?? 'unknown host'}
+            {t('environmentContextAttached')} · {attachedEnvironment.facts.os ?? t('unknownOs')} ·{' '}
+            {attachedEnvironment.facts.hostname ?? t('unknownHost')}
           </div>
         ) : null}
         {messages.length === 0 ? (
           <div className="assistant-empty">
             <Bot size={24} aria-hidden="true" />
-            <p>Ask about this terminal</p>
+            <p>{t('assistantEmptyPrompt')}</p>
           </div>
         ) : null}
         {messages.map((message, index) =>
           message.role === 'user' ? (
             <div className="assistant-message user" key={`user-${index}`}>
               <div className="assistant-message-label">
-                <ArrowUp size={12} aria-hidden="true" /> You
+                <ArrowUp size={12} aria-hidden="true" /> {t('you')}
               </div>
               <p>{message.content}</p>
               <div className="assistant-meta-row">
-                <MetaChip>~{estimateTokens(message.content)} estimated tokens</MetaChip>
+                <MetaChip>
+                  {ta('estimatedTokens', { count: String(estimateTokens(message.content)) })}
+                </MetaChip>
               </div>
             </div>
           ) : (
             <div className="assistant-message assistant" key={`assistant-${index}`}>
               <div className="assistant-message-label">
-                <Bot size={12} aria-hidden="true" /> AI Assistant
+                <Bot size={12} aria-hidden="true" /> {t('panelAssistant')}
                 {message.model ? (
                   <span className="assistant-message-model">{message.model}</span>
                 ) : null}
@@ -1089,7 +1117,7 @@ export function AssistantPanel({
                   </div>
                 ) : (
                   <details className="assistant-reasoning">
-                    <summary>Reasoning summary</summary>
+                    <summary>{t('reasoningSummary')}</summary>
                     <p>{reasoning}</p>
                   </details>
                 )
@@ -1118,6 +1146,7 @@ export function AssistantPanel({
                           allowRiskyRun={allowRiskyRun}
                           disabled={streaming}
                           onError={handleCommandError}
+                          language={language}
                         />
                       ))}
                     </Fragment>
@@ -1128,7 +1157,7 @@ export function AssistantPanel({
               ) : null}
               {sources.length > 0 && index === messages.length - 1 ? (
                 <div className="assistant-sources">
-                  <span className="assistant-sources-label">Sources</span>
+                  <span className="assistant-sources-label">{t('sources')}</span>
                   <div className="chip-row">
                     {sources.map((source) => (
                       <a
@@ -1149,19 +1178,23 @@ export function AssistantPanel({
                 <div className="assistant-meta-row">
                   {message.model ? <MetaChip>{message.model}</MetaChip> : null}
                   {message.usage?.input !== undefined ? (
-                    <MetaChip>in {message.usage.input}</MetaChip>
+                    <MetaChip>{ta('usageIn', { count: String(message.usage.input) })}</MetaChip>
                   ) : null}
                   {message.usage?.output !== undefined ? (
-                    <MetaChip>out {message.usage.output}</MetaChip>
+                    <MetaChip>{ta('usageOut', { count: String(message.usage.output) })}</MetaChip>
                   ) : null}
                   {message.usage?.reasoning !== undefined ? (
-                    <MetaChip>reasoning {message.usage.reasoning}</MetaChip>
+                    <MetaChip>
+                      {ta('usageReasoning', { count: String(message.usage.reasoning) })}
+                    </MetaChip>
                   ) : null}
                   {message.durationMs !== undefined ? (
                     <MetaChip>{formatElapsed(message.durationMs)}</MetaChip>
                   ) : null}
                   {!message.usage ? (
-                    <MetaChip>~{estimateTokens(message.content)} estimated tokens</MetaChip>
+                    <MetaChip>
+                      {ta('estimatedTokens', { count: String(estimateTokens(message.content)) })}
+                    </MetaChip>
                   ) : null}
                 </div>
               ) : null}
@@ -1185,13 +1218,17 @@ export function AssistantPanel({
       {consentRequest ? (
         <div className="assistant-consent-card" role="dialog" aria-modal="true">
           <div className="assistant-error-head">
-            <span>Allow AI context to be sent?</span>
+            <span>{t('consentTitle')}</span>
           </div>
-          <p>This endpoint has not been approved for this connection:</p>
+          <p>{t('consentEndpointNotApproved')}</p>
           <code>{consentRequest.endpoint}</code>
           <ul>
             {consentRequest.categories.map((category) => (
-              <li key={category}>{category.replaceAll('-', ' ')}</li>
+              <li key={category}>
+                {consentCategoryLabels[category]
+                  ? t(consentCategoryLabels[category])
+                  : category.replaceAll('-', ' ')}
+              </li>
             ))}
           </ul>
           <div className="command-card-actions">
@@ -1200,17 +1237,17 @@ export function AssistantPanel({
               className="primary-button settings-apply"
               onClick={() => void acceptConsent()}
             >
-              Allow and send
+              {t('consentAllow')}
             </button>
             <button
               type="button"
               className="toolbar-button"
               onClick={() => {
                 setConsentRequest(null);
-                setError('Endpoint consent was not granted.');
+                setError(t('consentDeclined'));
               }}
             >
-              Cancel
+              {t('cancel')}
             </button>
           </div>
         </div>
@@ -1219,7 +1256,7 @@ export function AssistantPanel({
       {error ? (
         <div className="assistant-error-card" role="alert">
           <div className="assistant-error-head">
-            <span>Request failed</span>
+            <span>{t('requestFailed')}</span>
             <button
               type="button"
               className="icon-button"
@@ -1251,7 +1288,7 @@ export function AssistantPanel({
                 send();
               }
             }}
-            placeholder="Ask about this terminal..."
+            placeholder={t('assistantComposerPlaceholder')}
             rows={1}
           />
           {streaming ? (

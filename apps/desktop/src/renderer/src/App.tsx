@@ -22,6 +22,8 @@ import {
   SquareTerminal
 } from 'lucide-react';
 import { applyPalette, applyTypography, resolvePalette } from './themes';
+import { translate } from './i18n';
+import type { MessageKey } from './i18n';
 import { AssistantPanel } from './AssistantPanel';
 import { EnvironmentPanel } from './EnvironmentPanel';
 import { ProfileEditor } from './ProfileEditor';
@@ -74,13 +76,11 @@ const defaultUiState: UiStateRecord = {
   rightPanelWidth: 360
 };
 
-function createLocalTab(
-  term: LocalTerminalRequest['term'] = defaultSettings.defaultTerm
-): TerminalTab {
+function createLocalTab(term: LocalTerminalRequest['term'], name: string): TerminalTab {
   const id = crypto.randomUUID();
   return {
     id,
-    name: 'Local Shell',
+    name,
     status: 'starting',
     request: {
       sessionId: id,
@@ -210,6 +210,16 @@ export function App(): React.JSX.Element {
   const [vaultStatus, setVaultStatus] = useState<VaultStatus | null>(null);
   const sftpControls = useRef(new Map<string, SftpTerminalControl>());
 
+  const t = useCallback(
+    (key: MessageKey): string => translate(settings.language, key),
+    [settings.language]
+  );
+  const ta = useCallback(
+    (key: MessageKey, values: Record<string, string>): string =>
+      t(key).replace(/\{(\w+)\}/gu, (_match, name: string) => values[name] ?? ''),
+    [t]
+  );
+
   useEffect(() => {
     void Promise.all([
       window.geared.getAppInfo(),
@@ -224,7 +234,11 @@ export function App(): React.JSX.Element {
         setSettings(savedSettings);
       })
       .catch((reason: unknown) =>
-        setError(reason instanceof Error ? reason.message : 'Unable to read application state')
+        setError(
+          reason instanceof Error
+            ? reason.message
+            : translate(defaultSettings.language, 'errReadState')
+        )
       );
   }, []);
 
@@ -290,22 +304,22 @@ export function App(): React.JSX.Element {
       setWslDistributions(await window.geared.discoverWsl());
       setError(null);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to discover WSL distributions');
+      setError(reason instanceof Error ? reason.message : t('errDiscoverWsl'));
     } finally {
       setWslLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (info?.platform === 'win32') void discoverWsl();
   }, [discoverWsl, info?.platform]);
 
   const addLocalTab = useCallback((): void => {
-    const tab = createLocalTab(settings.defaultTerm);
+    const tab = createLocalTab(settings.defaultTerm, t('localShell'));
     setTabs((current) => [...current, tab]);
     setActiveTabId(tab.id);
     setError(null);
-  }, [settings.defaultTerm]);
+  }, [settings.defaultTerm, t]);
 
   const closeTab = useCallback((id: string): void => {
     setTabs((current) => {
@@ -319,34 +333,33 @@ export function App(): React.JSX.Element {
     });
   }, []);
 
-  const openProfile = useCallback((profile: SessionProfileRecord): void => {
-    const request = profileToRequest(profile);
-    if (!request) {
-      setError(
-        profile.kind === 'ssh'
-          ? 'This saved SSH profile has no in-memory credential. Unlock the vault before connecting.'
-          : 'This saved profile is incomplete and cannot be opened.'
-      );
-      return;
-    }
-    const tab: TerminalTab = {
-      id: request.sessionId,
-      name: profile.name,
-      request,
-      status: 'starting'
-    };
-    setTabs((current) => [...current, tab]);
-    setActiveTabId(tab.id);
-    setError(null);
-  }, []);
+  const openProfile = useCallback(
+    (profile: SessionProfileRecord): void => {
+      const request = profileToRequest(profile);
+      if (!request) {
+        setError(profile.kind === 'ssh' ? t('profileNoCredential') : t('profileIncomplete'));
+        return;
+      }
+      const tab: TerminalTab = {
+        id: request.sessionId,
+        name: profile.name,
+        request,
+        status: 'starting'
+      };
+      setTabs((current) => [...current, tab]);
+      setActiveTabId(tab.id);
+      setError(null);
+    },
+    [t]
+  );
 
   const toggleSidebar = useCallback((): void => {
     const next = { ...uiState, sidebarCollapsed: !uiState.sidebarCollapsed };
     setUiState(next);
     void window.geared.saveUiState(next).catch((reason: unknown) => {
-      setError(reason instanceof Error ? reason.message : 'Unable to save UI state');
+      setError(reason instanceof Error ? reason.message : t('errSaveUiState'));
     });
-  }, [uiState]);
+  }, [uiState, t]);
 
   const [resizingPanel, setResizingPanel] = useState<'sidebar' | 'right' | null>(null);
   const dragRef = useRef<{ side: 'sidebar' | 'right'; startX: number; startWidth: number } | null>(
@@ -402,9 +415,9 @@ export function App(): React.JSX.Element {
     };
     setUiState(next);
     void window.geared.saveUiState(next).catch((reason: unknown) => {
-      setError(reason instanceof Error ? reason.message : 'Unable to save UI state');
+      setError(reason instanceof Error ? reason.message : t('errSaveUiState'));
     });
-  }, [uiState]);
+  }, [uiState, t]);
 
   // Once opened, the assistant panel stays mounted (hidden via CSS) so an
   // in-flight conversation and its streaming state survive panel switches.
@@ -431,18 +444,21 @@ export function App(): React.JSX.Element {
     setError(null);
   }, []);
 
-  const deleteProfileRecord = useCallback((profile: SessionProfileRecord): void => {
-    void window.geared
-      .deleteProfile(profile.id)
-      .then(setProfiles)
-      .catch((reason: unknown) =>
-        setError(reason instanceof Error ? reason.message : 'Unable to delete session')
-      );
-  }, []);
+  const deleteProfileRecord = useCallback(
+    (profile: SessionProfileRecord): void => {
+      void window.geared
+        .deleteProfile(profile.id)
+        .then(setProfiles)
+        .catch((reason: unknown) =>
+          setError(reason instanceof Error ? reason.message : t('errDeleteSession'))
+        );
+    },
+    [t]
+  );
 
   const openWslDistribution = useCallback(
     (name: string): void => {
-      if (!window.confirm(`Open the WSL distribution "${name}" in a new terminal?`)) return;
+      if (!window.confirm(ta('confirmOpenWsl', { name }))) return;
       const request: LocalTerminalRequest = {
         sessionId: crypto.randomUUID(),
         shell: 'wsl.exe',
@@ -460,7 +476,7 @@ export function App(): React.JSX.Element {
       setTabs((current) => [...current, tab]);
       setActiveTabId(tab.id);
     },
-    [settings.defaultTerm]
+    [settings.defaultTerm, ta]
   );
 
   const openQuickSsh = useCallback((request: SshTerminalRequest, name: string): void => {
@@ -473,7 +489,7 @@ export function App(): React.JSX.Element {
 
   const toggleSftp = useCallback((): void => {
     if (!supportsSftp(activeTab?.request)) {
-      setError('SFTP is available only for an active SSH session.');
+      setError(t('sftpRequiresSsh'));
       return;
     }
     const next: UiStateRecord = {
@@ -483,14 +499,14 @@ export function App(): React.JSX.Element {
     };
     setUiState(next);
     void window.geared.saveUiState(next).catch((reason: unknown) => {
-      setError(reason instanceof Error ? reason.message : 'Unable to save UI state');
+      setError(reason instanceof Error ? reason.message : t('errSaveUiState'));
     });
-  }, [activeTab?.request, uiState]);
+  }, [activeTab?.request, uiState, t]);
 
   const toggleEnvironment = useCallback((): void => {
     const target = environmentTarget(activeTab?.request, profiles);
     if (!target) {
-      setError('Environment detection is unavailable for this session.');
+      setError(t('envUnavailable'));
       return;
     }
     const next: UiStateRecord = {
@@ -500,19 +516,22 @@ export function App(): React.JSX.Element {
     };
     setUiState(next);
     void window.geared.saveUiState(next).catch((reason: unknown) => {
-      setError(reason instanceof Error ? reason.message : 'Unable to save UI state');
+      setError(reason instanceof Error ? reason.message : t('errSaveUiState'));
     });
-  }, [activeTab?.request, uiState]);
+  }, [activeTab?.request, uiState, t]);
 
-  const saveSettings = useCallback(async (nextSettings: SettingsRecord): Promise<void> => {
-    try {
-      setSettings(await window.geared.saveSettings(nextSettings));
-      setError(null);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to save settings');
-      throw reason;
-    }
-  }, []);
+  const saveSettings = useCallback(
+    async (nextSettings: SettingsRecord): Promise<void> => {
+      try {
+        setSettings(await window.geared.saveSettings(nextSettings));
+        setError(null);
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : t('errSaveSettings'));
+        throw reason;
+      }
+    },
+    [t]
+  );
 
   const cycleTab = useCallback((direction: 1 | -1): void => {
     setTabs((current) => {
@@ -666,15 +685,15 @@ export function App(): React.JSX.Element {
       const accepted = window.confirm(
         `${message.host}:${message.port}\n\nSHA-256 fingerprint:\n${message.fingerprint}\n\n${
           message.previousFingerprint
-            ? `The host key changed from ${message.previousFingerprint}. `
-            : 'This host is not trusted yet. '
-        }Trust this key for this connection?`
+            ? ta('hostKeyChangedFrom', { fingerprint: message.previousFingerprint })
+            : t('hostNotTrusted')
+        }${t('trustKeyPrompt')}`
       );
       if ('decideHostKey' in client) {
         client.decideHostKey(accepted ? 'approve' : 'reject');
       }
     },
-    []
+    [t, ta]
   );
 
   const rightPanelOpen = Boolean(uiState.rightPanel && !uiState.rightPanelCollapsed);
@@ -707,6 +726,7 @@ export function App(): React.JSX.Element {
         {!uiState.sidebarCollapsed ? (
           <Sidebar
             platform={info?.platform}
+            language={settings.language}
             profiles={profiles}
             wslDistributions={wslDistributions}
             wslLoading={wslLoading}
@@ -787,12 +807,10 @@ export function App(): React.JSX.Element {
                 <span className="empty-icon" aria-hidden="true">
                   &gt;_
                 </span>
-                <p>No open terminals</p>
-                <small>
-                  Open a local shell or start a session from the sidebar to get started.
-                </small>
+                <p>{t('noTerminals')}</p>
+                <small>{t('emptyTerminalHint')}</small>
                 <button type="button" className="empty-state-action" onClick={addLocalTab}>
-                  New local terminal
+                  {t('shortcutTabNew')}
                 </button>
               </div>
             ) : null}
@@ -826,7 +844,7 @@ export function App(): React.JSX.Element {
                 aria-selected={uiState.rightPanel === 'assistant'}
                 onClick={toggleAssistant}
               >
-                <Bot size={13} aria-hidden="true" /> AI Assistant
+                <Bot size={13} aria-hidden="true" /> {t('panelAssistant')}
               </button>
               <button
                 type="button"
@@ -841,7 +859,7 @@ export function App(): React.JSX.Element {
                 }
                 onClick={toggleEnvironment}
               >
-                <SquareTerminal size={13} aria-hidden="true" /> Environment
+                <SquareTerminal size={13} aria-hidden="true" /> {t('panelEnvironment')}
               </button>
               <span className="right-panel-spacer" />
               <button
@@ -896,6 +914,7 @@ export function App(): React.JSX.Element {
             environmentTarget(activeTab.request, profiles) ? (
               <EnvironmentPanel
                 target={environmentTarget(activeTab.request, profiles)!}
+                language={settings.language}
                 onClose={toggleEnvironment}
               />
             ) : null}
@@ -949,6 +968,7 @@ export function App(): React.JSX.Element {
           key={editingProfile?.id ?? 'new-profile'}
           profile={editingProfile}
           defaultTerm={settings.defaultTerm}
+          language={settings.language}
           onSaved={setProfiles}
           onError={setError}
           onClose={() => setShowProfileEditor(false)}
@@ -958,6 +978,7 @@ export function App(): React.JSX.Element {
       {showQuickSsh ? (
         <QuickSshDialog
           defaultTerm={settings.defaultTerm}
+          language={settings.language}
           onConnect={openQuickSsh}
           onClose={() => setShowQuickSsh(false)}
         />

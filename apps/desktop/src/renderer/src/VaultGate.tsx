@@ -44,7 +44,7 @@ export function VaultGate({ status, language, onStatusChange }: VaultGateProps):
         setConfirmPassword('');
       })
       .catch((reason: unknown) => {
-        setError(reason instanceof Error ? reason.message : 'Vault operation failed');
+        setError(reason instanceof Error ? reason.message : t('errVaultOperation'));
       })
       .finally(() => setBusy(false));
   };

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { EnvironmentFacts, EnvironmentRecord } from '@geared-term/protocol';
+import type { EnvironmentFacts, EnvironmentRecord, SettingsRecord } from '@geared-term/protocol';
+import { translate } from './i18n';
+import type { MessageKey } from './i18n';
 
 type EnvironmentTarget = {
   kind: 'local' | 'wsl' | 'ssh';
@@ -12,21 +14,27 @@ type EnvironmentTarget = {
 
 type EnvironmentPanelProps = {
   target: EnvironmentTarget;
+  language: SettingsRecord['language'];
   onClose: () => void;
 };
 
-const factLabels: Array<[keyof EnvironmentFacts, string]> = [
-  ['os', 'OS'],
-  ['distribution', 'Distribution'],
-  ['kernel', 'Kernel'],
-  ['architecture', 'Architecture'],
-  ['shell', 'Shell'],
-  ['shellVersion', 'Shell version'],
-  ['user', 'User'],
-  ['hostname', 'Hostname']
+const factLabels: Array<[keyof EnvironmentFacts, MessageKey]> = [
+  ['os', 'factOs'],
+  ['distribution', 'factDistribution'],
+  ['kernel', 'factKernel'],
+  ['architecture', 'factArchitecture'],
+  ['shell', 'factShell'],
+  ['shellVersion', 'factShellVersion'],
+  ['user', 'factUser'],
+  ['hostname', 'factHostname']
 ];
 
-export function EnvironmentPanel({ target, onClose }: EnvironmentPanelProps): React.JSX.Element {
+export function EnvironmentPanel({
+  target,
+  language,
+  onClose
+}: EnvironmentPanelProps): React.JSX.Element {
+  const t = useCallback((key: MessageKey): string => translate(language, key), [language]);
   const [records, setRecords] = useState<EnvironmentRecord[]>([]);
   const [facts, setFacts] = useState<EnvironmentFacts>({});
   const [notes, setNotes] = useState('');
@@ -70,9 +78,9 @@ export function EnvironmentPanel({ target, onClose }: EnvironmentPanelProps): Re
       }
       setError(null);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to load environment context');
+      setError(reason instanceof Error ? reason.message : t('errLoadEnvironment'));
     }
-  }, [matchesTarget, target.targetKey]);
+  }, [matchesTarget, t, target.targetKey]);
 
   useEffect(() => {
     void load();
@@ -97,7 +105,7 @@ export function EnvironmentPanel({ target, onClose }: EnvironmentPanelProps): Re
 
   const detect = async (): Promise<void> => {
     if (target.kind === 'ssh') {
-      setError('SSH environment detection runs automatically when the session is ready.');
+      setError(t('envSshAutoDetect'));
       return;
     }
     setLoading(true);
@@ -113,7 +121,7 @@ export function EnvironmentPanel({ target, onClose }: EnvironmentPanelProps): Re
       setDetectedAt(new Date().toISOString());
       setError(null);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Environment detection failed');
+      setError(reason instanceof Error ? reason.message : t('errEnvironmentDetect'));
     } finally {
       setLoading(false);
     }
@@ -138,7 +146,7 @@ export function EnvironmentPanel({ target, onClose }: EnvironmentPanelProps): Re
       setRecordId(next?.id);
       setError(null);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to save environment context');
+      setError(reason instanceof Error ? reason.message : t('errSaveEnvironment'));
     } finally {
       setLoading(false);
     }
@@ -158,7 +166,7 @@ export function EnvironmentPanel({ target, onClose }: EnvironmentPanelProps): Re
       setDetectedAt(null);
       setError(null);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to delete environment context');
+      setError(reason instanceof Error ? reason.message : t('errDeleteEnvironment'));
     } finally {
       setLoading(false);
     }
@@ -168,13 +176,13 @@ export function EnvironmentPanel({ target, onClose }: EnvironmentPanelProps): Re
     <aside className="environment-panel" aria-label="Environment context">
       <div className="environment-header">
         <div>
-          <p className="section-label">Environment</p>
+          <p className="section-label">{t('envTitle')}</p>
           <h2>
             {target.kind === 'wsl'
               ? target.distribution
               : target.kind === 'ssh'
-                ? 'SSH host'
-                : 'Local host'}
+                ? t('envSshHost')
+                : t('envLocalHost')}
           </h2>
         </div>
         <button
@@ -193,7 +201,7 @@ export function EnvironmentPanel({ target, onClose }: EnvironmentPanelProps): Re
           onClick={() => void detect()}
           disabled={loading}
         >
-          {loading ? '…' : 'Detect'}
+          {loading ? '…' : t('envDetect')}
         </button>
         <button
           type="button"
@@ -201,7 +209,7 @@ export function EnvironmentPanel({ target, onClose }: EnvironmentPanelProps): Re
           onClick={() => void save()}
           disabled={loading}
         >
-          Save context
+          {t('envSaveContext')}
         </button>
         {current ? (
           <button
@@ -210,16 +218,16 @@ export function EnvironmentPanel({ target, onClose }: EnvironmentPanelProps): Re
             onClick={() => void remove()}
             disabled={loading}
           >
-            Delete
+            {t('delete')}
           </button>
         ) : null}
       </div>
       {error ? <p className="sftp-error">{error}</p> : null}
       <p className="muted">
-        {verified ? 'Environment verified.' : 'Environment needs confirmation.'}
+        {verified ? t('envVerified') : t('envNeedsConfirmation')}
         {detectedAt
-          ? ` Last detected ${new Date(detectedAt).toLocaleString()}.`
-          : ' Not detected yet.'}
+          ? ` ${t('envLastDetected').replace('{time}', new Date(detectedAt).toLocaleString())}`
+          : ` ${t('envNeverDetected')}`}
       </p>
       <dl className="environment-facts">
         {factLabels.map(([key, label]) => (
@@ -230,11 +238,11 @@ export function EnvironmentPanel({ target, onClose }: EnvironmentPanelProps): Re
         ))}
       </dl>
       <label className="environment-field">
-        Notes
+        {t('envNotes')}
         <textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={3} />
       </label>
       <label className="environment-field">
-        Environment instructions
+        {t('envInstructions')}
         <textarea
           value={instructions}
           onChange={(event) => setInstructions(event.target.value)}
@@ -247,7 +255,7 @@ export function EnvironmentPanel({ target, onClose }: EnvironmentPanelProps): Re
           checked={attachToAi}
           onChange={(event) => setAttachToAi(event.target.checked)}
         />
-        <span>Attach this context to AI requests</span>
+        <span>{t('envAttach')}</span>
       </label>
       {!verified && current ? (
         <button
@@ -259,7 +267,7 @@ export function EnvironmentPanel({ target, onClose }: EnvironmentPanelProps): Re
           }}
           disabled={loading}
         >
-          Confirm detected facts
+          {t('envConfirmFacts')}
         </button>
       ) : null}
     </aside>

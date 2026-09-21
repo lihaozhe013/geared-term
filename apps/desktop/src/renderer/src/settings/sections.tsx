@@ -173,7 +173,7 @@ export function AppearanceSection({
           className="settings-input"
           value={draft.uiFontFamily}
           onChange={(event) => update('uiFontFamily', event.target.value.slice(0, 256))}
-          placeholder="system default"
+          placeholder={t('placeholderSystemDefault')}
           spellCheck={false}
         />
       </Row>

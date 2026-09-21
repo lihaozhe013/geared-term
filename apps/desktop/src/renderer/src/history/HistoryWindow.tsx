@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type {
   AiHistoryLoadResult,
   AiHistorySummary,
@@ -8,14 +8,20 @@ import type {
 import { FolderOpen, RefreshCw, Send, Trash2, X } from 'lucide-react';
 import { MarkdownView } from '../assistant/MarkdownView';
 import { applyPalette, applyTypography, resolvePalette } from '../themes';
+import { translate } from '../i18n';
+import type { MessageKey } from '../i18n';
 import { WindowTitleBar } from '../WindowTitleBar';
 
-function previewMarkdown(record: AiHistoryLoadResult): string {
+function previewMarkdown(record: AiHistoryLoadResult, t: (key: MessageKey) => string): string {
   const lines: string[] = [`# ${record.title}`];
-  if (record.model) lines.push('', `Model: ${record.model}`);
+  if (record.model) lines.push('', `${t('labelModel')}: ${record.model}`);
   for (const message of record.messages) {
     const role =
-      message.role === 'user' ? 'User' : message.role === 'assistant' ? 'Assistant' : 'System';
+      message.role === 'user'
+        ? t('roleUser')
+        : message.role === 'assistant'
+          ? t('roleAssistant')
+          : t('roleSystem');
     lines.push('', `## ${role}`, '', message.content);
   }
   return lines.join('\n');
@@ -28,6 +34,13 @@ export function HistoryWindow(): React.JSX.Element {
   const [confirmingClearAll, setConfirmingClearAll] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [language, setLanguage] = useState<SettingsRecord['language']>('system');
+  const t = useCallback((key: MessageKey): string => translate(language, key), [language]);
+  const ta = useCallback(
+    (key: MessageKey, values: Record<string, string>): string =>
+      t(key).replace(/\{(\w+)\}/gu, (_match, name: string) => values[name] ?? ''),
+    [t]
+  );
 
   const refresh = (): void => {
     void window.geared
@@ -37,7 +50,7 @@ export function HistoryWindow(): React.JSX.Element {
         setError(null);
       })
       .catch((reason: unknown) =>
-        setError(reason instanceof Error ? reason.message : 'Unable to load chat history')
+        setError(reason instanceof Error ? reason.message : t('errLoadChatHistory'))
       );
   };
 
@@ -48,6 +61,7 @@ export function HistoryWindow(): React.JSX.Element {
       const palette = resolvePalette(settings.theme, userThemes);
       applyPalette(palette);
       applyTypography(settings.uiFontSize, settings.uiFontFamily);
+      setLanguage(settings.language);
     };
     let themes: UserTheme[] = [];
     void Promise.all([window.geared.getSettings(), window.geared.listUserThemes()])
@@ -67,7 +81,7 @@ export function HistoryWindow(): React.JSX.Element {
         setError(null);
       })
       .catch((reason: unknown) =>
-        setError(reason instanceof Error ? reason.message : 'Unable to load conversation')
+        setError(reason instanceof Error ? reason.message : t('errLoadConversation'))
       );
   };
 
@@ -78,7 +92,7 @@ export function HistoryWindow(): React.JSX.Element {
       if (selected?.id === id) setSelected(null);
       refresh();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to delete conversation');
+      setError(reason instanceof Error ? reason.message : t('errDeleteConversation'));
     }
   };
 
@@ -87,10 +101,10 @@ export function HistoryWindow(): React.JSX.Element {
       await window.geared.clearAiHistory();
       setConfirmingClearAll(false);
       setSelected(null);
-      setStatus('All conversations were deleted.');
+      setStatus(t('historyAllDeleted'));
       refresh();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to clear chat history');
+      setError(reason instanceof Error ? reason.message : t('errClearChatHistory'));
     }
   };
 
@@ -98,22 +112,24 @@ export function HistoryWindow(): React.JSX.Element {
     if (!selected) return;
     try {
       await window.geared.continueAiHistory(selected.id);
-      setStatus('Loaded into the assistant.');
+      setStatus(t('historyLoaded'));
       window.close();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to continue conversation');
+      setError(reason instanceof Error ? reason.message : t('errContinueConversation'));
     }
   };
 
   return (
     <div className="history-window-shell">
-      <WindowTitleBar title="Chat History" platform={window.geared.platform} showMenu={false} />
+      <WindowTitleBar title={t('chatHistory')} platform={window.geared.platform} showMenu={false} />
       <div className="history-window">
         <aside className="history-list" aria-label="Chat history">
           <div className="history-list-toolbar">
             <div>
-              <p className="history-title">Chat History</p>
-              <p className="history-count">{entries.length} conversations</p>
+              <p className="history-title">{t('chatHistory')}</p>
+              <p className="history-count">
+                {ta('historyConversations', { count: String(entries.length) })}
+              </p>
             </div>
             <div className="history-toolbar-actions">
               {confirmingClearAll ? (
@@ -123,7 +139,7 @@ export function HistoryWindow(): React.JSX.Element {
                     className="history-entry-danger"
                     onClick={() => void clearAll()}
                   >
-                    Delete all
+                    {t('deleteAll')}
                   </button>
                   <button
                     type="button"
@@ -159,9 +175,7 @@ export function HistoryWindow(): React.JSX.Element {
             </div>
           </div>
           <div className="history-entries">
-            {entries.length === 0 ? (
-              <p className="settings-hint">No saved conversations yet.</p>
-            ) : null}
+            {entries.length === 0 ? <p className="settings-hint">{t('historyEmpty')}</p> : null}
             {entries.map((entry) => (
               <div className="history-entry" key={entry.id}>
                 {confirmingDelete === entry.id ? (
@@ -171,7 +185,7 @@ export function HistoryWindow(): React.JSX.Element {
                       className="history-entry-danger"
                       onClick={() => void remove(entry.id)}
                     >
-                      Delete
+                      {t('delete')}
                     </button>
                     <button
                       type="button"
@@ -191,7 +205,8 @@ export function HistoryWindow(): React.JSX.Element {
                     >
                       <span>{entry.title}</span>
                       <small>
-                        {new Date(entry.updatedAt).toLocaleString()} · {entry.messageCount} messages
+                        {new Date(entry.updatedAt).toLocaleString()} ·{' '}
+                        {ta('historyMessages', { count: String(entry.messageCount) })}
                       </small>
                     </button>
                     <button
@@ -212,7 +227,7 @@ export function HistoryWindow(): React.JSX.Element {
           {selected ? (
             <>
               <div className="history-preview-body">
-                <MarkdownView source={previewMarkdown(selected)} />
+                <MarkdownView source={previewMarkdown(selected, t)} />
               </div>
               <div className="history-footer">
                 <span className="history-footer-status">{error ?? status ?? ''}</span>
@@ -221,13 +236,13 @@ export function HistoryWindow(): React.JSX.Element {
                   className="primary-button settings-apply"
                   onClick={() => void continueInAssistant()}
                 >
-                  <Send size={13} aria-hidden="true" /> Continue in assistant
+                  <Send size={13} aria-hidden="true" /> {t('continueInAssistant')}
                 </button>
               </div>
             </>
           ) : (
             <div className="history-preview-empty">
-              <p className="muted">Select a conversation to preview it.</p>
+              <p className="muted">{t('historyPickConversation')}</p>
               {error ? <p className="settings-status status-error">{error}</p> : null}
               {status ? <p className="settings-status">{status}</p> : null}
             </div>

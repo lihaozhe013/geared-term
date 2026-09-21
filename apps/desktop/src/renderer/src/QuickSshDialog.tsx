@@ -1,22 +1,23 @@
-import { useState } from 'react';
-import type { SshTerminalRequest } from '@geared-term/protocol';
+import { useCallback, useState } from 'react';
+import type { SettingsRecord, SshTerminalRequest } from '@geared-term/protocol';
 import { useModalFocus } from './useModalFocus';
+import { translate } from './i18n';
+import type { MessageKey } from './i18n';
 
 type QuickSshDialogProps = {
   defaultTerm: SshTerminalRequest['term'];
+  language: SettingsRecord['language'];
   onConnect: (request: SshTerminalRequest, name: string) => void;
   onClose: () => void;
 };
 
-function errorMessage(reason: unknown): string {
-  return reason instanceof Error ? reason.message : 'Unable to open SSH connection';
-}
-
 export function QuickSshDialog({
   defaultTerm,
+  language,
   onConnect,
   onClose
 }: QuickSshDialogProps): React.JSX.Element {
+  const t = useCallback((key: MessageKey): string => translate(language, key), [language]);
   const [host, setHost] = useState('');
   const [port, setPort] = useState('22');
   const [username, setUsername] = useState('');
@@ -33,11 +34,11 @@ export function QuickSshDialog({
       const normalizedHost = host.trim();
       const normalizedUser = username.trim();
       const normalizedPort = Number(port);
-      if (!normalizedHost || !normalizedUser) throw new Error('SSH host and user are required');
+      if (!normalizedHost || !normalizedUser) throw new Error(t('errSshHostUserRequired'));
       if (!Number.isInteger(normalizedPort) || normalizedPort < 1 || normalizedPort > 65535) {
-        throw new Error('SSH port must be a valid number between 1 and 65535');
+        throw new Error(t('errSshPortRange'));
       }
-      if (!password && !privateKey) throw new Error('Password or private key is required');
+      if (!password && !privateKey) throw new Error(t('errSshCredentialRequired'));
       const request: SshTerminalRequest = {
         sessionId: crypto.randomUUID(),
         host: normalizedHost,
@@ -52,7 +53,7 @@ export function QuickSshDialog({
       };
       onConnect(request, `${normalizedUser}@${normalizedHost}`);
     } catch (reason) {
-      setError(errorMessage(reason));
+      setError(reason instanceof Error ? reason.message : t('errOpenSsh'));
     }
   };
 
@@ -68,8 +69,8 @@ export function QuickSshDialog({
       >
         <div className="settings-header">
           <div>
-            <p className="section-label">Temporary connection</p>
-            <h2 id="quick-ssh-title">Connect with SSH</h2>
+            <p className="section-label">{t('quickSshSection')}</p>
+            <h2 id="quick-ssh-title">{t('quickSshTitle')}</h2>
           </div>
           <button
             type="button"
@@ -82,12 +83,10 @@ export function QuickSshDialog({
           </button>
         </div>
         <div className="profile-editor-body">
-          <p className="muted quick-ssh-note">
-            This connection is not saved. Credentials remain in memory for the lifetime of the tab.
-          </p>
+          <p className="muted quick-ssh-note">{t('quickSshNote')}</p>
           <div className="settings-grid">
             <label>
-              Host
+              {t('labelHost')}
               <input
                 value={host}
                 onChange={(event) => setHost(event.target.value)}
@@ -96,7 +95,7 @@ export function QuickSshDialog({
               />
             </label>
             <label>
-              Port
+              {t('labelPort')}
               <input
                 type="number"
                 min="1"
@@ -106,7 +105,7 @@ export function QuickSshDialog({
               />
             </label>
             <label>
-              User
+              {t('labelUser')}
               <input
                 value={username}
                 onChange={(event) => setUsername(event.target.value)}
@@ -114,7 +113,7 @@ export function QuickSshDialog({
               />
             </label>
             <label>
-              Terminal type
+              {t('labelTerminalType')}
               <select
                 value={term}
                 onChange={(event) => setTerm(event.target.value as SshTerminalRequest['term'])}
@@ -127,7 +126,7 @@ export function QuickSshDialog({
               </select>
             </label>
             <label>
-              Password
+              {t('labelPassword')}
               <input
                 type="password"
                 value={password}
@@ -135,7 +134,7 @@ export function QuickSshDialog({
               />
             </label>
             <label>
-              Private-key passphrase (optional)
+              {t('labelKeyPassphraseOptional')}
               <input
                 type="password"
                 value={passphrase}
@@ -143,12 +142,12 @@ export function QuickSshDialog({
               />
             </label>
             <label className="profile-editor-wide">
-              Private key (optional)
+              {t('labelPrivateKeyOptional')}
               <textarea
                 value={privateKey}
                 onChange={(event) => setPrivateKey(event.target.value)}
                 rows={6}
-                placeholder="Paste an OpenSSH private key"
+                placeholder={t('placeholderPrivateKey')}
               />
             </label>
           </div>
@@ -156,10 +155,10 @@ export function QuickSshDialog({
         </div>
         <div className="settings-actions">
           <button type="button" className="toolbar-button" onClick={onClose}>
-            Cancel
+            {t('cancel')}
           </button>
           <button type="submit" className="primary-button profile-save">
-            Connect
+            {t('connect')}
           </button>
         </div>
       </form>

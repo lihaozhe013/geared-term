@@ -1,11 +1,19 @@
-import { useEffect, useState } from 'react';
-import type { AppInfo, SessionProfileRecord, WslDistribution } from '@geared-term/protocol';
+import { useCallback, useEffect, useState } from 'react';
+import type {
+  AppInfo,
+  SessionProfileRecord,
+  SettingsRecord,
+  WslDistribution
+} from '@geared-term/protocol';
 import { ChevronDown, ChevronRight, PanelLeftClose, Plus, RefreshCw } from 'lucide-react';
+import { translate } from './i18n';
+import type { MessageKey } from './i18n';
 
 type SidebarTab = 'sessions' | 'wsl';
 
 type SidebarProps = {
   platform: AppInfo['platform'] | undefined;
+  language: SettingsRecord['language'];
   profiles: SessionProfileRecord[];
   wslDistributions: WslDistribution[];
   wslLoading: boolean;
@@ -42,6 +50,7 @@ function groupProfiles(profiles: SessionProfileRecord[]): {
 
 export function Sidebar({
   platform,
+  language,
   profiles,
   wslDistributions,
   wslLoading,
@@ -53,6 +62,7 @@ export function Sidebar({
   onRefreshWsl,
   onCollapse
 }: SidebarProps): React.JSX.Element {
+  const t = useCallback((key: MessageKey): string => translate(language, key), [language]);
   const [tab, setTab] = useState<SidebarTab>('sessions');
   const [collapsedGroups, setCollapsedGroups] = useState<ReadonlySet<string>>(new Set());
   const [profileMenu, setProfileMenu] = useState<{
@@ -106,7 +116,7 @@ export function Sidebar({
           aria-selected={tab === 'sessions'}
           onClick={() => setTab('sessions')}
         >
-          Sessions
+          {t('sessions')}
         </button>
         {isWindows ? (
           <button
@@ -197,8 +207,8 @@ export function Sidebar({
               <span className="empty-icon" aria-hidden="true">
                 +
               </span>
-              <p>No saved sessions</p>
-              <small>Use the + button in the sidebar to keep a session profile.</small>
+              <p>{t('sidebarEmpty')}</p>
+              <small>{t('sidebarEmptyHint')}</small>
             </div>
           ) : null}
         </div>
@@ -222,7 +232,7 @@ export function Sidebar({
             </button>
           ))}
           {wslDistributions.length === 0 && !wslLoading ? (
-            <small className="muted">No distributions discovered.</small>
+            <small className="muted">{t('noDistributionsDiscovered')}</small>
           ) : null}
         </div>
       )}
@@ -240,7 +250,7 @@ export function Sidebar({
               setProfileMenu(null);
             }}
           >
-            Edit
+            {t('edit')}
           </button>
           <button
             type="button"
@@ -251,7 +261,7 @@ export function Sidebar({
               setProfileMenu(null);
             }}
           >
-            Delete
+            {t('delete')}
           </button>
         </div>
       ) : null}

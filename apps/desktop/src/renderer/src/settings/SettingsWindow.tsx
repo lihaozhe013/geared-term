@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { applyPalette, applyTypography, resolvePalette } from '../themes';
 import { makeTranslate } from './sections';
+import type { Translate } from './sections';
 import {
   AboutSection,
   AiAssistantSection,
@@ -51,6 +52,7 @@ export function SettingsWindow(): React.JSX.Element {
   const [runtime, setRuntime] = useState<RuntimeInfo | null>(null);
   const [category, setCategory] = useState<Category>('general');
   const [loadError, setLoadError] = useState<string | null>(null);
+  const t: Translate = makeTranslate(settings?.language ?? 'system');
 
   useEffect(() => {
     void Promise.all([
@@ -67,7 +69,7 @@ export function SettingsWindow(): React.JSX.Element {
         setRuntime(runtimeInfo);
       })
       .catch((reason: unknown) =>
-        setLoadError(reason instanceof Error ? reason.message : 'Unable to load settings')
+        setLoadError(reason instanceof Error ? reason.message : t('errLoadSettings'))
       );
   }, []);
 
@@ -109,7 +111,7 @@ export function SettingsWindow(): React.JSX.Element {
     try {
       setSettings(await window.geared.saveSettings({ ...settings, ...patch }));
     } catch (reason) {
-      setLoadError(reason instanceof Error ? reason.message : 'Unable to save settings');
+      setLoadError(reason instanceof Error ? reason.message : t('errSaveSettings'));
     }
   };
 
@@ -121,7 +123,7 @@ export function SettingsWindow(): React.JSX.Element {
   if (loadError) {
     return (
       <div className="settings-window-shell">
-        <WindowTitleBar title="Geared Term Settings" platform={platform} showMenu={false} />
+        <WindowTitleBar title={t('settingsWindowTitle')} platform={platform} showMenu={false} />
         <div className="settings-loading">{loadError}</div>
       </div>
     );
@@ -129,20 +131,18 @@ export function SettingsWindow(): React.JSX.Element {
   if (!settings) {
     return (
       <div className="settings-window-shell">
-        <WindowTitleBar title="Geared Term Settings" platform={platform} showMenu={false} />
+        <WindowTitleBar title={t('settingsWindowTitle')} platform={platform} showMenu={false} />
         <div className="settings-loading" aria-busy="true">
-          Loading…
+          {t('loading')}
         </div>
       </div>
     );
   }
 
-  const t = makeTranslate(settings.language);
-
   return (
     <div className="settings-window-shell">
       <WindowTitleBar
-        title="Geared Term Settings"
+        title={t('settingsWindowTitle')}
         platform={platform}
         showMenu={false}
         language={settings.language}

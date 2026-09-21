@@ -1,10 +1,13 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useModalFocus } from './useModalFocus';
-import type { SessionProfileRecord } from '@geared-term/protocol';
+import { translate } from './i18n';
+import type { MessageKey } from './i18n';
+import type { SessionProfileRecord, SettingsRecord } from '@geared-term/protocol';
 
 type ProfileEditorProps = {
   profile?: SessionProfileRecord;
   defaultTerm: SessionProfileRecord['term'];
+  language: SettingsRecord['language'];
   onSaved: (profiles: SessionProfileRecord[]) => void;
   onClose: () => void;
   onError: (message: string) => void;
@@ -31,12 +34,13 @@ type ProfileDraft = {
 
 function createDraft(
   profile: SessionProfileRecord | undefined,
-  defaultTerm: ProfileDraft['term']
+  defaultTerm: ProfileDraft['term'],
+  defaultName: string
 ): ProfileDraft {
   return {
     id: profile?.id ?? crypto.randomUUID(),
     kind: profile?.kind ?? 'local',
-    name: profile?.name ?? 'New session',
+    name: profile?.name ?? defaultName,
     group: profile?.group ?? '',
     term: profile?.term ?? defaultTerm,
     shell: profile?.shell ?? '',
@@ -60,11 +64,15 @@ function asError(reason: unknown, fallback: string): string {
 export function ProfileEditor({
   profile,
   defaultTerm,
+  language,
   onSaved,
   onClose,
   onError
 }: ProfileEditorProps): React.JSX.Element {
-  const [draft, setDraft] = useState<ProfileDraft>(() => createDraft(profile, defaultTerm));
+  const t = useCallback((key: MessageKey): string => translate(language, key), [language]);
+  const [draft, setDraft] = useState<ProfileDraft>(() =>
+    createDraft(profile, defaultTerm, translate(language, 'profileDefaultName'))
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { containerRef } = useModalFocus<HTMLFormElement>();
@@ -87,7 +95,7 @@ export function ProfileEditor({
     setError(null);
     try {
       const name = draft.name.trim();
-      if (!name) throw new Error('Profile name is required');
+      if (!name) throw new Error(t('errProfileNameRequired'));
       const profileInput: SessionProfileRecord = {
         id: draft.id,
         kind: draft.kind,
@@ -117,16 +125,16 @@ export function ProfileEditor({
           : {})
       };
       if (draft.kind === 'wsl' && !draft.distribution.trim()) {
-        throw new Error('WSL distribution is required');
+        throw new Error(t('errWslDistributionRequired'));
       }
       if (draft.kind === 'ssh' && (!draft.host.trim() || !draft.user.trim())) {
-        throw new Error('SSH host and user are required');
+        throw new Error(t('errSshHostUserRequired'));
       }
       if (
         draft.kind === 'ssh' &&
         (!Number.isInteger(Number(draft.port)) || Number(draft.port) < 1)
       ) {
-        throw new Error('SSH port must be a valid positive number');
+        throw new Error(t('errSshPortPositive'));
       }
 
       const hasCredentialInput =
@@ -148,7 +156,7 @@ export function ProfileEditor({
       onSaved(saved);
       onClose();
     } catch (reason) {
-      const message = asError(reason, 'Unable to save profile');
+      const message = asError(reason, t('errSaveProfile'));
       setError(message);
       onError(message);
     } finally {
@@ -168,8 +176,8 @@ export function ProfileEditor({
       >
         <div className="settings-header">
           <div>
-            <p className="section-label">Session profile</p>
-            <h2>{profile ? 'Edit session' : 'New session profile'}</h2>
+            <p className="section-label">{t('profileSection')}</p>
+            <h2>{profile ? t('editSession') : t('newSessionProfile')}</h2>
           </div>
           <button
             type="button"
@@ -185,7 +193,7 @@ export function ProfileEditor({
         <div className="profile-editor-body">
           <div className="settings-grid">
             <label>
-              Name
+              {t('labelName')}
               <input
                 value={draft.name}
                 onChange={(event) => update('name', event.target.value)}
@@ -193,26 +201,26 @@ export function ProfileEditor({
               />
             </label>
             <label>
-              Kind
+              {t('labelKind')}
               <select
                 value={draft.kind}
                 onChange={(event) => update('kind', event.target.value as ProfileDraft['kind'])}
                 disabled={Boolean(profile)}
               >
-                <option value="local">Local</option>
+                <option value="local">{t('profileLocal')}</option>
                 <option value="wsl">WSL</option>
                 <option value="ssh">SSH</option>
               </select>
             </label>
             <label>
-              Group (optional)
+              {t('labelGroup')}
               <input
                 value={draft.group}
                 onChange={(event) => update('group', event.target.value)}
               />
             </label>
             <label>
-              Terminal type
+              {t('labelTerminalType')}
               <select
                 value={draft.term}
                 onChange={(event) => update('term', event.target.value as ProfileDraft['term'])}
@@ -228,10 +236,10 @@ export function ProfileEditor({
 
           {draft.kind === 'local' ? (
             <div className="profile-editor-section">
-              <p className="section-label">Startup</p>
+              <p className="section-label">{t('profileStartup')}</p>
               <div className="settings-grid">
                 <label>
-                  Shell executable (optional)
+                  {t('labelShellExecutable')}
                   <input
                     value={draft.shell}
                     onChange={(event) => update('shell', event.target.value)}
@@ -239,14 +247,14 @@ export function ProfileEditor({
                   />
                 </label>
                 <label>
-                  Working directory (optional)
+                  {t('labelWorkingDirectory')}
                   <input
                     value={draft.cwd}
                     onChange={(event) => update('cwd', event.target.value)}
                   />
                 </label>
                 <label className="profile-editor-wide">
-                  Arguments (one per line)
+                  {t('labelArguments')}
                   <textarea
                     value={draft.args}
                     onChange={(event) => update('args', event.target.value)}
@@ -262,7 +270,7 @@ export function ProfileEditor({
               <p className="section-label">WSL</p>
               <div className="settings-grid">
                 <label>
-                  Distribution
+                  {t('factDistribution')}
                   <input
                     value={draft.distribution}
                     onChange={(event) => update('distribution', event.target.value)}
@@ -270,14 +278,14 @@ export function ProfileEditor({
                   />
                 </label>
                 <label>
-                  User (optional)
+                  {t('labelUserOptional')}
                   <input
                     value={draft.user}
                     onChange={(event) => update('user', event.target.value)}
                   />
                 </label>
                 <label className="profile-editor-wide">
-                  Working directory (optional)
+                  {t('labelWorkingDirectory')}
                   <input
                     value={draft.cwd}
                     onChange={(event) => update('cwd', event.target.value)}
@@ -291,10 +299,10 @@ export function ProfileEditor({
           {isSsh ? (
             <>
               <div className="profile-editor-section">
-                <p className="section-label">Connection</p>
+                <p className="section-label">{t('sectionConnection')}</p>
                 <div className="settings-grid">
                   <label>
-                    Host
+                    {t('labelHost')}
                     <input
                       value={draft.host}
                       onChange={(event) => update('host', event.target.value)}
@@ -302,7 +310,7 @@ export function ProfileEditor({
                     />
                   </label>
                   <label>
-                    Port
+                    {t('labelPort')}
                     <input
                       type="number"
                       min="1"
@@ -312,7 +320,7 @@ export function ProfileEditor({
                     />
                   </label>
                   <label className="profile-editor-wide">
-                    User
+                    {t('labelUser')}
                     <input
                       value={draft.user}
                       onChange={(event) => update('user', event.target.value)}
@@ -321,40 +329,40 @@ export function ProfileEditor({
                 </div>
               </div>
               <div className="profile-editor-section">
-                <p className="section-label">Credentials</p>
+                <p className="section-label">{t('sectionCredentials')}</p>
                 <p className="settings-hint">
                   {savedCredentialLabels.length > 0
-                    ? `Saved in the vault: ${savedCredentialLabels.join(', ')}. Leave fields blank to keep them.`
-                    : 'Stored encrypted in the vault. All fields are optional.'}
+                    ? t('credentialsSavedHint').replace('{refs}', savedCredentialLabels.join(', '))
+                    : t('credentialsStoredHint')}
                 </p>
                 <div className="settings-grid">
                   <label>
-                    Password (optional)
+                    {t('labelPasswordOptional')}
                     <input
                       type="password"
                       value={draft.password}
                       onChange={(event) => update('password', event.target.value)}
-                      placeholder="Leave blank to keep saved"
+                      placeholder={t('placeholderKeepSaved')}
                       autoComplete="new-password"
                     />
                   </label>
                   <label>
-                    Passphrase (optional)
+                    {t('labelPassphraseOptional')}
                     <input
                       type="password"
                       value={draft.passphrase}
                       onChange={(event) => update('passphrase', event.target.value)}
-                      placeholder="For private key"
+                      placeholder={t('placeholderForPrivateKey')}
                       autoComplete="new-password"
                     />
                   </label>
                   <label className="profile-editor-wide">
-                    Private key (optional)
+                    {t('labelPrivateKeyOptional')}
                     <textarea
                       value={draft.privateKey}
                       onChange={(event) => update('privateKey', event.target.value)}
                       rows={5}
-                      placeholder="Paste an OpenSSH private key; it is never returned to the renderer."
+                      placeholder={t('placeholderPrivateKeyLong')}
                     />
                   </label>
                   {profile?.secretRefs ? (
@@ -364,7 +372,7 @@ export function ProfileEditor({
                         checked={draft.clearCredentials}
                         onChange={(event) => update('clearCredentials', event.target.checked)}
                       />
-                      <span>Clear all saved SSH credentials on save</span>
+                      <span>{t('clearCredentialsOnSave')}</span>
                     </label>
                   ) : null}
                 </div>
@@ -383,10 +391,10 @@ export function ProfileEditor({
             data-modal-cancel
             disabled={busy}
           >
-            Cancel
+            {t('cancel')}
           </button>
           <button type="submit" className="primary-button profile-save" disabled={busy}>
-            {busy ? 'Saving…' : 'Save profile'}
+            {busy ? t('saving') : t('saveProfile')}
           </button>
         </div>
       </form>

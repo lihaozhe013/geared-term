@@ -59,9 +59,9 @@ function draftModelFrom(profile: AiModelProfile): DraftModel {
   };
 }
 
-function createEmptyDraft(): Draft {
+function createEmptyDraft(defaultName: string): Draft {
   return {
-    name: 'New connection',
+    name: defaultName,
     protocol: 'responses',
     baseUrl: 'https://api.openai.com/v1',
     models: [
@@ -92,7 +92,7 @@ function draftFrom(record: AiConnectionRecord): Draft {
 export function AiConnectionsSection({ t }: { t: Translate }): React.JSX.Element {
   const [connections, setConnections] = useState<AiConnectionRecord[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [draft, setDraft] = useState<Draft>(createEmptyDraft);
+  const [draft, setDraft] = useState<Draft>(() => createEmptyDraft(t('newConnection')));
   const [dirty, setDirty] = useState(false);
   const [discovering, setDiscovering] = useState(false);
   const [discovered, setDiscovered] = useState<string[]>([]);
@@ -112,7 +112,7 @@ export function AiConnectionsSection({ t }: { t: Translate }): React.JSX.Element
         }
       })
       .catch((reason: unknown) =>
-        setError(reason instanceof Error ? reason.message : 'Unable to load AI connections')
+        setError(reason instanceof Error ? reason.message : t('errLoadConnections'))
       );
   }, []);
 
@@ -130,7 +130,7 @@ export function AiConnectionsSection({ t }: { t: Translate }): React.JSX.Element
     if (dirty && !window.confirm(t('unsavedChanges'))) return;
     const record = connectionsRef.current.find((item) => item.id === id);
     setSelectedId(id);
-    setDraft(record ? draftFrom(record) : createEmptyDraft());
+    setDraft(record ? draftFrom(record) : createEmptyDraft(t('newConnection')));
     setDirty(false);
     setDiscovered([]);
     setStatus(null);
@@ -204,19 +204,19 @@ export function AiConnectionsSection({ t }: { t: Translate }): React.JSX.Element
       }))
       .filter((model) => model.model.length > 0);
     if (models.length === 0) {
-      setError('Add at least one model before saving the connection.');
+      setError(t('errNoModelsToSave'));
       return;
     }
     const defaultModel = models.some((model) => model.model === draft.defaultModel)
       ? draft.defaultModel
       : models[0]?.model;
     if (!defaultModel) {
-      setError('Select a default model before saving the connection.');
+      setError(t('errNoDefaultModel'));
       return;
     }
     const input: AiConnectionInput = {
       ...(draft.id ? { id: draft.id } : {}),
-      name: draft.name.trim() || 'Untitled connection',
+      name: draft.name.trim() || t('untitledConnection'),
       protocol: draft.protocol,
       baseUrl: draft.baseUrl.trim(),
       models,
@@ -235,25 +235,25 @@ export function AiConnectionsSection({ t }: { t: Translate }): React.JSX.Element
       setStatus(t('savedStatus'));
       setError(null);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to save AI connection');
+      setError(reason instanceof Error ? reason.message : t('errSaveConnection'));
     }
   };
 
   const remove = async (): Promise<void> => {
     if (!draft.id) return;
-    if (!window.confirm(`Delete the connection "${draft.name}"?`)) return;
+    if (!window.confirm(t('confirmDeleteConnection').replace('{name}', draft.name))) return;
     try {
       const saved = await window.geared.deleteAiConnection(draft.id);
       setConnections(saved);
       const record = saved[0];
       setSelectedId(record ? record.id : null);
-      setDraft(record ? draftFrom(record) : createEmptyDraft());
+      setDraft(record ? draftFrom(record) : createEmptyDraft(t('newConnection')));
       setDirty(false);
       setDiscovered([]);
       setStatus(null);
       setError(null);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to delete AI connection');
+      setError(reason instanceof Error ? reason.message : t('errDeleteConnection'));
     }
   };
 
@@ -275,9 +275,11 @@ export function AiConnectionsSection({ t }: { t: Translate }): React.JSX.Element
             ...(draft.apiKey ? { apiKey: draft.apiKey } : {})
           });
       setDiscovered(result.models);
-      setStatus(`${t('connectionVerified')} ${result.models.length} models`);
+      setStatus(
+        `${t('connectionVerified')} ${t('modelsFound').replace('{count}', String(result.models.length))}`
+      );
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Connection test failed');
+      setError(reason instanceof Error ? reason.message : t('errConnectionTest'));
     } finally {
       setDiscovering(false);
     }
@@ -381,16 +383,13 @@ export function AiConnectionsSection({ t }: { t: Translate }): React.JSX.Element
             </div>
           </div>
           <div className="settings-card">
-            <p className="settings-card-title">Models</p>
-            <p className="settings-hint">
-              Choose the default model and, for Responses connections, the defaults used for new
-              chats.
-            </p>
+            <p className="settings-card-title">{t('models')}</p>
+            <p className="settings-hint">{t('modelsHint')}</p>
             <div className="ai-model-list">
               {draft.models.map((model, index) => (
                 <div className="ai-model-card" key={model.id}>
                   <div className="ai-model-card-header">
-                    <strong>Model {index + 1}</strong>
+                    <strong>{t('modelNumber').replace('{index}', String(index + 1))}</strong>
                     <button
                       type="button"
                       className="icon-button danger-button"
@@ -400,7 +399,7 @@ export function AiConnectionsSection({ t }: { t: Translate }): React.JSX.Element
                       <Trash2 size={13} aria-hidden="true" />
                     </button>
                   </div>
-                  <Row label="Model ID">
+                  <Row label={t('modelIdLabel')}>
                     <input
                       className="settings-input"
                       value={model.model}
@@ -411,14 +410,14 @@ export function AiConnectionsSection({ t }: { t: Translate }): React.JSX.Element
                       spellCheck={false}
                     />
                   </Row>
-                  <Row label="Display name">
+                  <Row label={t('displayNameLabel')}>
                     <input
                       className="settings-input"
                       value={model.label}
                       onChange={(event) =>
                         patchModel(index, { label: event.target.value.slice(0, 256) })
                       }
-                      placeholder="Optional"
+                      placeholder={t('optionalPlaceholder')}
                       spellCheck={false}
                     />
                   </Row>
@@ -430,7 +429,7 @@ export function AiConnectionsSection({ t }: { t: Translate }): React.JSX.Element
                       onChange={() => patch({ defaultModel: model.model })}
                       disabled={!model.model}
                     />
-                    Default model
+                    {t('defaultModel')}
                   </label>
                   {draft.protocol === 'responses' ? (
                     <div className="ai-model-options">
@@ -489,7 +488,7 @@ export function AiConnectionsSection({ t }: { t: Translate }): React.JSX.Element
                             })
                           }
                         />
-                        {model.responses.reasoningSummary ? 'Summary' : 'No summary'}
+                        {model.responses.reasoningSummary ? t('summaryOn') : t('summaryOff')}
                       </label>
                       <label className="ai-model-toggle">
                         <input
@@ -501,7 +500,7 @@ export function AiConnectionsSection({ t }: { t: Translate }): React.JSX.Element
                             })
                           }
                         />
-                        {model.responses.webSearch ? 'Web on' : 'Web off'}
+                        {model.responses.webSearch ? t('webOn') : t('webOff')}
                       </label>
                     </div>
                   ) : null}
@@ -510,12 +509,12 @@ export function AiConnectionsSection({ t }: { t: Translate }): React.JSX.Element
             </div>
             <div className="settings-actions-row">
               <button type="button" className="toolbar-button" onClick={() => addModel()}>
-                <Plus size={13} aria-hidden="true" /> Add model
+                <Plus size={13} aria-hidden="true" /> {t('addModel')}
               </button>
             </div>
             {discovered.length > 0 ? (
               <>
-                <p className="settings-hint">Discovered models</p>
+                <p className="settings-hint">{t('discoveredModels')}</p>
                 <div className="chip-row">
                   {discovered.map((model) => (
                     <button
