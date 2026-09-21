@@ -286,7 +286,8 @@ function MenuEntry({
           aria-expanded={submenuOpen}
           onClick={() => setSubmenuOpen((current) => !current)}
         >
-          <span>{item.label}</span>
+          <span className="desktop-menu-entry-check" />
+          <span className="desktop-menu-entry-label">{item.label}</span>
           <ChevronRight size={14} aria-hidden="true" />
         </button>
         {submenuOpen ? (
