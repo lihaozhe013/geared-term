@@ -1888,6 +1888,78 @@ button:disabled {
   line-height: 1.45;
 }
 
+.shortcut-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  min-height: 26px;
+}
+
+.shortcut-error {
+  color: #e5534b;
+  font-size: var(--gt-fs-sm);
+}
+
+.shortcut-reset-all {
+  padding: 5px 12px;
+  border: 1px solid var(--gt-border-strong, #344157);
+  border-radius: var(--gt-radius-md);
+  background: transparent;
+  color: var(--gt-text, #e4eaf3);
+  font-size: var(--gt-fs-sm);
+  cursor: pointer;
+}
+
+.shortcut-reset-all:hover {
+  border-color: var(--gt-accent, #5c8ea5);
+  color: var(--gt-accent, #5c8ea5);
+}
+
+.shortcut-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.kbd-capture {
+  min-width: 150px;
+  padding: 6px 14px;
+  border: 1px solid var(--gt-border-strong, #344157);
+  border-radius: var(--gt-radius-md);
+  background: var(--gt-input-bg, #1a2332);
+  color: var(--gt-text, #e4eaf3);
+  font-family: var(--gt-font-mono, ui-monospace, monospace);
+  font-size: var(--gt-fs-sm);
+  text-align: center;
+  cursor: pointer;
+}
+
+.kbd-capture:hover {
+  border-color: var(--gt-accent, #5c8ea5);
+}
+
+.kbd-capture.recording {
+  border-style: dashed;
+  border-color: var(--gt-accent, #5c8ea5);
+  color: var(--gt-accent, #5c8ea5);
+}
+
+.shortcut-reset {
+  padding: 5px 9px;
+  border: 1px solid var(--gt-border-strong, #344157);
+  border-radius: var(--gt-radius-md);
+  background: transparent;
+  color: var(--gt-text-muted, #71809a);
+  font-size: var(--gt-fs-sm);
+  cursor: pointer;
+}
+
+.shortcut-reset:hover {
+  border-color: var(--gt-accent, #5c8ea5);
+  color: var(--gt-accent, #5c8ea5);
+}
+
 .settings-input,
 .settings-select,
 .settings-textarea {

@@ -1,4 +1,12 @@
 import { app, BrowserWindow, Menu, type MenuItemConstructorOptions } from 'electron';
+import {
+  resolveKeybindings,
+  toElectronAccelerator,
+  type CommandId,
+  type KeybindingMap,
+  type KeybindingOverrides,
+  type Platform
+} from '@geared-term/keybindings';
 
 export type MenuLocale = 'en-US' | 'zh-CN';
 
@@ -15,7 +23,16 @@ export type MenuState = {
   theme: string;
   themeNames: string[];
   isDevelopment: boolean;
+  keybindings: KeybindingOverrides;
 };
+
+const menuPlatform: Platform =
+  process.platform === 'darwin' ? 'darwin' : process.platform === 'win32' ? 'win32' : 'linux';
+
+/** Resolves the Electron accelerator for a command from the persisted overrides. */
+function acceleratorFor(bindings: KeybindingMap, command: CommandId): string | undefined {
+  return toElectronAccelerator(bindings[command], menuPlatform) ?? undefined;
+}
 
 let activeMenuState: MenuState | undefined;
 let activeMenuCommands: MenuCommands | undefined;
@@ -46,6 +63,12 @@ export function executeApplicationMenuAction(action: string, window: BrowserWind
     case 'toggle-assistant':
     case 'toggle-environment':
     case 'cycle-panels':
+    case 'tab-close':
+    case 'tab-next':
+    case 'tab-previous':
+    case 'zoom-in':
+    case 'zoom-out':
+    case 'zoom-reset':
       commands.onCommand(action);
       return;
     case 'open-settings':
@@ -81,15 +104,6 @@ export function executeApplicationMenuAction(action: string, window: BrowserWind
     case 'toggle-dev-tools':
       if (!state.isDevelopment) throw new Error('Developer tools are unavailable');
       window.webContents.toggleDevTools();
-      return;
-    case 'reset-zoom':
-      window.webContents.setZoomFactor(1);
-      return;
-    case 'zoom-in':
-      window.webContents.setZoomFactor(Math.min(3, window.webContents.getZoomFactor() + 0.1));
-      return;
-    case 'zoom-out':
-      window.webContents.setZoomFactor(Math.max(0.5, window.webContents.getZoomFactor() - 0.1));
       return;
     case 'toggle-fullscreen':
       window.setFullScreen(!window.isFullScreen());
@@ -131,6 +145,9 @@ const labels = {
   'en-US': {
     file: 'File',
     newLocalTerminal: 'New local terminal',
+    nextTab: 'Next tab',
+    previousTab: 'Previous tab',
+    closeTab: 'Close tab',
     quickConnection: 'Temporary SSH connection…',
     openConfigFolder: 'Open configuration folder',
     settings: 'Settings…',
@@ -145,9 +162,9 @@ const labels = {
     view: 'View',
     reload: 'Reload',
     toggleDevTools: 'Toggle developer tools',
-    resetZoom: 'Actual size',
-    zoomIn: 'Zoom in',
-    zoomOut: 'Zoom out',
+    resetZoom: 'Reset terminal font size',
+    zoomIn: 'Increase terminal font size',
+    zoomOut: 'Decrease terminal font size',
     toggleFullscreen: 'Toggle full screen',
     panels: 'Panels',
     sftp: 'SFTP files',
@@ -170,6 +187,9 @@ const labels = {
   'zh-CN': {
     file: '文件',
     newLocalTerminal: '新建本地终端',
+    nextTab: '下一个标签',
+    previousTab: '上一个标签',
+    closeTab: '关闭标签',
     quickConnection: '临时 SSH 连接…',
     openConfigFolder: '打开配置目录',
     settings: '设置…',
@@ -184,9 +204,9 @@ const labels = {
     view: '视图',
     reload: '重新加载',
     toggleDevTools: '切换开发者工具',
-    resetZoom: '实际大小',
-    zoomIn: '放大',
-    zoomOut: '缩小',
+    resetZoom: '重置终端字号',
+    zoomIn: '增大终端字号',
+    zoomOut: '减小终端字号',
     toggleFullscreen: '切换全屏',
     panels: '面板',
     sftp: 'SFTP 文件',
@@ -212,6 +232,7 @@ export function buildApplicationMenu(state: MenuState, commands: MenuCommands): 
   activeMenuState = state;
   activeMenuCommands = commands;
   const t = labels[state.locale];
+  const bindings = resolveKeybindings(state.keybindings, menuPlatform);
   const applicationMenu: MenuItemConstructorOptions[] =
     process.platform === 'darwin'
       ? [
@@ -239,12 +260,34 @@ export function buildApplicationMenu(state: MenuState, commands: MenuCommands): 
         {
           id: 'new-local',
           label: t.newLocalTerminal,
-          accelerator: 'CmdOrCtrl+T',
+          accelerator: acceleratorFor(bindings, 'tab.new'),
           click: () => commands.onCommand('new-local')
+        },
+        {
+          id: 'tab-next',
+          label: t.nextTab,
+          accelerator: acceleratorFor(bindings, 'tab.next'),
+          click: () => commands.onCommand('tab-next')
+        },
+        {
+          id: 'tab-previous',
+          label: t.previousTab,
+          accelerator: acceleratorFor(bindings, 'tab.previous'),
+          click: () => commands.onCommand('tab-previous')
+        },
+        {
+          id: 'tab-close',
+          label: t.closeTab,
+          accelerator: acceleratorFor(bindings, 'tab.close'),
+          click: () => commands.onCommand('tab-close')
         },
         { id: 'quick-ssh', label: t.quickConnection, click: () => commands.onCommand('quick-ssh') },
         { type: 'separator' },
-        { label: t.settings, accelerator: 'CmdOrCtrl+,', click: commands.onOpenSettings },
+        {
+          label: t.settings,
+          accelerator: acceleratorFor(bindings, 'app.settings'),
+          click: commands.onOpenSettings
+        },
         { label: t.openConfigFolder, click: commands.onOpenConfigFolder },
         ...(process.platform === 'darwin'
           ? []
@@ -271,9 +314,21 @@ export function buildApplicationMenu(state: MenuState, commands: MenuCommands): 
           ? [{ role: 'toggleDevTools' as const, label: t.toggleDevTools }]
           : []),
         { type: 'separator' },
-        { role: 'resetZoom', label: t.resetZoom },
-        { role: 'zoomIn', label: t.zoomIn },
-        { role: 'zoomOut', label: t.zoomOut },
+        {
+          label: t.resetZoom,
+          accelerator: acceleratorFor(bindings, 'terminal.zoomReset'),
+          click: () => commands.onCommand('zoom-reset')
+        },
+        {
+          label: t.zoomIn,
+          accelerator: acceleratorFor(bindings, 'terminal.zoomIn'),
+          click: () => commands.onCommand('zoom-in')
+        },
+        {
+          label: t.zoomOut,
+          accelerator: acceleratorFor(bindings, 'terminal.zoomOut'),
+          click: () => commands.onCommand('zoom-out')
+        },
         { type: 'separator' },
         { role: 'togglefullscreen', label: t.toggleFullscreen },
         {
@@ -285,7 +340,7 @@ export function buildApplicationMenu(state: MenuState, commands: MenuCommands): 
             { type: 'separator' },
             {
               label: t.cycleMode,
-              accelerator: 'F6',
+              accelerator: acceleratorFor(bindings, 'panel.cycle'),
               click: () => commands.onCommand('cycle-panels')
             }
           ]

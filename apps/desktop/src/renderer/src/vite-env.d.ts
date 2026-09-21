@@ -134,6 +134,8 @@ declare global {
       saveUiState: (input: UiStateRecord) => Promise<UiStateRecord>;
       getSettings: () => Promise<SettingsRecord>;
       saveSettings: (input: SettingsRecord) => Promise<SettingsRecord>;
+      beginKeyCapture: () => Promise<SftpOperationResult>;
+      endKeyCapture: () => Promise<SftpOperationResult>;
       openSettings: (category?: string) => Promise<SftpOperationResult>;
       onSettingsChanged: (listener: (settings: SettingsRecord) => void) => () => void;
       onVaultChanged: (listener: (status: VaultStatus) => void) => () => void;

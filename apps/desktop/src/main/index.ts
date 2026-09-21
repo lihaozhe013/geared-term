@@ -1,4 +1,14 @@
-import { app, BrowserWindow, dialog, ipcMain, safeStorage, screen, session, shell } from 'electron';
+import {
+  app,
+  BrowserWindow,
+  Menu,
+  dialog,
+  ipcMain,
+  safeStorage,
+  screen,
+  session,
+  shell
+} from 'electron';
 import { mkdir as fsMkdir } from 'node:fs/promises';
 import { basename, join, posix } from 'node:path';
 import {
@@ -105,6 +115,10 @@ import { EnvironmentManager } from './environment/manager';
 import { buildAssistantContext } from './ai/context';
 
 const isDevelopment = !app.isPackaged;
+// Depth of in-flight key-capture sessions (shortcut recording in the settings
+// window). While positive, the application menu is detached so its registered
+// accelerators cannot swallow the keys being recorded.
+let keyCaptureDepth = 0;
 // Keeps automated runs (E2E tests, portable scenarios) hermetic by redirecting
 // profile storage away from the machine-wide default location.
 const userDataOverride = process.env.GEARED_USER_DATA?.trim();
@@ -162,7 +176,8 @@ async function rebuildApplicationMenu(): Promise<void> {
       themeNames: [
         ...new Set([...BUILTIN_THEME_NAMES, ...userThemes.themes.map((theme) => theme.name)])
       ],
-      isDevelopment
+      isDevelopment,
+      keybindings: settings.keybindings
     },
     {
       onCommand: (command) => sendToRenderer('menu-command', command),
@@ -467,6 +482,22 @@ function registerIpc(): void {
   ipcMain.handle('app:open-settings', (_event, input: unknown) => {
     const parsed = SettingsOpenRequestSchema.parse(input ?? {});
     settingsWindow.open(parsed.category as SettingsCategory | undefined);
+    return SftpOperationResultSchema.parse({ accepted: true });
+  });
+  // While a shortcut is being recorded the application menu is detached so its
+  // accelerators cannot steal the pressed keys before the renderer sees them.
+  // begin/end are counted because a second recording can start while the
+  // rebuild triggered by the first end is still in flight.
+  ipcMain.handle('app:begin-key-capture', () => {
+    keyCaptureDepth += 1;
+    Menu.setApplicationMenu(null);
+    return SftpOperationResultSchema.parse({ accepted: true });
+  });
+  ipcMain.handle('app:end-key-capture', async () => {
+    keyCaptureDepth = Math.max(0, keyCaptureDepth - 1);
+    if (keyCaptureDepth > 0) return SftpOperationResultSchema.parse({ accepted: true });
+    await rebuildApplicationMenu();
+    if (keyCaptureDepth > 0) Menu.setApplicationMenu(null);
     return SftpOperationResultSchema.parse({ accepted: true });
   });
   ipcMain.handle('app:open-history', () => {
@@ -1070,7 +1101,12 @@ void app.whenReady().then(async () => {
   installSecurityHandlers();
   installContentSecurityPolicy();
   registerIpc();
-  settingsWindow = new SettingsWindowManager(logger, isDevelopment);
+  settingsWindow = new SettingsWindowManager(logger, isDevelopment, () => {
+    // Safety net: restore the application menu if the settings window closes
+    // mid-capture and the renderer never got to end the key capture.
+    keyCaptureDepth = 0;
+    void rebuildApplicationMenu();
+  });
   historyWindow = new HistoryWindowManager(logger, isDevelopment);
   await rebuildApplicationMenu();
   mainWindow = createWindow();

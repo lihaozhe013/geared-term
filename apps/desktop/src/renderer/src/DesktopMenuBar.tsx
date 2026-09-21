@@ -1,6 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronRight } from 'lucide-react';
 import type { SettingsRecord } from '@geared-term/protocol';
+import {
+  formatKeybinding,
+  normalizePlatform,
+  resolveKeybindings,
+  type KeybindingMap,
+  type KeybindingOverrides
+} from '@geared-term/keybindings';
 
 type MenuAction = string;
 
@@ -24,6 +31,7 @@ type DesktopMenuBarProps = {
   theme: string;
   themeNames: string[];
   isDevelopment: boolean;
+  keybindings?: KeybindingOverrides;
 };
 
 type MenuLabels = {
@@ -81,9 +89,9 @@ const labels: Record<'en-US' | 'zh-CN', MenuLabels> = {
     view: 'View',
     reload: 'Reload',
     devTools: 'Toggle developer tools',
-    actualSize: 'Actual size',
-    zoomIn: 'Zoom in',
-    zoomOut: 'Zoom out',
+    actualSize: 'Reset terminal font size',
+    zoomIn: 'Increase terminal font size',
+    zoomOut: 'Decrease terminal font size',
     fullScreen: 'Toggle full screen',
     panels: 'Panels',
     sftp: 'SFTP files',
@@ -117,9 +125,9 @@ const labels: Record<'en-US' | 'zh-CN', MenuLabels> = {
     view: '视图',
     reload: '重新加载',
     devTools: '切换开发者工具',
-    actualSize: '实际大小',
-    zoomIn: '放大',
-    zoomOut: '缩小',
+    actualSize: '重置终端字号',
+    zoomIn: '增大终端字号',
+    zoomOut: '减小终端字号',
     fullScreen: '切换全屏',
     panels: '面板',
     sftp: 'SFTP 文件',
@@ -164,18 +172,21 @@ function createMenus(
   language: SettingsRecord['language'],
   theme: string,
   themeNames: string[],
-  isDevelopment: boolean
+  isDevelopment: boolean,
+  bindings: KeybindingMap
 ): MenuDefinition[] {
   const t = labels[resolveLocale(language)];
+  const hint = (command: keyof KeybindingMap): string =>
+    formatKeybinding(bindings[command], normalizePlatform(window.geared.platform));
   return [
     {
       id: 'file',
       label: t.file,
       items: [
-        action('new-local', t.newLocal, 'new-local', { shortcut: 'Ctrl+T' }),
+        action('new-local', t.newLocal, 'new-local', { shortcut: hint('tab.new') }),
         action('quick-ssh', t.quickConnection, 'quick-ssh'),
         separator('file-divider-1'),
-        action('settings', t.settings, 'open-settings', { shortcut: 'Ctrl+,' }),
+        action('settings', t.settings, 'open-settings', { shortcut: hint('app.settings') }),
         action('config-folder', t.openConfigFolder, 'open-config-folder'),
         separator('file-divider-2'),
         action('quit', t.quit, 'quit')
@@ -201,9 +212,9 @@ function createMenus(
         action('reload', t.reload, 'reload'),
         ...(isDevelopment ? [action('devtools', t.devTools, 'toggle-dev-tools')] : []),
         separator('view-divider-1'),
-        action('actual-size', t.actualSize, 'reset-zoom'),
-        action('zoom-in', t.zoomIn, 'zoom-in'),
-        action('zoom-out', t.zoomOut, 'zoom-out'),
+        action('actual-size', t.actualSize, 'zoom-reset', { shortcut: hint('terminal.zoomReset') }),
+        action('zoom-in', t.zoomIn, 'zoom-in', { shortcut: hint('terminal.zoomIn') }),
+        action('zoom-out', t.zoomOut, 'zoom-out', { shortcut: hint('terminal.zoomOut') }),
         separator('view-divider-2'),
         action('fullscreen', t.fullScreen, 'toggle-fullscreen'),
         submenu('panels', t.panels, [
@@ -211,7 +222,7 @@ function createMenus(
           action('assistant', t.assistant, 'toggle-assistant'),
           action('environment', t.environment, 'toggle-environment'),
           separator('panels-divider'),
-          action('cycle-panels', t.cyclePanels, 'cycle-panels', { shortcut: 'F6' })
+          action('cycle-panels', t.cyclePanels, 'cycle-panels', { shortcut: hint('panel.cycle') })
         ]),
         submenu(
           'themes',
@@ -311,11 +322,16 @@ export function DesktopMenuBar({
   language,
   theme,
   themeNames,
-  isDevelopment
+  isDevelopment,
+  keybindings
 }: DesktopMenuBarProps): React.JSX.Element {
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
-  const menus = createMenus(language, theme, themeNames, isDevelopment);
+  const bindings = useMemo(
+    () => resolveKeybindings(keybindings, normalizePlatform(window.geared.platform)),
+    [keybindings]
+  );
+  const menus = createMenus(language, theme, themeNames, isDevelopment, bindings);
 
   useEffect(() => {
     const onPointerDown = (event: PointerEvent): void => {

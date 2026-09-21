@@ -4,6 +4,7 @@
     { "path": "packages/protocol" },
     { "path": "packages/domain" },
     { "path": "packages/command-parser" },
+    { "path": "packages/keybindings" },
     { "path": "packages/test-support" },
     { "path": "apps/desktop" }
   ]

@@ -34,6 +34,7 @@
   },
   "dependencies": {
     "@geared-term/domain": "workspace:*",
+    "@geared-term/keybindings": "workspace:*",
     "@geared-term/protocol": "workspace:*",
     "@xterm/addon-fit": "0.11.0",
     "@xterm/addon-search": "0.16.0",

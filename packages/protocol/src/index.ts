@@ -52,6 +52,7 @@ export const SETTINGS_CATEGORIES = [
   'general',
   'appearance',
   'terminal',
+  'shortcuts',
   'sftp',
   'ai-connections',
   'ai-assistant',
@@ -133,6 +134,12 @@ export const UiStateRecordSchema = z
   })
   .strict();
 
+/** Persisted keybinding overrides keyed by command id; unknown ids and
+ *  invalid specs are dropped when bindings are resolved. */
+export const KeybindingOverridesSchema = z
+  .record(z.string().min(1).max(64), z.string().min(1).max(64))
+  .default({});
+
 export const SettingsRecordSchema = z
   .object({
     schemaVersion: z.literal(1),
@@ -150,6 +157,7 @@ export const SettingsRecordSchema = z
     uiFontSize: z.number().min(10).max(24).default(13),
     terminalFontFamily: z.string().min(1).max(256).default('Cascadia Code'),
     terminalFontLigatures: z.boolean().default(false),
+    keybindings: KeybindingOverridesSchema,
     terminalFontFallbacks: z
       .array(
         z

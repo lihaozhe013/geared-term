@@ -59,7 +59,8 @@ const defaultSettings: SettingsRecord = {
   terminalFontFamily: 'Cascadia Code',
   terminalFontLigatures: true,
   terminalFontFallbacks: [],
-  globalAiInstructions: ''
+  globalAiInstructions: '',
+  keybindings: {}
 };
 
 const defaultUiState: UiStateRecord = {
@@ -500,12 +501,41 @@ export function App(): React.JSX.Element {
     }
   }, []);
 
+  const cycleTab = useCallback((direction: 1 | -1): void => {
+    setTabs((current) => {
+      if (current.length > 1) {
+        setActiveTabId((active) => {
+          const index = current.findIndex((tab) => tab.id === active);
+          if (index === -1) return active;
+          const next = (index + direction + current.length) % current.length;
+          return current[next]?.id ?? active;
+        });
+      }
+      return current;
+    });
+  }, []);
+
+  const zoomFont = useCallback((delta: number | 'reset'): void => {
+    const current = menuHandlers.current.settings;
+    const next =
+      delta === 'reset' ? 14 : Math.min(32, Math.max(8, current.terminalFontSize + delta));
+    if (next === current.terminalFontSize) return;
+    void menuHandlers.current
+      .saveSettings({ ...current, terminalFontSize: next })
+      .catch(() => undefined);
+  }, []);
+
   const menuHandlers = useRef({
     addLocalTab,
+    closeTab,
     openQuickSshDialog: (): void => setShowQuickSsh(true),
     toggleAssistant,
     toggleSftp,
     toggleEnvironment,
+    cycleTab,
+    zoomFont,
+    tabs,
+    activeTabId,
     uiState,
     setUiState,
     settings,
@@ -513,10 +543,15 @@ export function App(): React.JSX.Element {
   });
   menuHandlers.current = {
     addLocalTab,
+    closeTab,
     openQuickSshDialog: (): void => setShowQuickSsh(true),
     toggleAssistant,
     toggleSftp,
     toggleEnvironment,
+    cycleTab,
+    zoomFont,
+    tabs,
+    activeTabId,
     uiState,
     setUiState,
     settings,
@@ -557,6 +592,31 @@ export function App(): React.JSX.Element {
         };
         handlers.setUiState(nextState);
         void window.geared.saveUiState(nextState).catch(() => undefined);
+        return;
+      }
+      if (command === 'tab-close') {
+        const activeId = handlers.activeTabId ?? handlers.tabs[0]?.id;
+        if (activeId) handlers.closeTab(activeId);
+        return;
+      }
+      if (command === 'tab-next') {
+        handlers.cycleTab(1);
+        return;
+      }
+      if (command === 'tab-previous') {
+        handlers.cycleTab(-1);
+        return;
+      }
+      if (command === 'zoom-in') {
+        handlers.zoomFont(1);
+        return;
+      }
+      if (command === 'zoom-out') {
+        handlers.zoomFont(-1);
+        return;
+      }
+      if (command === 'zoom-reset') {
+        handlers.zoomFont('reset');
         return;
       }
       if (command.startsWith('theme:')) {
@@ -619,6 +679,7 @@ export function App(): React.JSX.Element {
         themeNames={themeNames}
         isDevelopment={!info?.isPackaged}
         onOpenSettings={() => void window.geared.openSettings()}
+        keybindings={settings.keybindings}
       />
 
       <section

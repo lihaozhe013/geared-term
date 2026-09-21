@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { defaultKeybindings, resolveKeybindings } from '@geared-term/keybindings';
 import {
   buildTerminalContextMenu,
   toTerminalPasteText,
@@ -7,7 +8,7 @@ import {
 
 describe('terminalShortcutsFor', () => {
   it('uses shifted chords on Windows/Linux', () => {
-    expect(terminalShortcutsFor('win32')).toEqual({
+    expect(terminalShortcutsFor(defaultKeybindings('win32'), 'win32')).toEqual({
       copy: 'Ctrl+Shift+C',
       paste: 'Ctrl+Shift+V',
       selectAll: 'Ctrl+Shift+A',
@@ -16,12 +17,17 @@ describe('terminalShortcutsFor', () => {
   });
 
   it('uses Cmd chords on macOS', () => {
-    expect(terminalShortcutsFor('darwin')).toEqual({
-      copy: 'Cmd+C',
-      paste: 'Cmd+V',
-      selectAll: 'Cmd+A',
-      search: 'Cmd+F'
+    expect(terminalShortcutsFor(defaultKeybindings('darwin'), 'darwin')).toEqual({
+      copy: '⌘C',
+      paste: '⌘V',
+      selectAll: '⌘A',
+      search: '⌘F'
     });
+  });
+
+  it('reflects customized bindings', () => {
+    const bindings = resolveKeybindings({ 'terminal.copy': 'ctrl+alt+c' }, 'win32');
+    expect(terminalShortcutsFor(bindings, 'win32').copy).toBe('Ctrl+Alt+C');
   });
 });
 
@@ -43,7 +49,7 @@ describe('buildTerminalContextMenu', () => {
     search: 'Search',
     clear: 'Clear'
   };
-  const shortcuts = terminalShortcutsFor('win32');
+  const shortcuts = terminalShortcutsFor(defaultKeybindings('win32'), 'win32');
   const actions = {
     copy: () => undefined,
     paste: () => undefined,

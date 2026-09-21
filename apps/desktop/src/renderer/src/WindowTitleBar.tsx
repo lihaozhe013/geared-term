@@ -1,5 +1,6 @@
 import { Settings } from 'lucide-react';
 import type { SettingsRecord } from '@geared-term/protocol';
+import type { KeybindingOverrides } from '@geared-term/keybindings';
 import { DesktopMenuBar } from './DesktopMenuBar';
 import { WindowControls } from './WindowControls';
 import gearedTermMark from './assets/geared-term-mark.png';
@@ -14,6 +15,7 @@ type WindowTitleBarProps = {
   isDevelopment?: boolean;
   showMenu?: boolean;
   onOpenSettings?: () => void;
+  keybindings?: KeybindingOverrides;
 };
 
 export function WindowTitleBar({
@@ -25,7 +27,8 @@ export function WindowTitleBar({
   themeNames = [],
   isDevelopment = false,
   showMenu = true,
-  onOpenSettings
+  onOpenSettings,
+  keybindings
 }: WindowTitleBarProps): React.JSX.Element {
   const isMac = platform === 'darwin';
   return (
@@ -41,6 +44,7 @@ export function WindowTitleBar({
             theme={theme}
             themeNames={themeNames}
             isDevelopment={isDevelopment}
+            keybindings={keybindings}
           />
         ) : null}
       </div>

@@ -1,8 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { FitAddon } from '@xterm/addon-fit';
 import { SearchAddon, type ISearchDecorationOptions } from '@xterm/addon-search';
 import { Terminal } from '@xterm/xterm';
 import { normalizeTerminalFontFallbacks } from '@geared-term/protocol';
+import {
+  matchesKeybinding,
+  normalizePlatform,
+  resolveKeybindings,
+  type KeybindingMap
+} from '@geared-term/keybindings';
 import {
   TerminalPortMessageSchema,
   type LocalTerminalRequest,
@@ -111,6 +117,14 @@ export function TerminalPane({
   registerSftpControlRef.current = registerSftpControl;
   paletteRef.current = palette;
 
+  const platform = useMemo(() => normalizePlatform(window.geared.platform), []);
+  const keybindings = useMemo(
+    () => resolveKeybindings(settings.keybindings, platform),
+    [settings.keybindings, platform]
+  );
+  const keybindingsRef = useRef<KeybindingMap>(keybindings);
+  keybindingsRef.current = keybindings;
+
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
@@ -137,20 +151,19 @@ export function TerminalPane({
       // Escape byte) while it is visible without stopping DOM propagation so
       // the menu's own Escape handler still runs.
       if (event.type === 'keydown' && contextMenuOpenRef.current) return false;
-      if (event.type !== 'keydown' || (!event.ctrlKey && !event.metaKey)) return true;
-      const isMac = window.geared.platform === 'darwin';
-      const isMacCopyPaste = event.metaKey && !event.shiftKey && isMac;
-      const key = event.key.toLowerCase();
+      if (event.type !== 'keydown') return true;
+      const bindings = keybindingsRef.current;
       // Returning false only makes xterm skip the key; without preventDefault
       // Chromium still runs its default edit command (Ctrl+Shift+V is
       // paste-as-plain-text on the focused textarea), which fires a native
       // paste event and the clipboard text reaches the shell twice.
-      if (key === 'c' && ((event.ctrlKey && event.shiftKey) || isMacCopyPaste)) {
+      if (matchesKeybinding(event, bindings['terminal.copy'], platform)) {
         event.preventDefault();
-        if (terminal.getSelection()) void navigator.clipboard.writeText(terminal.getSelection());
+        const selection = terminal.getSelection();
+        if (selection) void navigator.clipboard.writeText(selection);
         return false;
       }
-      if (key === 'v' && ((event.ctrlKey && event.shiftKey) || isMacCopyPaste)) {
+      if (matchesKeybinding(event, bindings['terminal.paste'], platform)) {
         event.preventDefault();
         void navigator.clipboard
           .readText()
@@ -158,17 +171,22 @@ export function TerminalPane({
           .catch(() => undefined);
         return false;
       }
-      if (key === 'a' && ((event.ctrlKey && event.shiftKey) || isMacCopyPaste)) {
+      if (matchesKeybinding(event, bindings['terminal.selectAll'], platform)) {
         event.preventDefault();
         terminal.selectAll();
         return false;
       }
-      if (key === 'f' && (event.ctrlKey || (event.metaKey && isMac))) {
+      if (matchesKeybinding(event, bindings['terminal.search'], platform)) {
         event.preventDefault();
         setShowSearch((current) => {
           if (!current) requestAnimationFrame(() => searchInputRef.current?.focus());
           return !current;
         });
+        return false;
+      }
+      if (matchesKeybinding(event, bindings['terminal.clear'], platform)) {
+        event.preventDefault();
+        terminal.clear();
         return false;
       }
       return true;
@@ -430,7 +448,7 @@ export function TerminalPane({
           search: translate(settings.language, 'terminalSearch'),
           clear: translate(settings.language, 'terminalClear')
         },
-        shortcuts: terminalShortcutsFor(window.geared.platform),
+        shortcuts: terminalShortcutsFor(keybindings, platform),
         actions: {
           copy: () => {
             const terminal = terminalRef.current;

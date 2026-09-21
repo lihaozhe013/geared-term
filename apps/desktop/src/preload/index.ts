@@ -298,6 +298,12 @@ const api = Object.freeze({
     const settings = SettingsRecordSchema.parse(input);
     return SettingsRecordSchema.parse(await ipcRenderer.invoke('settings:save', settings));
   },
+  beginKeyCapture: async () => {
+    return SftpOperationResultSchema.parse(await ipcRenderer.invoke('app:begin-key-capture', {}));
+  },
+  endKeyCapture: async () => {
+    return SftpOperationResultSchema.parse(await ipcRenderer.invoke('app:end-key-capture', {}));
+  },
   openSettings: async (category?: string) => {
     const request = SettingsOpenRequestSchema.parse({ category });
     return SftpOperationResultSchema.parse(await ipcRenderer.invoke('app:open-settings', request));

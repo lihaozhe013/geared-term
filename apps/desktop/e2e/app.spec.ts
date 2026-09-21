@@ -48,6 +48,7 @@ test('exposes exactly the documented preload surface', async () => {
   expect(keys).toEqual(
     [
       'acceptAiEndpoint',
+      'beginKeyCapture',
       'cancelSftpTransfer',
       'clearAiHistory',
       'continueAiHistory',
@@ -65,6 +66,7 @@ test('exposes exactly the documented preload surface', async () => {
       'downloadPathsSftp',
       'downloadSftp',
       'enableAutoUnlock',
+      'endKeyCapture',
       'executeMenuAction',
       'executeCommandAction',
       'getAppInfo',

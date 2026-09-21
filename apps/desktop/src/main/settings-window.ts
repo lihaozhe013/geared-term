@@ -12,6 +12,7 @@ export type SettingsCategory =
   | 'general'
   | 'appearance'
   | 'terminal'
+  | 'shortcuts'
   | 'sftp'
   | 'ai-connections'
   | 'ai-assistant'
@@ -27,7 +28,8 @@ export class SettingsWindowManager {
 
   constructor(
     private readonly logger: Logger,
-    private readonly isDevelopment: boolean
+    private readonly isDevelopment: boolean,
+    private readonly onClosed?: () => void
   ) {}
 
   open(category?: SettingsCategory): void {
@@ -79,6 +81,7 @@ export class SettingsWindowManager {
     }
     window.on('closed', () => {
       if (this.window === window) this.window = undefined;
+      this.onClosed?.();
     });
     this.window = window;
   }

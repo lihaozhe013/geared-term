@@ -1,5 +1,6 @@
 import type { ContextMenuItem } from '../sftp/context-menu';
 import { normalizeTerminalLineEndings } from '@geared-term/protocol';
+import { formatKeybinding, type KeybindingMap, type Platform } from '@geared-term/keybindings';
 
 export type TerminalMenuLabels = {
   copy: string;
@@ -24,17 +25,17 @@ export type TerminalMenuActions = {
   clear: () => void;
 };
 
-/** Hint chords shown in the menu; copy/paste/select-all use the shifted chord
- *  on Windows/Linux (SPEC 7.4) and the Cmd chord on macOS. */
-export function terminalShortcutsFor(platform: string): TerminalMenuShortcuts {
-  if (platform === 'darwin') {
-    return { copy: 'Cmd+C', paste: 'Cmd+V', selectAll: 'Cmd+A', search: 'Cmd+F' };
-  }
+/** Hint chords shown in the menu, derived from the resolved keybinding map so
+ *  customized bindings are reflected (SPEC 7.4 keeps the default chords). */
+export function terminalShortcutsFor(
+  bindings: KeybindingMap,
+  platform: Platform
+): TerminalMenuShortcuts {
   return {
-    copy: 'Ctrl+Shift+C',
-    paste: 'Ctrl+Shift+V',
-    selectAll: 'Ctrl+Shift+A',
-    search: 'Ctrl+F'
+    copy: formatKeybinding(bindings['terminal.copy'], platform),
+    paste: formatKeybinding(bindings['terminal.paste'], platform),
+    selectAll: formatKeybinding(bindings['terminal.selectAll'], platform),
+    search: formatKeybinding(bindings['terminal.search'], platform)
   };
 }
 

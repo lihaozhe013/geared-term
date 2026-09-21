@@ -11,6 +11,7 @@ import {
   Bot,
   FolderSync,
   Info,
+  Keyboard,
   Lock,
   Palette,
   Settings as SettingsIcon,
@@ -28,12 +29,14 @@ import {
 } from './sections';
 import { AiConnectionsSection } from './AiConnections';
 import { SecurityVaultSection } from './SecurityVault';
+import { ShortcutsSection } from './ShortcutsSection';
 import { WindowTitleBar } from '../WindowTitleBar';
 
 type Category =
   | 'general'
   | 'appearance'
   | 'terminal'
+  | 'shortcuts'
   | 'sftp'
   | 'ai-connections'
   | 'ai-assistant'
@@ -73,7 +76,12 @@ export function SettingsWindow(): React.JSX.Element {
     const offNavigate = window.geared.onSettingsNavigate((next) => {
       if (next === 'general' || next === 'appearance' || next === 'terminal' || next === 'sftp') {
         setCategory(next);
-      } else if (next === 'ai-connections' || next === 'ai-assistant' || next === 'security') {
+      } else if (
+        next === 'ai-connections' ||
+        next === 'ai-assistant' ||
+        next === 'security' ||
+        next === 'shortcuts'
+      ) {
         setCategory(next);
       } else if (next === 'about') {
         setCategory(next);
@@ -167,6 +175,13 @@ export function SettingsWindow(): React.JSX.Element {
           </button>
           <button
             type="button"
+            className={`settings-nav-item ${category === 'shortcuts' ? 'active' : ''}`}
+            onClick={() => setCategory('shortcuts')}
+          >
+            <Keyboard size={15} aria-hidden="true" /> {t('groupShortcuts')}
+          </button>
+          <button
+            type="button"
             className={`settings-nav-item ${category === 'sftp' ? 'active' : ''}`}
             onClick={() => setCategory('sftp')}
           >
@@ -218,6 +233,9 @@ export function SettingsWindow(): React.JSX.Element {
             ) : null}
             {category === 'terminal' ? (
               <TerminalSection settings={settings} onSave={save} t={t} />
+            ) : null}
+            {category === 'shortcuts' ? (
+              <ShortcutsSection settings={settings} onSave={save} t={t} />
             ) : null}
             {category === 'sftp' ? <SftpSection settings={settings} onSave={save} t={t} /> : null}
             {category === 'ai-connections' ? <AiConnectionsSection t={t} /> : null}
