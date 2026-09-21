@@ -181,15 +181,6 @@ importers:
 
   apps/desktop:
     dependencies:
-      '@geared-term/domain':
-        specifier: workspace:*
-        version: link:../../packages/domain
-      '@geared-term/keybindings':
-        specifier: workspace:*
-        version: link:../../packages/keybindings
-      '@geared-term/protocol':
-        specifier: workspace:*
-        version: link:../../packages/protocol
       '@xterm/addon-fit':
         specifier: 0.11.0
         version: 0.11.0
@@ -236,6 +227,18 @@ importers:
         specifier: 4.6.5
         version: 4.6.5
     devDependencies:
+      '@electron/asar':
+        specifier: 3.4.1
+        version: 3.4.1
+      '@geared-term/command-parser':
+        specifier: workspace:*
+        version: link:../../packages/command-parser
+      '@geared-term/keybindings':
+        specifier: workspace:*
+        version: link:../../packages/keybindings
+      '@geared-term/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
       '@playwright/test':
         specifier: ^1.63.0
         version: 1.63.0

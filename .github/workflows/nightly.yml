@@ -116,6 +116,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Install packaged smoke-test display
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends --yes xvfb
+
       - name: Build Windows installer and portable
         if: matrix.platform == 'windows'
         run: pnpm run package:win
@@ -129,6 +135,36 @@ jobs:
       - name: Build Linux AppImage
         if: matrix.platform == 'linux'
         run: pnpm run package:linux
+
+      - name: Prepare unpacked package for startup smoke test (Windows)
+        if: matrix.platform == 'windows'
+        run:
+          pnpm --filter @geared-term/desktop exec electron-builder --config electron-builder.yml
+          --win --x64 --dir --publish never
+
+      - name: Prepare unpacked package for startup smoke test (macOS)
+        if: matrix.platform == 'macos'
+        run:
+          pnpm --filter @geared-term/desktop exec electron-builder --config electron-builder.yml
+          --mac --arm64 --dir --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Prepare unpacked package for startup smoke test (Linux)
+        if: matrix.platform == 'linux'
+        run:
+          pnpm --filter @geared-term/desktop exec electron-builder --config electron-builder.yml
+          --linux --x64 --dir --publish never
+
+      - name: Verify packaged startup (Windows/macOS)
+        if: matrix.platform != 'linux'
+        run: pnpm --filter @geared-term/desktop smoke:packaged
+
+      - name: Verify packaged startup (Linux)
+        if: matrix.platform == 'linux'
+        run:
+          xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24' pnpm --filter
+          @geared-term/desktop smoke:packaged
 
       - name: Verify Windows packages
         if: matrix.platform == 'windows'

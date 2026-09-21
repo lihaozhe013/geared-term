@@ -6,6 +6,10 @@ import { SettingsSchema, defaultSettings } from './schema';
 import { VersionedJsonStore } from './json-store';
 
 describe('versioned JSON store', () => {
+  it('keeps background sessions opt-in for fresh installs', () => {
+    expect(defaultSettings.keepRunningInBackground).toBe(false);
+  });
+
   it('writes validated data atomically and recovers the previous version', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'geared-term-store-'));
     const path = join(directory, 'config.json');

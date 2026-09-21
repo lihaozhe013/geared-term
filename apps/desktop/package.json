@@ -14,10 +14,11 @@
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
-    "build": "electron-vite build",
+    "build": "electron-vite build && node scripts/verify-bundle.mjs",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run src --passWithNoTests",
     "test:e2e": "playwright test -c playwright.config.ts",
+    "smoke:packaged": "node scripts/packaged-startup.mjs",
     "audit:security": "node scripts/security-audit.mjs",
     "postinstall": "electron-builder install-app-deps",
     "build:win": "pnpm run build && electron-builder --config electron-builder.yml --win --publish never",
@@ -33,9 +34,6 @@
     "package:linux": "pnpm run build:linux:x64"
   },
   "dependencies": {
-    "@geared-term/domain": "workspace:*",
-    "@geared-term/keybindings": "workspace:*",
-    "@geared-term/protocol": "workspace:*",
     "@xterm/addon-fit": "0.11.0",
     "@xterm/addon-search": "0.16.0",
     "@xterm/addon-webgl": "0.19.0",
@@ -53,6 +51,10 @@
     "zod": "4.6.5"
   },
   "devDependencies": {
+    "@electron/asar": "3.4.1",
+    "@geared-term/command-parser": "workspace:*",
+    "@geared-term/keybindings": "workspace:*",
+    "@geared-term/protocol": "workspace:*",
     "@playwright/test": "^1.63.0",
     "@types/better-sqlite3": "^9.6.0",
     "@types/react": "19.3.0",

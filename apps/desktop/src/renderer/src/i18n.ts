@@ -20,7 +20,8 @@ const messages = {
     defaultTerm: 'Default terminal type',
     splitCommands: 'Show safe command blocks separately',
     allowRiskyRun: 'Allow Run on risky commands (sudo, rm -rf, ...)',
-    keepRunningInBackground: 'Keep running in the background when the window is closed',
+    keepRunningInBackground:
+      'Keep sessions running after closing the window (restore from the tray or Dock)',
     remoteCommands: 'Remote file commands (one per line)',
     remoteCommandsHint:
       'Used by the SFTP file context menu; names are quoted and control characters rejected.',
@@ -248,7 +249,7 @@ const messages = {
     defaultTerm: '默认终端类型',
     splitCommands: '将安全命令块分开展示',
     allowRiskyRun: '允许一键运行有风险的命令（sudo、rm -rf 等）',
-    keepRunningInBackground: '关闭窗口后在后台保持运行',
+    keepRunningInBackground: '关闭窗口后保持会话运行（可从托盘或程序坞重新唤起）',
     remoteCommands: '远程文件命令（每行一条）',
     remoteCommandsHint: '用于 SFTP 文件右键菜单；文件名会被安全引用，控制字符将被拒绝。',
     groupGeneral: '通用',

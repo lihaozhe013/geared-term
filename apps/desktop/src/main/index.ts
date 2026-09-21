@@ -125,13 +125,16 @@ let keyCaptureDepth = 0;
 const userDataOverride = process.env.GEARED_USER_DATA?.trim();
 if (userDataOverride) app.setPath('userData', userDataOverride);
 // Keyed on the userData directory, so the override above must land first.
-if (!app.requestSingleInstanceLock()) {
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+if (!hasSingleInstanceLock) {
   app.quit();
 } else {
   app.on('second-instance', () => restoreMainWindow());
 }
 let logger: Logger;
 let mainWindow: BrowserWindow | undefined;
+let pendingRestore = false;
+let applicationReady = false;
 let quitRequested = false;
 let trayController: TrayController | undefined;
 let settingsWindow: SettingsWindowManager;
@@ -156,12 +159,17 @@ function backgroundModeEnabled(): boolean {
 }
 
 function restoreMainWindow(): void {
+  if (!applicationReady || !storage || !logger) {
+    pendingRestore = true;
+    return;
+  }
   if (!mainWindow || mainWindow.isDestroyed()) {
     mainWindow = createWindow();
     return;
   }
   if (mainWindow.isMinimized()) mainWindow.restore();
   mainWindow.show();
+  mainWindow.webContents.setBackgroundThrottling(true);
   mainWindow.focus();
 }
 
@@ -171,11 +179,13 @@ function toggleMainWindow(): void {
     return;
   }
   if (mainWindow.isVisible() && mainWindow.isFocused()) {
+    mainWindow.webContents.setBackgroundThrottling(false);
     mainWindow.hide();
     return;
   }
   if (mainWindow.isMinimized()) mainWindow.restore();
   mainWindow.show();
+  mainWindow.webContents.setBackgroundThrottling(true);
   mainWindow.focus();
 }
 
@@ -374,6 +384,7 @@ function createWindow(): BrowserWindow {
         // Background mode keeps the whole renderer (tabs, PTYs, scrollback)
         // alive behind a hidden window; rearm the interception for the next
         // real close.
+        window.webContents.setBackgroundThrottling(false);
         window.hide();
         persistingWindowState = false;
       });
@@ -1100,72 +1111,82 @@ function registerIpc(): void {
   });
 }
 
-void app.whenReady().then(async () => {
-  const logDirectory = isDevelopment
-    ? join(process.cwd(), 'debug-logs')
-    : join(app.getPath('userData'), 'logs');
-  logger = createLogger(logDirectory);
-  storage = new AppStorage(app.getPath('userData'), logger, {
-    isEncryptionAvailable: () => safeStorage.isEncryptionAvailable(),
-    encryptString: (plaintext) => safeStorage.encryptString(plaintext),
-    decryptString: (encrypted) => safeStorage.decryptString(encrypted),
-    selectedStorageBackend: () =>
-      process.platform === 'linux' ? safeStorage.getSelectedStorageBackend() : undefined
-  });
-  await storage.load();
-  environmentManager = new EnvironmentManager(storage, logger, (record) =>
-    sendToRenderer('environment:updated', EnvironmentRecordSchema.parse(record))
-  );
-  localTerminals = new LocalTerminalManager(logger, {
-    onReady: (details) => environmentManager.onLocalReady(details),
-    onClosed: (sessionId) => environmentManager.onClosed(sessionId)
-  });
-  const knownHosts = new KnownHostsStore(join(app.getPath('userData'), 'known-hosts.json'), logger);
-  transferManager = new TransferManager(
-    (sessionId) => sshSessions.sftpService(sessionId),
-    (event) => sendToRenderer('sftp:transfer-event', SftpTransferEventSchema.parse(event))
-  );
-  sshSessions = new SshSessionManager(logger, knownHosts, {
-    onReady: (details) =>
-      environmentManager.onSshReady(details, (signal) =>
-        sshSessions.exec(details.sessionId, undefined, signal)
-      ),
-    onSftpCd: (sessionId, directory) =>
-      sendToRenderer('sftp:cd', SftpCdEventSchema.parse({ sessionId, directory })),
-    onClosed: (sessionId) => {
-      environmentManager.onClosed(sessionId);
-      transferManager.cancelForSession(sessionId);
+if (hasSingleInstanceLock) {
+  void app.whenReady().then(async () => {
+    const logDirectory = isDevelopment
+      ? join(process.cwd(), 'debug-logs')
+      : join(app.getPath('userData'), 'logs');
+    logger = createLogger(logDirectory);
+    storage = new AppStorage(app.getPath('userData'), logger, {
+      isEncryptionAvailable: () => safeStorage.isEncryptionAvailable(),
+      encryptString: (plaintext) => safeStorage.encryptString(plaintext),
+      decryptString: (encrypted) => safeStorage.decryptString(encrypted),
+      selectedStorageBackend: () =>
+        process.platform === 'linux' ? safeStorage.getSelectedStorageBackend() : undefined
+    });
+    await storage.load();
+    environmentManager = new EnvironmentManager(storage, logger, (record) =>
+      sendToRenderer('environment:updated', EnvironmentRecordSchema.parse(record))
+    );
+    localTerminals = new LocalTerminalManager(logger, {
+      onReady: (details) => environmentManager.onLocalReady(details),
+      onClosed: (sessionId) => environmentManager.onClosed(sessionId)
+    });
+    const knownHosts = new KnownHostsStore(
+      join(app.getPath('userData'), 'known-hosts.json'),
+      logger
+    );
+    transferManager = new TransferManager(
+      (sessionId) => sshSessions.sftpService(sessionId),
+      (event) => sendToRenderer('sftp:transfer-event', SftpTransferEventSchema.parse(event))
+    );
+    sshSessions = new SshSessionManager(logger, knownHosts, {
+      onReady: (details) =>
+        environmentManager.onSshReady(details, (signal) =>
+          sshSessions.exec(details.sessionId, undefined, signal)
+        ),
+      onSftpCd: (sessionId, directory) =>
+        sendToRenderer('sftp:cd', SftpCdEventSchema.parse({ sessionId, directory })),
+      onClosed: (sessionId) => {
+        environmentManager.onClosed(sessionId);
+        transferManager.cancelForSession(sessionId);
+      }
+    });
+    process.on('uncaughtException', (error) =>
+      logger.error('system', 'Uncaught exception', { error: error.message })
+    );
+    process.on('unhandledRejection', (reason) =>
+      logger.error('system', 'Unhandled rejection', { reason })
+    );
+    installSecurityHandlers();
+    installContentSecurityPolicy();
+    registerIpc();
+    settingsWindow = new SettingsWindowManager(logger, isDevelopment, () => {
+      // Safety net: restore the application menu if the settings window closes
+      // mid-capture and the renderer never got to end the key capture.
+      keyCaptureDepth = 0;
+      void rebuildApplicationMenu();
+    });
+    historyWindow = new HistoryWindowManager(logger, isDevelopment);
+    await rebuildApplicationMenu();
+    trayController = new TrayController(
+      logger,
+      () => toggleMainWindow(),
+      () => app.quit()
+    );
+    trayController.sync(
+      storage.settingsSnapshot().keepRunningInBackground,
+      resolveMenuLocale(storage.settingsSnapshot().language)
+    );
+    mainWindow = createWindow();
+    applicationReady = true;
+    if (pendingRestore) {
+      pendingRestore = false;
+      restoreMainWindow();
     }
+    logger.info('app', 'Application ready', { packaged: app.isPackaged });
   });
-  process.on('uncaughtException', (error) =>
-    logger.error('system', 'Uncaught exception', { error: error.message })
-  );
-  process.on('unhandledRejection', (reason) =>
-    logger.error('system', 'Unhandled rejection', { reason })
-  );
-  installSecurityHandlers();
-  installContentSecurityPolicy();
-  registerIpc();
-  settingsWindow = new SettingsWindowManager(logger, isDevelopment, () => {
-    // Safety net: restore the application menu if the settings window closes
-    // mid-capture and the renderer never got to end the key capture.
-    keyCaptureDepth = 0;
-    void rebuildApplicationMenu();
-  });
-  historyWindow = new HistoryWindowManager(logger, isDevelopment);
-  await rebuildApplicationMenu();
-  trayController = new TrayController(
-    logger,
-    () => toggleMainWindow(),
-    () => app.quit()
-  );
-  trayController.sync(
-    storage.settingsSnapshot().keepRunningInBackground,
-    resolveMenuLocale(storage.settingsSnapshot().language)
-  );
-  mainWindow = createWindow();
-  logger.info('app', 'Application ready', { packaged: app.isPackaged });
-});
+}
 
 app.on('before-quit', () => {
   quitRequested = true;

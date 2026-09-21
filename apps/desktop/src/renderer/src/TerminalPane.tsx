@@ -294,8 +294,10 @@ export function TerminalPane({
       if (!result.success) return;
       const message = result.data;
       if (message.kind === 'output') {
-        terminal.write(message.chunk);
-        client?.acknowledge(new TextEncoder().encode(message.chunk).byteLength);
+        const bytes = new TextEncoder().encode(message.chunk).byteLength;
+        terminal.write(message.chunk, () => {
+          if (!disposed) client?.acknowledge(bytes);
+        });
       } else if (message.kind === 'state') {
         onStateRef.current(message);
         if (message.state === 'failed') {

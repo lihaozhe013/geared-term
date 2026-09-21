@@ -4,9 +4,9 @@
     "types": ["node"],
     "jsx": "react-jsx",
     "paths": {
-      "@geared-term/domain": ["../../packages/domain/src/index.ts"],
       "@geared-term/protocol": ["../../packages/protocol/src/index.ts"],
-      "@geared-term/command-parser": ["../../packages/command-parser/src/index.ts"]
+      "@geared-term/command-parser": ["../../packages/command-parser/src/index.ts"],
+      "@geared-term/keybindings": ["../../packages/keybindings/src/index.ts"]
     }
   },
   "include": [
