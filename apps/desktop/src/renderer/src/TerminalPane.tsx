@@ -66,6 +66,7 @@ type TerminalPaneProps = {
     client: TerminalClient
   ) => void;
   onAlternateScreen?: (active: boolean) => void;
+  onTitleChange?: (title: string) => void;
   registerSftpControl?: (control: SftpTerminalControl | null) => void;
   onAddToChat?: (text: string) => void;
 };
@@ -96,6 +97,7 @@ export function TerminalPane({
   onState,
   onHostKeyPrompt,
   onAlternateScreen,
+  onTitleChange,
   registerSftpControl,
   onAddToChat
 }: TerminalPaneProps): React.JSX.Element {
@@ -114,6 +116,7 @@ export function TerminalPane({
   const onStateRef = useRef(onState);
   const onHostKeyPromptRef = useRef(onHostKeyPrompt);
   const onAlternateScreenRef = useRef(onAlternateScreen);
+  const onTitleChangeRef = useRef(onTitleChange);
   const registerSftpControlRef = useRef(registerSftpControl);
   const paletteRef = useRef(palette);
   activeRef.current = active;
@@ -387,6 +390,10 @@ export function TerminalPane({
         return false;
       }
     );
+    // OSC 0/1/2 titles (icon+title and title) drive the tab label.
+    const titleSubscription = terminal.onTitleChange((title) => {
+      onTitleChangeRef.current?.(title);
+    });
 
     const resizeObserver = new ResizeObserver(() => {
       if (activeRef.current) {
@@ -403,6 +410,7 @@ export function TerminalPane({
       resizeSubscription?.dispose();
       handlerEnter.dispose();
       handlerLeave.dispose();
+      titleSubscription.dispose();
       setAlternate(false);
       registerSftpControlRef.current?.(null);
       client?.close();

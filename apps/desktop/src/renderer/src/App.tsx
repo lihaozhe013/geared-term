@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { normalizePlatform, resolveKeybindings } from '@geared-term/keybindings';
 import { BUILTIN_THEME_NAMES, parseRemoteFileCommands } from '@geared-term/protocol';
 import type {
   AppInfo,
@@ -31,6 +32,14 @@ import { QuickSshDialog } from './QuickSshDialog';
 import { Sidebar } from './Sidebar';
 import { SftpPanel } from './SftpPanel';
 import { TerminalPane, type SftpTerminalControl } from './TerminalPane';
+import { TabBar } from './terminal/tab-bar';
+import { tabShortcutsFor } from './terminal/tab-context-menu';
+import {
+  insertTabAfter,
+  moveTabById,
+  nextCopyName,
+  tabDisplayLabel
+} from './terminal/tab-ordering';
 import { VaultGate } from './VaultGate';
 import { WindowTitleBar } from './WindowTitleBar';
 
@@ -42,6 +51,8 @@ type TerminalTab = {
   name: string;
   request: TerminalRequest;
   status: TabStatus;
+  manualTitle?: boolean;
+  dynamicTitle?: string;
 };
 
 const defaultSettings: SettingsRecord = {
@@ -220,6 +231,11 @@ export function App(): React.JSX.Element {
     [t]
   );
 
+  const tabMenuShortcuts = useMemo(() => {
+    const platform = normalizePlatform(window.geared.platform);
+    return tabShortcutsFor(resolveKeybindings(settings.keybindings, platform), platform);
+  }, [settings.keybindings]);
+
   useEffect(() => {
     void Promise.all([
       window.geared.getAppInfo(),
@@ -331,6 +347,50 @@ export function App(): React.JSX.Element {
       });
       return next;
     });
+  }, []);
+
+  const renameTab = useCallback((id: string, name: string): void => {
+    setTabs((current) =>
+      current.map((tab) => (tab.id === id ? { ...tab, name, manualTitle: true } : tab))
+    );
+  }, []);
+
+  const applyTabTitle = useCallback((id: string, title: string): void => {
+    setTabs((current) =>
+      current.map((tab) =>
+        tab.id === id && tab.dynamicTitle !== title ? { ...tab, dynamicTitle: title } : tab
+      )
+    );
+  }, []);
+
+  const reorderTabs = useCallback(
+    (draggedId: string, targetId: string, placeAfter: boolean): void => {
+      setTabs((current) => moveTabById(current, draggedId, targetId, placeAfter));
+    },
+    []
+  );
+
+  const duplicateTab = useCallback((id: string): void => {
+    setTabs((current) => {
+      const source = current.find((tab) => tab.id === id);
+      if (!source) return current;
+      const sessionId = crypto.randomUUID();
+      // The copy needs a fresh sessionId: live sessions are keyed by it in
+      // the main process, and reusing one would spawn over the original.
+      const copy: TerminalTab = {
+        id: sessionId,
+        name: nextCopyName(current.map(tabDisplayLabel), tabDisplayLabel(source)),
+        status: 'starting',
+        request: { ...source.request, sessionId }
+      };
+      setActiveTabId(sessionId);
+      return insertTabAfter(current, copy, source.id);
+    });
+  }, []);
+
+  const closeOtherTabs = useCallback((id: string): void => {
+    setTabs((current) => current.filter((tab) => tab.id === id));
+    setActiveTabId(id);
   }, []);
 
   const openProfile = useCallback(
@@ -753,32 +813,25 @@ export function App(): React.JSX.Element {
         )}
 
         <section className="terminal-card" aria-label="Terminal workspace">
-          <div className="tab-bar" role="tablist" aria-label="Terminal tabs">
-            {tabs.map((tab) => (
-              <div
-                className={`terminal-tab ${tab.id === activeTab?.id ? 'active' : ''}`}
-                key={tab.id}
-              >
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={tab.id === activeTab?.id}
-                  onClick={() => setActiveTabId(tab.id)}
-                >
-                  <span>{tab.name}</span>
-                </button>
-                <button
-                  type="button"
-                  className="tab-close"
-                  onClick={() => closeTab(tab.id)}
-                  aria-label={`Close ${tab.name}`}
-                  title={tabs.length > 1 ? undefined : 'Closing the last tab empties the workspace'}
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-          </div>
+          <TabBar
+            tabs={tabs.map((tab) => ({ id: tab.id, label: tabDisplayLabel(tab) }))}
+            activeTabId={activeTabId}
+            labels={{
+              rename: t('tabRename'),
+              duplicate: t('tabDuplicate'),
+              newTab: t('shortcutTabNew'),
+              close: t('shortcutTabClose'),
+              closeOthers: t('tabCloseOthers')
+            }}
+            shortcuts={tabMenuShortcuts}
+            onActivate={setActiveTabId}
+            onClose={closeTab}
+            onReorder={reorderTabs}
+            onRename={renameTab}
+            onDuplicate={duplicateTab}
+            onNewTab={addLocalTab}
+            onCloseOthers={closeOtherTabs}
+          />
           <div className="terminal-surface" data-active-status={activeTab?.status ?? 'none'}>
             {tabs.map((tab) => (
               <TerminalPane
@@ -792,6 +845,7 @@ export function App(): React.JSX.Element {
                 onAlternateScreen={(value) =>
                   setAlternateScreens((current) => ({ ...current, [tab.id]: value }))
                 }
+                onTitleChange={(title) => applyTabTitle(tab.id, title)}
                 registerSftpControl={(control) => {
                   if (control) {
                     sftpControls.current.set(tab.id, control);

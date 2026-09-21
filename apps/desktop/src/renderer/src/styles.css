@@ -1232,6 +1232,7 @@ button:disabled {
 }
 
 .terminal-tab {
+  position: relative;
   display: flex;
   min-width: calc(120px * var(--gt-ui-scale, 1));
   max-width: calc(240px * var(--gt-ui-scale, 1));
@@ -1272,6 +1273,44 @@ button:disabled {
 .tab-close:hover {
   color: var(--gt-danger, #f4a5a5);
   background: var(--gt-hover, #1a2332);
+}
+
+.terminal-tab.dragging {
+  opacity: 0.45;
+}
+
+.terminal-tab.drop-before::before,
+.terminal-tab.drop-after::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--gt-accent, #5c8ea5);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.terminal-tab.drop-before::before {
+  left: 0;
+}
+
+.terminal-tab.drop-after::after {
+  right: 0;
+}
+
+.terminal-tab > .tab-rename {
+  min-width: 0;
+  flex: 1;
+  margin: 0 4px;
+  padding: 2px 6px;
+  border: 1px solid var(--gt-accent, #5c8ea5);
+  border-radius: var(--gt-radius-sm, 3px);
+  color: var(--gt-text-dim, #d8e0ee);
+  background: var(--gt-background, #0d1117);
+  font-size: var(--gt-fs-sm);
+  outline: none;
 }
 
 .toolbar-button {
