@@ -39,6 +39,8 @@ import {
   readAlternateScreenPath,
   readEchoedCommandLine
 } from './terminal/line-tracker';
+import { logInputDiagnostic } from './terminal/input-diagnostics';
+import { isBareSpaceKeydown } from './terminal/space-guard';
 
 type TerminalRequest = LocalTerminalRequest | SshTerminalRequest | SshProfileTerminalRequest;
 type TerminalClient =
@@ -107,6 +109,7 @@ export function TerminalPane({
   const contextMenuOpenRef = useRef(false);
   const terminalRef = useRef<Terminal | null>(null);
   const clientRef = useRef<TerminalClient | null>(null);
+  const sendToShellRef = useRef<((data: string) => void) | null>(null);
   const activeRef = useRef(active);
   const onStateRef = useRef(onState);
   const onHostKeyPromptRef = useRef(onHostKeyPrompt);
@@ -154,7 +157,33 @@ export function TerminalPane({
       // Escape byte) while it is visible without stopping DOM propagation so
       // the menu's own Escape handler still runs.
       if (event.type === 'keydown' && contextMenuOpenRef.current) return false;
-      if (event.type !== 'keydown') return true;
+      if (event.type !== 'keydown') {
+        if (event.type === 'keypress') {
+          logInputDiagnostic('keypress', {
+            key: event.key,
+            charCode: event.charCode,
+            isComposing: event.isComposing
+          });
+        }
+        return true;
+      }
+      if (event.keyCode === 229 || event.isComposing) {
+        logInputDiagnostic('composition keydown', { key: event.key, keyCode: event.keyCode });
+      }
+      // xterm only transmits space from the textarea's keypress path (see
+      // space-guard.ts), which IME/229 states can kill while keydown-driven
+      // keys keep working; route bare space through the keydown path instead.
+      if (isBareSpaceKeydown(event)) {
+        logInputDiagnostic('bare space intercepted', {
+          keyCode: event.keyCode,
+          repeat: event.repeat
+        });
+        // preventDefault keeps the browser from inserting the character into
+        // the textarea, which would deliver it a second time via keypress.
+        event.preventDefault();
+        sendToShellRef.current?.(' ');
+        return false;
+      }
       const bindings = keybindingsRef.current;
       // Returning false only makes xterm skip the key; without preventDefault
       // Chromium still runs its default edit command (Ctrl+Shift+V is
@@ -283,12 +312,16 @@ export function TerminalPane({
           : window.geared.createLocalTerminal(request, onMessage);
       clientRef.current = client;
       if (!disposed) {
-        inputSubscription = terminal.onData((data) => {
-          client?.sendInput(data);
+        // Single funnel for every keystroke that reaches the shell (xterm's
+        // onData and the space keydown fallback alike) so cd following stays
+        // accurate no matter which path delivered the data.
+        const sendToShell = (data: string): void => {
+          if (!client) return;
+          client.sendInput(data);
           // Forward submitted command lines for cd following; while the SFTP
           // panel is detached or a full-screen program owns the terminal the
           // lines are not shell commands and must not be tracked.
-          if (!client || !isSshRequest(request)) return;
+          if (!isSshRequest(request)) return;
           if (alternateActive) {
             lineTracker = createLineTracker();
             return;
@@ -304,7 +337,9 @@ export function TerminalPane({
             }
             if (text.trim()) client.sendCdLine(text.slice(0, 1024));
           }
-        });
+        };
+        sendToShellRef.current = sendToShell;
+        inputSubscription = terminal.onData(sendToShell);
         resizeSubscription = terminal.onResize(sendResize);
         sendResize();
         terminal.focus();
@@ -365,6 +400,7 @@ export function TerminalPane({
       searchRef.current = null;
       terminalRef.current = null;
       clientRef.current = null;
+      sendToShellRef.current = null;
     };
   }, [request]);
 
@@ -418,6 +454,35 @@ export function TerminalPane({
       }
     });
     return () => cancelAnimationFrame(frame);
+  }, [active]);
+
+  // Electron does not fire the textarea's blur/focus events when the OS window
+  // loses and regains focus, so xterm can keep painting the inactive (hollow)
+  // cursor even though keystrokes flow again. The window focus event is the
+  // reliable signal to resynchronize both focus and the cursor paint.
+  useEffect(() => {
+    if (!active) return;
+    const restoreFocus = (): void => {
+      const terminal = terminalRef.current;
+      const textarea = terminal?.textarea;
+      if (!terminal || !textarea || !activeRef.current) return;
+      logInputDiagnostic('window focus', {
+        documentHasFocus: document.hasFocus(),
+        textareaFocused: document.activeElement === textarea
+      });
+      if (document.activeElement !== textarea) {
+        terminal.focus();
+        return;
+      }
+      // DOM focus never moved: re-firing blur/focus forces xterm to repaint
+      // the cursor with the real focus state. Skip while an IME composition
+      // holds text in the textarea so the composition is not cancelled.
+      if (textarea.value !== '') return;
+      terminal.blur();
+      terminal.focus();
+    };
+    window.addEventListener('focus', restoreFocus);
+    return () => window.removeEventListener('focus', restoreFocus);
   }, [active]);
 
   const closeSearch = (): void => {
