@@ -47,7 +47,9 @@ describe('buildTerminalContextMenu', () => {
     paste: 'Paste',
     selectAll: 'Select all',
     search: 'Search',
-    clear: 'Clear'
+    clear: 'Clear',
+    addSelectionToChat: 'Add selection to chat',
+    addScreenToChat: 'Add screen snapshot to chat'
   };
   const shortcuts = terminalShortcutsFor(defaultKeybindings('win32'), 'win32');
   const actions = {
@@ -55,7 +57,9 @@ describe('buildTerminalContextMenu', () => {
     paste: () => undefined,
     selectAll: () => undefined,
     search: () => undefined,
-    clear: () => undefined
+    clear: () => undefined,
+    addSelectionToChat: () => undefined,
+    addScreenToChat: () => undefined
   };
 
   it('enables copy only when a selection exists', () => {
@@ -76,6 +80,31 @@ describe('buildTerminalContextMenu', () => {
     expect(withoutSelection.find((item) => item.id === 'terminal-menu-copy')?.disabled).toBe(true);
   });
 
+  it('gates the chat selection item but keeps the screen snapshot item available', () => {
+    const withoutSelection = buildTerminalContextMenu({
+      hasSelection: false,
+      labels,
+      shortcuts,
+      actions
+    });
+    expect(
+      withoutSelection.find((item) => item.id === 'terminal-menu-add-selection-to-chat')?.disabled
+    ).toBe(true);
+    expect(
+      withoutSelection.find((item) => item.id === 'terminal-menu-add-screen-to-chat')?.disabled
+    ).toBeUndefined();
+
+    const withSelection = buildTerminalContextMenu({
+      hasSelection: true,
+      labels,
+      shortcuts,
+      actions
+    });
+    expect(
+      withSelection.find((item) => item.id === 'terminal-menu-add-selection-to-chat')?.disabled
+    ).toBe(false);
+  });
+
   it('orders actions and separates the utility group', () => {
     const items = buildTerminalContextMenu({ hasSelection: false, labels, shortcuts, actions });
     expect(items.map((item) => item.id)).toEqual([
@@ -83,9 +112,17 @@ describe('buildTerminalContextMenu', () => {
       'terminal-menu-paste',
       'terminal-menu-select-all',
       'terminal-menu-search',
-      'terminal-menu-clear'
+      'terminal-menu-clear',
+      'terminal-menu-add-selection-to-chat',
+      'terminal-menu-add-screen-to-chat'
     ]);
     expect(items.find((item) => item.id === 'terminal-menu-search')?.separatorBefore).toBe(true);
+    expect(
+      items.find((item) => item.id === 'terminal-menu-add-selection-to-chat')?.separatorBefore
+    ).toBe(true);
+    expect(
+      items.find((item) => item.id === 'terminal-menu-add-screen-to-chat')?.separatorBefore
+    ).toBeUndefined();
   });
 
   it('shows shortcut hints and keeps paste enabled without a selection', () => {

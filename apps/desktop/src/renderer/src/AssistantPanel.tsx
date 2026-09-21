@@ -91,6 +91,8 @@ type AssistantPanelProps = {
   onToggleSplitCommand?: () => void;
   pendingHistoryId?: string | null;
   onPendingHistoryConsumed?: () => void;
+  pendingChatText?: string | null;
+  onPendingChatTextConsumed?: () => void;
   hidden?: boolean;
 };
 
@@ -303,6 +305,8 @@ export function AssistantPanel({
   onToggleSplitCommand,
   pendingHistoryId,
   onPendingHistoryConsumed,
+  pendingChatText,
+  onPendingChatTextConsumed,
   hidden = false
 }: AssistantPanelProps): React.JSX.Element {
   const [connections, setConnections] = useState<AiConnectionRecord[]>([]);
@@ -452,6 +456,22 @@ export function AssistantPanel({
       )
       .finally(() => onPendingHistoryConsumed?.());
   }, [pendingHistoryId, streaming, onPendingHistoryConsumed]);
+
+  // Terminal "add to chat" appends fenced terminal text after whatever the
+  // user already typed; safe during streaming because the composer stays
+  // editable, only the send button is gated.
+  useEffect(() => {
+    if (!pendingChatText) return;
+    setComposer((current) => (current ? `${current}\n\n${pendingChatText}` : pendingChatText));
+    onPendingChatTextConsumed?.();
+    const frame = requestAnimationFrame(() => {
+      const element = composerRef.current;
+      if (!element) return;
+      element.focus();
+      element.selectionStart = element.selectionEnd = element.value.length;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [pendingChatText, onPendingChatTextConsumed]);
 
   useEffect(() => {
     const box = reasoningBoxRef.current;
@@ -912,9 +932,7 @@ export function AssistantPanel({
                   <div className="assistant-menu-separator" />
                 </>
               ) : null}
-              {connections.length > 1 ? (
-                <p className="assistant-menu-heading">Models</p>
-              ) : null}
+              {connections.length > 1 ? <p className="assistant-menu-heading">Models</p> : null}
               {modelOptions.map((option) => (
                 <button
                   type="button"
@@ -951,14 +969,15 @@ export function AssistantPanel({
               onClick={() => setReasoningMenuOpen((open) => !open)}
               title="Reasoning effort for this chat"
             >
-              <span className="assistant-picker-label">
-                {responseOptions.reasoningEffort}
-              </span>
+              <span className="assistant-picker-label">{responseOptions.reasoningEffort}</span>
               <ChevronDown size={13} aria-hidden="true" />
             </button>
             {reasoningMenuOpen ? (
               <>
-                <div className="assistant-menu-backdrop" onClick={() => setReasoningMenuOpen(false)} />
+                <div
+                  className="assistant-menu-backdrop"
+                  onClick={() => setReasoningMenuOpen(false)}
+                />
                 <div className="assistant-picker-menu" role="menu">
                   {reasoningEfforts.map((effort) => (
                     <button
@@ -985,7 +1004,12 @@ export function AssistantPanel({
         ) : null}
       </div>
 
-      <div className="assistant-messages" aria-live="polite" ref={messagesBoxRef} onScroll={handleMessagesScroll}>
+      <div
+        className="assistant-messages"
+        aria-live="polite"
+        ref={messagesBoxRef}
+        onScroll={handleMessagesScroll}
+      >
         {attachedEnvironment ? (
           <div className="assistant-context-chip">
             Environment context attached · {attachedEnvironment.facts.os ?? 'unknown OS'} ·{' '}
@@ -1171,7 +1195,11 @@ export function AssistantPanel({
             ))}
           </ul>
           <div className="command-card-actions">
-            <button type="button" className="primary-button settings-apply" onClick={() => void acceptConsent()}>
+            <button
+              type="button"
+              className="primary-button settings-apply"
+              onClick={() => void acceptConsent()}
+            >
               Allow and send
             </button>
             <button

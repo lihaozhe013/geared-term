@@ -18,6 +18,8 @@ const pasteLabel = /^(Paste|粘贴)/;
 const selectAllLabel = /^(Select all|全选)/;
 const searchLabel = /^(Search|搜索)/;
 const clearLabel = /^(Clear|清屏)/;
+const addSelectionToChatLabel = /^(Add selection to chat|添加选中内容到对话)/;
+const addScreenToChatLabel = /^(Add screen snapshot to chat|添加屏幕快照到对话)/;
 
 function activeTerminalHost(session: AppSession) {
   return session.page.locator('.terminal-wrapper:not([hidden]) .terminal-host');
@@ -74,4 +76,66 @@ test('pastes the system clipboard into the shell from the context menu', async (
     'geared-context-paste',
     { timeout: 15_000 }
   );
+});
+
+test('adds the terminal selection to the assistant composer from the context menu', async () => {
+  const { page, app } = session;
+  await openLocalTab(app);
+  await expect(page.locator('.terminal-surface')).toHaveAttribute('data-active-status', 'running', {
+    timeout: 30_000
+  });
+  const host = activeTerminalHost(session);
+  await host.click();
+  await page.keyboard.type('echo geared-chat-selection');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.terminal-wrapper:not([hidden]) .xterm-rows')).toContainText(
+    'geared-chat-selection',
+    { timeout: 15_000 }
+  );
+
+  await host.click({ button: 'right' });
+  const menu = page.locator('.sftp-context-menu');
+  await expect(menu.getByRole('menuitem', { name: addSelectionToChatLabel })).toBeDisabled();
+
+  await menu.getByRole('menuitem', { name: selectAllLabel }).click();
+  await expect(menu).toHaveCount(0);
+  await host.click({ button: 'right' });
+  await expect(menu.getByRole('menuitem', { name: addSelectionToChatLabel })).toBeEnabled();
+  await menu.getByRole('menuitem', { name: addSelectionToChatLabel }).click();
+
+  await expect(page.getByRole('tab', { name: /AI Assistant/ })).toHaveAttribute(
+    'aria-selected',
+    'true'
+  );
+  const composer = page.locator('.assistant-composer textarea');
+  await expect(composer).toBeVisible();
+  await expect(composer).toHaveValue(/```terminal\n[\s\S]*geared-chat-selection/);
+});
+
+test('adds the visible screen to the assistant composer from the context menu', async () => {
+  const { page, app } = session;
+  await openLocalTab(app);
+  await expect(page.locator('.terminal-surface')).toHaveAttribute('data-active-status', 'running', {
+    timeout: 30_000
+  });
+  const host = activeTerminalHost(session);
+  await host.click();
+  await page.keyboard.type('echo geared-chat-screen');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.terminal-wrapper:not([hidden]) .xterm-rows')).toContainText(
+    'geared-chat-screen',
+    { timeout: 15_000 }
+  );
+
+  await host.click({ button: 'right' });
+  const menu = page.locator('.sftp-context-menu');
+  await menu.getByRole('menuitem', { name: addScreenToChatLabel }).click();
+
+  await expect(page.getByRole('tab', { name: /AI Assistant/ })).toHaveAttribute(
+    'aria-selected',
+    'true'
+  );
+  const composer = page.locator('.assistant-composer textarea');
+  await expect(composer).toBeVisible();
+  await expect(composer).toHaveValue(/```terminal\n[\s\S]*geared-chat-screen/);
 });

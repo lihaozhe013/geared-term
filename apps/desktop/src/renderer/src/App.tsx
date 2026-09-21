@@ -205,6 +205,7 @@ export function App(): React.JSX.Element {
   const [editingProfile, setEditingProfile] = useState<SessionProfileRecord | undefined>();
   const [showQuickSsh, setShowQuickSsh] = useState(false);
   const [pendingHistoryId, setPendingHistoryId] = useState<string | null>(null);
+  const [pendingChatText, setPendingChatText] = useState<string | null>(null);
   const [vaultStatus, setVaultStatus] = useState<VaultStatus | null>(null);
   const sftpControls = useRef(new Map<string, SftpTerminalControl>());
 
@@ -256,6 +257,17 @@ export function App(): React.JSX.Element {
       }),
     []
   );
+
+  // Same reveal-the-assistant flow as "continue in history": flip the right
+  // panel open and let the pending text ride the assistant keep-alive mount.
+  const handleAddToChat = useCallback((text: string): void => {
+    setPendingChatText(text);
+    setUiState((current) =>
+      current.rightPanel === 'assistant' && !current.rightPanelCollapsed
+        ? current
+        : { ...current, rightPanel: 'assistant', rightPanelCollapsed: false }
+    );
+  }, []);
 
   const palette = useMemo(
     () => resolvePalette(settings.theme, userThemes),
@@ -766,6 +778,7 @@ export function App(): React.JSX.Element {
                     sftpControls.current.delete(tab.id);
                   }
                 }}
+                onAddToChat={handleAddToChat}
               />
             ))}
             {tabs.length === 0 ? (
@@ -861,6 +874,8 @@ export function App(): React.JSX.Element {
                 }}
                 pendingHistoryId={pendingHistoryId}
                 onPendingHistoryConsumed={() => setPendingHistoryId(null)}
+                pendingChatText={pendingChatText}
+                onPendingChatTextConsumed={() => setPendingChatText(null)}
               />
             ) : null}
             {uiState.rightPanel === 'sftp' && activeTab && supportsSftp(activeTab.request) ? (

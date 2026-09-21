@@ -8,6 +8,8 @@ export type TerminalMenuLabels = {
   selectAll: string;
   search: string;
   clear: string;
+  addSelectionToChat: string;
+  addScreenToChat: string;
 };
 
 export type TerminalMenuShortcuts = {
@@ -23,6 +25,8 @@ export type TerminalMenuActions = {
   selectAll: () => void;
   search: () => void;
   clear: () => void;
+  addSelectionToChat: () => void;
+  addScreenToChat: () => void;
 };
 
 /** Hint chords shown in the menu, derived from the resolved keybinding map so
@@ -83,6 +87,18 @@ export function buildTerminalContextMenu(input: {
       id: 'terminal-menu-clear',
       label: labels.clear,
       run: actions.clear
+    },
+    {
+      id: 'terminal-menu-add-selection-to-chat',
+      label: labels.addSelectionToChat,
+      disabled: !hasSelection,
+      separatorBefore: true,
+      run: actions.addSelectionToChat
+    },
+    {
+      id: 'terminal-menu-add-screen-to-chat',
+      label: labels.addScreenToChat,
+      run: actions.addScreenToChat
     }
   ];
 }

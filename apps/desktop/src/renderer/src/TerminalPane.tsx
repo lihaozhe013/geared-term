@@ -25,6 +25,7 @@ import {
   terminalShortcutsFor,
   toTerminalPasteText
 } from './terminal/context-menu';
+import { extractSelectionText, extractViewportText, formatChatInsert } from './terminal/extract';
 import { attachWebglRenderer } from './terminal/renderer';
 import {
   buildLigatureJoiner,
@@ -64,6 +65,7 @@ type TerminalPaneProps = {
   ) => void;
   onAlternateScreen?: (active: boolean) => void;
   registerSftpControl?: (control: SftpTerminalControl | null) => void;
+  onAddToChat?: (text: string) => void;
 };
 
 function isSshRequest(request: TerminalRequest): request is SshTerminalRequest {
@@ -92,7 +94,8 @@ export function TerminalPane({
   onState,
   onHostKeyPrompt,
   onAlternateScreen,
-  registerSftpControl
+  registerSftpControl,
+  onAddToChat
 }: TerminalPaneProps): React.JSX.Element {
   const hostRef = useRef<HTMLDivElement>(null);
   const fitRef = useRef<FitAddon | null>(null);
@@ -446,7 +449,9 @@ export function TerminalPane({
           paste: translate(settings.language, 'terminalPaste'),
           selectAll: translate(settings.language, 'terminalSelectAll'),
           search: translate(settings.language, 'terminalSearch'),
-          clear: translate(settings.language, 'terminalClear')
+          clear: translate(settings.language, 'terminalClear'),
+          addSelectionToChat: translate(settings.language, 'terminalAddSelectionToChat'),
+          addScreenToChat: translate(settings.language, 'terminalAddScreenToChat')
         },
         shortcuts: terminalShortcutsFor(keybindings, platform),
         actions: {
@@ -480,6 +485,16 @@ export function TerminalPane({
             const terminal = terminalRef.current;
             terminal?.clear();
             terminal?.focus();
+          },
+          addSelectionToChat: () => {
+            const terminal = terminalRef.current;
+            const text = terminal ? extractSelectionText(terminal) : null;
+            if (text) onAddToChat?.(formatChatInsert(text));
+          },
+          addScreenToChat: () => {
+            const terminal = terminalRef.current;
+            const text = terminal ? extractViewportText(terminal) : null;
+            if (text) onAddToChat?.(formatChatInsert(text));
           }
         }
       })
