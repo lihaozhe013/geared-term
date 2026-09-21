@@ -127,7 +127,9 @@ if (userDataOverride) app.setPath('userData', userDataOverride);
 // Keyed on the userData directory, so the override above must land first.
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) {
-  app.quit();
+  // The secondary process has not initialized any application resources, so
+  // exit immediately instead of waiting for Electron's ready/quit lifecycle.
+  app.exit(0);
 } else {
   app.on('second-instance', () => restoreMainWindow());
 }

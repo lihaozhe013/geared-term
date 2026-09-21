@@ -1,6 +1,6 @@
 import { createRequire } from 'node:module';
 import { promises as fs } from 'node:fs';
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
@@ -8,6 +8,15 @@ import { DOM_RENDERER_ARGS, launchApp, openLocalTab, type AppSession } from './f
 
 const require = createRequire(import.meta.url);
 const appDirectory = join(dirname(fileURLToPath(import.meta.url)), '..');
+const secondaryLaunchArgs = [
+  appDirectory,
+  '--disable-features=CalculateNativeWinOcclusion',
+  '--disable-backgrounding-occluded-windows',
+  '--disable-renderer-backgrounding',
+  '--disable-background-timer-throttling',
+  '--enable-unsafe-swiftshader',
+  ...DOM_RENDERER_ARGS
+];
 
 let session: AppSession;
 
@@ -45,6 +54,25 @@ async function setBackgroundMode(enabled: boolean): Promise<void> {
     const current = await geared.getSettings();
     await geared.saveSettings({ ...current, keepRunningInBackground });
   }, enabled);
+}
+
+function spawnSecondaryInstance(): ChildProcess {
+  return spawn(require('electron') as unknown as string, secondaryLaunchArgs, {
+    stdio: 'ignore',
+    env: {
+      ...process.env,
+      GEARED_USER_DATA: join(session.userDataDirectory, 'user-data')
+    }
+  });
+}
+
+async function waitForProcessExit(
+  child: ChildProcess
+): Promise<{ code: number | null; signal: NodeJS.Signals | null }> {
+  return new Promise((resolve, reject) => {
+    child.once('error', reject);
+    child.once('exit', (code, signal) => resolve({ code, signal }));
+  });
 }
 
 test('keeps the process resident and restores the window when the app relaunches', async () => {
@@ -89,18 +117,8 @@ test('keeps the process resident and restores the window when the app relaunches
 
   // A second launch of the same profile must hand off to the resident
   // instance, which re-shows the hidden window.
-  const electronBinary = require('electron') as unknown as string;
-  const secondInstance = spawn(electronBinary, [appDirectory], {
-    stdio: 'ignore',
-    env: {
-      ...process.env,
-      GEARED_USER_DATA: join(session.userDataDirectory, 'user-data')
-    }
-  });
-  const secondExit = new Promise<number | null>((resolve) => {
-    secondInstance.on('exit', (code) => resolve(code));
-  });
-  expect(await secondExit).toBe(0);
+  const secondExit = await waitForProcessExit(spawnSecondaryInstance());
+  expect(secondExit).toEqual({ code: 0, signal: null });
   await expect
     .poll(
       () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.isVisible()),
@@ -140,19 +158,8 @@ test('keeps bounded high-volume output flowing while hidden', async () => {
     )
     .toBe(false);
 
-  const secondInstance = spawn(require('electron') as unknown as string, [appDirectory], {
-    stdio: 'ignore',
-    env: {
-      ...process.env,
-      GEARED_USER_DATA: join(session.userDataDirectory, 'user-data')
-    }
-  });
-  await new Promise<void>((resolve, reject) => {
-    secondInstance.once('error', reject);
-    secondInstance.once('exit', (code) =>
-      code === 0 ? resolve() : reject(new Error(`exit=${code}`))
-    );
-  });
+  const secondExit = await waitForProcessExit(spawnSecondaryInstance());
+  expect(secondExit).toEqual({ code: 0, signal: null });
   await expect(page.locator('.terminal-wrapper:not([hidden]) .xterm-rows')).toContainText(
     'geared-background-after',
     { timeout: 20_000 }
