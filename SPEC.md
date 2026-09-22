@@ -1,10 +1,10 @@
 # Geared Term Product Specification
 
-> Status: Draft for implementation approval
+> Status: Current implementation baseline
 >
-> Last updated: 2026-09-19
+> Last updated: 2026-09-22
 >
-> Target repository: `E:\dev\geared-term`
+> Target repository: `geared-term`
 
 ## 1. Purpose
 
@@ -141,7 +141,8 @@ is not supported until its packaged application passes the same smoke tests.
 
 The native application menu MUST provide File, Edit, View, Window, and Help functions appropriate to
 each platform, including settings, temporary connection, config location, theme, language, terminal
-mode, and About.
+font zoom, and About. The current F6 action cycles the right-panel views; it is not a terminal-mode
+cycle.
 
 When terminal focus is active, the following behavior is required:
 
@@ -153,7 +154,7 @@ When terminal focus is active, the following behavior is required:
 | Select all              | `Ctrl+Shift+A`      | `Cmd+A`             |
 | Search                  | `Ctrl+F`            | `Cmd+F`             |
 | Send Tab/backtab        | `Tab` / `Shift+Tab` | `Tab` / `Shift+Tab` |
-| Cycle terminal mode     | `F6` / `Shift+F6`   | `F6` / `Shift+F6`   |
+| Cycle right-panel view  | `F6`                | `F6`                |
 
 - **APP-019**: `Ctrl+C` in terminal context MUST send ETX and MUST NOT be captured by a root copy
   binding.
@@ -223,39 +224,50 @@ When terminal focus is active, the following behavior is required:
 
 ## 10. Terminal subsystem
 
+The requirements in this section describe the current implementation baseline. A capability that is
+not currently implemented is stated as such instead of being treated as complete.
+
 ### 10.1 Backend-neutral contract
 
 - **TERM-001**: Local PTY and SSH backends MUST implement the same lifecycle: create, input, resize,
   output, exit, close, and structured failure.
-- **TERM-002**: Every event MUST carry a session identifier. Data and terminal-state events MUST
-  carry a monotonically increasing sequence number so late events can be discarded.
+- **TERM-002**: Backend output, prompt, and terminal-state events carry a session identifier and a
+  monotonically increasing sequence number. The renderer currently validates these events but does
+  not independently discard late events by sequence number.
 - **TERM-003**: Close, exit, renderer detach, and backend failure MUST converge on one idempotent
   terminal state.
 - **TERM-004**: Raw terminal output MUST flow directly to xterm.js and MUST NOT enter React state.
-- **TERM-005**: Output transport MUST batch data and implement bounded flow control. A slow renderer
-  MUST not create an unbounded main-process queue.
+- **TERM-005**: Local PTY output uses a bounded queue and ACK-based flow control; the local queue is
+  bounded and terminates the session on sustained overload. SSH output is streamed through the
+  MessagePort, but the SSH manager currently does not apply backend-side ACK flow control.
 - **TERM-006**: Resize bursts MAY be coalesced, but the final size MUST reach the backend.
 
 ### 10.2 xterm.js behavior
 
-- **TERM-007**: The terminal MUST support common VT/xterm behavior, 16/256/true color, Unicode, CJK,
-  emoji, wide characters, combining characters, Powerline/Nerd Font glyphs, cursor styles, mouse
-  reporting, and alternate-screen applications.
+- **TERM-007**: The xterm renderer supports common VT/xterm behavior, 16/256/true color, Unicode,
+  CJK, emoji, wide characters, combining characters, Powerline/Nerd Font glyphs, cursor styles,
+  mouse reporting at the xterm layer, and alternate-screen applications. The renderer currently
+  forwards `onData` input but does not separately forward xterm `onBinary` input, so binary mouse
+  reports are not part of the complete backend input path.
 - **TERM-008**: The implementation MUST support selection, copy, paste, select all, visible
   scrollbar, scrollback, search with current-match navigation, and web links.
 - **TERM-009**: WebGL rendering SHOULD be used when available and MUST fall back without losing the
   session after WebGL initialization or context loss.
 - **TERM-010**: OSC 52 clipboard writes MAY update the local clipboard. Clipboard reads requested by
   the terminal MUST remain disabled unless a later security review approves them.
-- **TERM-011**: Interactive mode MUST accept input. Read-only mode MUST preserve selection, copy,
-  scrolling, and search while suppressing terminal input.
-- **TERM-012**: Per-tab mode cycling MUST preserve the defined `F6` behavior.
-- **TERM-013**: `Ctrl+wheel` terminal zoom MUST remain bounded to a usable font-size range and MUST
-  trigger a correct PTY resize.
-- **TERM-014**: Pasted and inserted text MUST normalize platform line endings predictably. NUL, DEL,
-  ESC, BEL, and unsupported control characters MUST NOT be injected by command actions.
-- **TERM-015**: Bracketed paste mode MUST be respected. Multi-line paste outside bracketed paste
-  SHOULD require a review/confirmation step.
+- **TERM-011**: The current implementation provides interactive mode only. It supports terminal
+  selection, copy, scrolling, and search while forwarding terminal input. A separate read-only mode
+  is not currently implemented.
+- **TERM-012**: `F6` cycles the right-panel views through the application menu and renderer menu
+  command. Per-tab terminal-mode cycling is not currently implemented.
+- **TERM-013**: Terminal font zoom is available through the View menu and resolved keyboard
+  bindings. The current font-size range is 8 through 32, and changing the font causes xterm to refit
+  and send the resulting terminal dimensions to the active backend. `Ctrl+wheel` zoom is not
+  currently implemented.
+- **TERM-014**: Terminal paste normalizes LF and CRLF line endings to CR before xterm receives the
+  text. The current terminal paste path does not apply a universal NUL, DEL, ESC, or BEL filter.
+- **TERM-015**: xterm owns bracketed-paste handling for terminal paste. The current implementation
+  does not add a separate review or confirmation step for multi-line paste outside bracketed paste.
 - **TERM-016**: A terminal component unmount MUST dispose all DOM, xterm, addon, resize, and
   transport subscriptions exactly once without implicitly closing a session that is being retained
   by its owning tab.
@@ -265,15 +277,17 @@ When terminal focus is active, the following behavior is required:
 - **TERM-017**: Context extraction MUST read the xterm buffer, never terminal DOM nodes or a raw PTY
   log.
 - **TERM-018**: A non-empty selection takes precedence over the viewport.
-- **TERM-019**: Users MAY include a configured, bounded number of lines preceding the viewport. The
-  default MUST NOT include the complete scrollback.
-- **TERM-020**: Snapshot text MUST join wrapped rows correctly, remove style escape sequences,
-  retain meaningful internal blank lines, trim display padding, and distinguish normal and alternate
-  buffers.
-- **TERM-021**: The user MUST see the selected source, truncation state, line/character bounds, and
-  a preview before externally transmitting terminal content.
-- **TERM-022**: One snapshot MUST be limited to 256 KiB unless a future schema migration
-  deliberately changes the limit.
+- **TERM-019**: The current viewport snapshot reads only the active xterm viewport. The configured
+  number of preceding lines is stored in settings but is not currently included in extraction.
+- **TERM-020**: Selection and viewport extraction read the xterm buffer, strip recognized control
+  sequences, trim trailing blank viewport lines, and preserve the active normal or alternate buffer.
+  The current implementation does not provide a separate wrapped-row reconstruction step or a
+  user-visible disclosure for every formatting transformation.
+- **TERM-021**: The current selection and viewport actions insert the extracted text directly into
+  the assistant composer. They do not currently show a separate source, line/character bound,
+  truncation, or preview confirmation UI before insertion.
+- **TERM-022**: Selection and viewport text inserted into the assistant are capped at 256 KiB after
+  extraction.
 
 ## 11. Local shell sessions
 
