@@ -357,6 +357,7 @@ body.panel-resizing {
 
 .right-rail {
   display: flex;
+  align-items: center;
   min-width: 0;
   justify-content: center;
   padding: 12px 6px;
