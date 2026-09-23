@@ -137,6 +137,97 @@ export const SessionProfileSaveRequestSchema = z
   })
   .strict();
 
+export const LlmWebSiteIdSchema = z.enum(['chatgpt', 'deepseek']);
+
+export const LlmWebOpenRequestSchema = z.object({ site: LlmWebSiteIdSchema }).strict();
+
+export const LlmWebNavigateRequestSchema = z
+  .object({ action: z.enum(['back', 'forward', 'reload', 'home']) })
+  .strict();
+
+export const LlmWebPaneBoundsSchema = z
+  .object({
+    x: z.number().int().min(-32768).max(32768),
+    y: z.number().int().min(-32768).max(32768),
+    width: z.number().int().min(0).max(32768),
+    height: z.number().int().min(0).max(32768)
+  })
+  .strict();
+
+export const LlmWebVisibleRequestSchema = z.object({ visible: z.boolean() }).strict();
+
+export const LlmWebSiteDataRequestSchema = z.object({ site: LlmWebSiteIdSchema }).strict();
+
+export const LlmWebNavigationSchema = z
+  .object({
+    site: LlmWebSiteIdSchema.nullable(),
+    url: z.string().max(2048),
+    title: z.string().max(512),
+    canGoBack: z.boolean(),
+    canGoForward: z.boolean(),
+    isLoading: z.boolean()
+  })
+  .strict();
+
+export const LlmWebPaneStatusSchema = z
+  .object({
+    site: LlmWebSiteIdSchema.nullable(),
+    state: z.enum(['hidden', 'off', 'loading', 'ready', 'enhanced', 'degraded', 'failed']),
+    detail: z.string().max(256).default('')
+  })
+  .strict();
+
+export const LlmWebAdapterReportSchema = z
+  .object({
+    site: LlmWebSiteIdSchema,
+    adapterVersion: z.string().max(32),
+    chatSurface: z.boolean(),
+    generating: z.boolean(),
+    blockCount: z.number().int().min(0).max(4096)
+  })
+  .strict();
+
+export const LlmWebCommandRowSchema = z
+  .object({
+    rowId: z.string().min(1).max(160),
+    shell: z.enum(['bash', 'zsh', 'fish', 'powershell', 'cmd', 'unknown']),
+    exactText: z
+      .string()
+      .min(1)
+      .max(256 * 1024),
+    revision: z.string().regex(/^[0-9a-f]{16}$/u),
+    stability: z.enum(['stable', 'incomplete', 'unsafe']),
+    risk: z.enum(['normal', 'destructive']),
+    confidence: z.enum(['high', 'medium', 'low']),
+    runAllowed: z.boolean()
+  })
+  .strict();
+
+export const LlmWebCandidateGroupSchema = z
+  .object({
+    blockId: z.string().min(1).max(128),
+    streaming: z.boolean(),
+    wholeBlock: z.boolean().default(false),
+    rows: z.array(LlmWebCommandRowSchema).min(1).max(96)
+  })
+  .strict();
+
+export const LlmWebCandidatesSchema = z
+  .object({
+    site: LlmWebSiteIdSchema,
+    groups: z.array(LlmWebCandidateGroupSchema).max(64)
+  })
+  .strict();
+
+export type LlmWebSiteId = z.infer<typeof LlmWebSiteIdSchema>;
+export type LlmWebNavigation = z.infer<typeof LlmWebNavigationSchema>;
+export type LlmWebPaneStatus = z.infer<typeof LlmWebPaneStatusSchema>;
+export type LlmWebAdapterReport = z.infer<typeof LlmWebAdapterReportSchema>;
+export type LlmWebCommandRow = z.infer<typeof LlmWebCommandRowSchema>;
+export type LlmWebCandidateGroup = z.infer<typeof LlmWebCandidateGroupSchema>;
+export type LlmWebCandidates = z.infer<typeof LlmWebCandidatesSchema>;
+export type LlmWebPaneBounds = z.infer<typeof LlmWebPaneBoundsSchema>;
+
 export const UiStateRecordSchema = z
   .object({
     schemaVersion: z.literal(1),
@@ -150,10 +241,10 @@ export const UiStateRecordSchema = z
       .optional(),
     maximized: z.boolean(),
     sidebarCollapsed: z.boolean(),
-    rightPanel: z.enum(['sftp', 'assistant', 'environment']).nullable(),
+    rightPanel: z.enum(['sftp', 'assistant', 'environment', 'web']).nullable(),
     rightPanelCollapsed: z.boolean(),
     sidebarWidth: z.number().int().min(170).max(520).default(240),
-    rightPanelWidth: z.number().int().min(280).max(760).default(360),
+    rightPanelWidth: z.number().int().min(280).max(1400).default(360),
     splitRatio: z.number().min(0.15).max(0.85).optional()
   })
   .strict();
@@ -198,7 +289,10 @@ export const SettingsRecordSchema = z
       .max(8)
       .default([]),
     defaultAiConnectionId: IdSchema.nullable().default(null),
-    globalAiInstructions: z.string().max(8192).default('')
+    globalAiInstructions: z.string().max(8192).default(''),
+    llmWebEnabled: z.boolean().default(true),
+    llmWebCommandEnhancement: z.boolean().default(true),
+    llmWebEnhancementOffSites: z.array(LlmWebSiteIdSchema).max(8).default([])
   })
   .strict();
 
@@ -967,7 +1061,6 @@ export const TerminalCommandActionSchema = z
     revision: IdSchema
   })
   .strict();
-
 /**
  * Shells treat CR as accept-line, but on Windows ConPTY an LF in the input
  * stream is not a proper Enter and derails PSReadLine's multi-line rendering.
