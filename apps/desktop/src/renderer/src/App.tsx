@@ -911,9 +911,46 @@ export function App(): React.JSX.Element {
             ))}
             {tabs.length === 0 ? (
               <div className="empty-state terminal-empty">
-                <span className="empty-icon" aria-hidden="true">
-                  &gt;_
-                </span>
+                <svg
+                  className="empty-terminal-art"
+                  viewBox="0 0 72 52"
+                  aria-hidden="true"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <rect x="2" y="2" width="68" height="48" rx="9" />
+                  <path d="M2 15h68" />
+                  <circle
+                    className="art-dot"
+                    cx="12"
+                    cy="8.5"
+                    r="1.6"
+                    fill="currentColor"
+                    stroke="none"
+                  />
+                  <circle
+                    className="art-dot"
+                    cx="19"
+                    cy="8.5"
+                    r="1.6"
+                    fill="currentColor"
+                    stroke="none"
+                  />
+                  <circle
+                    className="art-dot"
+                    cx="26"
+                    cy="8.5"
+                    r="1.6"
+                    fill="currentColor"
+                    stroke="none"
+                  />
+                  <path className="art-prompt" d="M14 23l6 6-6 6" />
+                  <path className="art-prompt" d="M25 35h11" />
+                  <path className="art-line" d="M14 42h30" />
+                </svg>
                 <p>{t('noTerminals')}</p>
                 <small>{t('emptyTerminalHint')}</small>
                 <button type="button" className="empty-state-action" onClick={addLocalTab}>

@@ -1211,6 +1211,24 @@ button:disabled {
   font-size: var(--gt-fs-display);
 }
 
+.empty-terminal-art {
+  width: calc(76px * var(--gt-ui-scale, 1));
+  height: auto;
+  color: var(--gt-text-muted, #7e8ba0);
+}
+
+.empty-terminal-art .art-dot {
+  opacity: 0.5;
+}
+
+.empty-terminal-art .art-prompt {
+  stroke: var(--gt-accent, #5c8ea5);
+}
+
+.empty-terminal-art .art-line {
+  opacity: 0.35;
+}
+
 .empty-state p {
   margin: 12px 0 6px;
   color: var(--gt-text-dim, #c3ccda);
