@@ -26,11 +26,16 @@ The specification was derived from:
 2. [`docs/web-llm-page-support-requirements.md`](docs/web-llm-page-support-requirements.md), only to
    keep that separate feature out of this product.
 
+The implementation structure, process boundaries, transport protocol, storage design, and update
+mechanics are documented in [`docs/architecture.md`](docs/architecture.md); requirement status is
+tracked in [`docs/requirements-matrix.md`](docs/requirements-matrix.md).
+
 When sources disagree, the following order applies:
 
 1. security, data integrity, and explicit safety invariants in this specification;
 2. explicit requirements and product decisions in this specification;
-3. recorded architecture decisions in the implementation plan.
+3. recorded architecture decisions in
+   [`docs/architecture-decisions/`](docs/architecture-decisions/).
 
 ## 3. Product goals
 
@@ -169,6 +174,23 @@ When terminal focus is active, the following behavior is required:
   context menu with copy, paste, select all, search, and clear actions, where copy is enabled only
   while a selection exists.
 
+### 7.5 Auxiliary windows and background mode
+
+- **APP-023**: Settings MUST run in a single-instance auxiliary window with the same security
+  boundary as the main window. Re-opening settings MUST focus the existing window and MAY navigate
+  it to a requested category.
+- **APP-024**: Opening a remote file for editing MUST load it through a dedicated editor window with
+  a bounded document size and MUST read and write through the main process. A save MUST be validated
+  against the current remote state and MUST report a conflict instead of silently overwriting an
+  externally changed or missing file.
+- **APP-025**: Keyboard shortcuts for application commands MUST be rebindable from the Shortcuts
+  settings category with per-command and global reset. Invalid combinations MUST be rejected and
+  conflicting bindings MUST be reported to the user.
+- **APP-026**: On Windows and Linux, an opt-in background mode MUST keep the application running
+  with a tray icon offering show and quit actions when the main window is closed; a second launch
+  MUST re-show the hidden window. Background mode MUST default to off. macOS MUST NOT create a tray
+  icon and MUST keep standard Dock behavior.
+
 ## 8. Sessions and profiles
 
 ### 8.1 Saved sessions
@@ -271,6 +293,10 @@ not currently implemented is stated as such instead of being treated as complete
 - **TERM-016**: A terminal component unmount MUST dispose all DOM, xterm, addon, resize, and
   transport subscriptions exactly once without implicitly closing a session that is being retained
   by its owning tab.
+- **TERM-024**: Terminal rendering MAY apply programming-ligature substitutions discovered by
+  probing the configured font's actual OpenType tables, with a bounded fallback sequence set when
+  font inspection is unavailable. Ligature rendering MUST NOT alter cell input, selection, or
+  snapshot extraction semantics.
 
 ### 10.3 Terminal context snapshots
 
@@ -284,8 +310,8 @@ not currently implemented is stated as such instead of being treated as complete
   The current implementation does not provide a separate wrapped-row reconstruction step or a
   user-visible disclosure for every formatting transformation.
 - **TERM-021**: The selection and direct screen-to-chat actions insert the extracted text directly
-  into the assistant composer. They do not show a separate source, line/character bound,
-  truncation, or preview confirmation UI before insertion.
+  into the assistant composer. They do not show a separate source, line/character bound, truncation,
+  or preview confirmation UI before insertion.
 - **TERM-022**: Selection and viewport text inserted into the assistant are capped at 256 KiB after
   extraction.
 - **TERM-023**: The terminal context menu MUST offer a disposable editor for the active xterm
@@ -388,6 +414,9 @@ not currently implemented is stated as such instead of being treated as complete
 - **SFTP-012**: File names containing unsupported terminal control characters MUST be rejected
   rather than injected.
 - **SFTP-013**: `Ctrl+wheel` in either file pane MUST zoom both pane lists within bounded limits.
+- **SFTP-014**: An SSH file context-menu action MUST open the remote file in the editor window of
+  APP-024, bounded in size, and MUST reject oversized or non-file targets with a visible error
+  instead of loading them.
 - **LOCAL-FILES-001**: Ordinary local shell sessions MUST expose a single local file pane through
   the Files entry. WSL sessions MUST NOT reuse this pane.
 - **LOCAL-FILES-002**: The local pane MUST initially use the main process' resolved terminal startup
@@ -642,7 +671,29 @@ reported in Settings without blocking startup.
 - **OBS-006**: Operational events MAY include opaque IDs, byte counts, durations, protocol state,
   error codes, and feature state needed to diagnose behavior.
 
-## 22. Performance and reliability
+## 22. Update delivery
+
+- **UPD-001**: Unstable builds MUST be distributed through a rolling nightly prerelease on the
+  project's GitHub repository. Each release MUST contain the supported platform artifacts, a SHA-256
+  checksum manifest, and the full commit SHA it was built from.
+- **UPD-002**: A packaged build MUST embed its commit SHA and MUST determine freshness by comparing
+  it with the current nightly release SHA. A build without a valid embedded SHA MUST report a
+  structured error instead of guessing.
+- **UPD-003**: Packaged builds MUST check for updates automatically once shortly after startup and
+  then at most once per day, and MUST support a manual check from Settings → About. Development
+  builds MUST NOT check for updates.
+- **UPD-004**: Automatic download and in-app installation MUST be limited to the Windows NSIS
+  installer build and MUST run only from an explicit user action. Portable Windows, macOS, and Linux
+  builds MUST present the release page link for manual download instead.
+- **UPD-005**: The updater MUST target only Geared Term's own release feed, and update traffic MUST
+  NOT include user content, credentials, or identifiers beyond an ordinary release metadata request.
+  Update failures MUST be bounded and redacted and MUST NOT interrupt terminal, SFTP, or AI
+  sessions.
+- **UPD-006**: The UI MUST render the validated update state machine (`idle`, `checking`,
+  `up-to-date`, `available`, `downloading`, `downloaded`, `error`), including download progress and
+  the install affordance when an update is ready.
+
+## 23. Performance and reliability
 
 - **REL-001**: Terminal output MUST bypass React reconciliation and be written to xterm.js in
   batches.
@@ -659,7 +710,7 @@ reported in Settings without blocking startup.
 - **REL-007**: Large terminal output, long scrollback, rapid resize, CJK/emoji, alternate-screen
   tools, and simultaneous SFTP or AI work MUST be included in release regression tests.
 
-## 23. Accessibility
+## 24. Accessibility
 
 - **A11Y-001**: All application controls, tabs, dialogs, command actions, settings, and status
   changes MUST be keyboard reachable and have meaningful accessible names.
@@ -671,9 +722,9 @@ reported in Settings without blocking startup.
 - **A11Y-005**: Terminal accessibility support SHOULD use xterm.js accessibility facilities without
   mirroring unlimited terminal content into React.
 
-## 24. Verification requirements
+## 25. Verification requirements
 
-### 24.1 Unit and fixture tests
+### 25.1 Unit and fixture tests
 
 At minimum, automated tests MUST cover:
 
@@ -691,9 +742,11 @@ At minimum, automated tests MUST cover:
 - Bash-family and PowerShell command fixtures, incomplete streaming fences, comments, prompt
   stripping, and conservative fallback;
 - settings, UI state, database repositories, schema migrations, vault, history, and corruption
-  quarantine.
+  quarantine;
+- nightly release parsing, the update state machine, keybinding resolution and conflict detection,
+  and the remote-editor and snapshot-draft window lifecycle paths.
 
-### 24.2 Integration and end-to-end tests
+### 25.2 Integration and end-to-end tests
 
 The suite MUST exercise:
 
@@ -711,13 +764,13 @@ The suite MUST exercise:
 - IME, high DPI, multiple displays, alternate-screen applications, and WebGL fallback through a
   documented manual matrix where automation is insufficient.
 
-### 24.3 Traceability
+### 25.3 Traceability
 
 Every normative requirement ID MUST appear in a requirements matrix with implementation owner,
 automated test or manual procedure, evidence, and status. A feature is not complete merely because a
 module with a matching name exists.
 
-## 25. Initial release definition of done
+## 26. Initial release definition of done
 
 Geared Term's initial release is complete only when:
 
