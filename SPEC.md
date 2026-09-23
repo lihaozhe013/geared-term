@@ -581,7 +581,8 @@ not currently implemented is stated as such instead of being treated as complete
   adjustments, preserve order, and remove blanks, duplicates, and the primary font.
 - **SET-004**: Font sizes MUST remain within 8-32 logical pixels and terminal line height within
   1.00-2.00 in stable 0.05 steps. Terminal padding MUST remain an integer between 0 and 32 logical
-  pixels and MUST default to 0 so the terminal fills its workspace.
+  pixels and MUST default to 8 for the shell buffer. While the alternate screen buffer is active,
+  the padding MUST be ignored so full-screen programs fill the workspace.
 - **SET-005**: Built-in themes MUST include a dark default theme and the four Catppuccin variants.
   UI, terminal, selection, cursor, search, and code highlighting colors MUST remain coordinated.
 - **SET-006**: User theme JSON files MUST be loadable from a documented theme directory. A valid

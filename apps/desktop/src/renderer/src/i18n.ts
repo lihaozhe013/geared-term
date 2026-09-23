@@ -134,7 +134,7 @@ const messages = {
     fontLigaturesHint:
       'Renders programming ligatures (=>, ->, !==) as single glyphs when the terminal font provides them.',
     terminalPaddingHint:
-      'Space between the terminal grid and the workspace edge. 0 fills the workspace; full-screen TUI programs draw inside this inset.',
+      'Inset around the shell prompt. Full-screen programs (vim, lazygit, tmux) always fill the workspace; 0 makes the shell edge to edge too.',
     fallbackFonts: 'Fallback fonts (ordered)',
     addFallback: 'Add fallback font',
     fontScale: 'Scale',
@@ -606,7 +606,7 @@ const messages = {
     fontLigatures: '启用字体连字',
     fontLigaturesHint: '当终端字体支持时，将编程连字（=>、->、!== 等）渲染为单个字形。',
     terminalPaddingHint:
-      '终端网格与工作区边缘之间的留白。0 表示铺满工作区；全屏 TUI 程序绘制在该留白之内。',
+      'shell 提示符周围的留白。全屏程序（vim、lazygit、tmux 等）始终铺满工作区；设为 0 时 shell 也贴边。',
     fallbackFonts: '回退字体（有序）',
     addFallback: '添加回退字体',
     fontScale: '缩放',

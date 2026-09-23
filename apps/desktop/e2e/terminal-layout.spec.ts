@@ -3,6 +3,9 @@ import { launchApp, openLocalTab, type AppSession } from './fixtures';
 
 let session: AppSession;
 
+const DEFAULT_PADDING = 8;
+const CUSTOM_PADDING = 12;
+
 test.beforeAll(async () => {
   session = await launchApp();
   await openLocalTab(session.app);
@@ -24,7 +27,21 @@ async function setTerminalPadding(padding: number): Promise<void> {
   }, padding);
 }
 
-type Geometry = { padding: number; insetLeft: number; insetTop: number };
+// `node -e` keeps the escape sequence portable across the pwsh/cmd/bash shells a
+// local profile can start. The program only toggles the mode and exits, but the
+// shell never leaves the alternate buffer, so the state persists at its prompt.
+async function emitMode(set: 'h' | 'l'): Promise<void> {
+  await session.page.locator('.terminal-wrapper:not([hidden]) .terminal-host').click();
+  await session.page.keyboard.insertText(`node -e "process.stdout.write('\\u001b[?1049${set}')"`);
+  await session.page.keyboard.press('Enter');
+}
+
+type Geometry = {
+  alternate: boolean;
+  padding: number;
+  insetLeft: number;
+  insetTop: number;
+};
 
 function measure(): Promise<Geometry> {
   return session.page.evaluate(() => {
@@ -32,10 +49,13 @@ function measure(): Promise<Geometry> {
     const host = document.querySelector<HTMLElement>(
       '.terminal-wrapper:not([hidden]) .terminal-host'
     );
-    if (!surface || !host) return { padding: -1, insetLeft: -1, insetTop: -1 };
+    if (!surface || !host) {
+      return { alternate: false, padding: -1, insetLeft: -1, insetTop: -1 };
+    }
     const surfaceRect = surface.getBoundingClientRect();
     const hostRect = host.getBoundingClientRect();
     return {
+      alternate: surface.dataset.alternateScreen === 'true',
       padding: parseFloat(getComputedStyle(surface).paddingLeft),
       insetLeft: hostRect.left - surfaceRect.left,
       insetTop: hostRect.top - surfaceRect.top
@@ -43,18 +63,33 @@ function measure(): Promise<Geometry> {
   });
 }
 
-test('terminal fills the workspace edge to edge by default', async () => {
+async function expectPadding(expected: number): Promise<void> {
+  await expect.poll(async () => (await measure()).padding, { timeout: 10_000 }).toBe(expected);
+}
+
+test('shell prompt keeps the default padding', async () => {
   const geometry = await measure();
-  expect(geometry.padding).toBe(0);
-  expect(geometry.insetLeft).toBeCloseTo(0, 0);
-  expect(geometry.insetTop).toBeCloseTo(0, 0);
+  expect(geometry.alternate).toBe(false);
+  expect(geometry.padding).toBe(DEFAULT_PADDING);
+  expect(geometry.insetLeft).toBeCloseTo(DEFAULT_PADDING, 0);
+  expect(geometry.insetTop).toBeCloseTo(DEFAULT_PADDING, 0);
 });
 
-test('terminal padding setting insets the terminal surface', async () => {
-  await setTerminalPadding(12);
-  await expect.poll(async () => (await measure()).padding, { timeout: 10_000 }).toBe(12);
-  const geometry = await measure();
-  expect(geometry.insetLeft).toBeCloseTo(12, 0);
-  expect(geometry.insetTop).toBeCloseTo(12, 0);
-  await setTerminalPadding(0);
+test('full-screen programs fill the workspace and restore the shell padding', async () => {
+  await setTerminalPadding(CUSTOM_PADDING);
+  await expectPadding(CUSTOM_PADDING);
+
+  await emitMode('h');
+  await expect.poll(async () => (await measure()).alternate, { timeout: 15_000 }).toBe(true);
+  await expectPadding(0);
+  const fullScreen = await measure();
+  expect(fullScreen.insetLeft).toBeCloseTo(0, 0);
+  expect(fullScreen.insetTop).toBeCloseTo(0, 0);
+
+  await emitMode('l');
+  await expect.poll(async () => (await measure()).alternate, { timeout: 15_000 }).toBe(false);
+  await expectPadding(CUSTOM_PADDING);
+
+  await setTerminalPadding(DEFAULT_PADDING);
+  await expectPadding(DEFAULT_PADDING);
 });

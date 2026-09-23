@@ -69,7 +69,7 @@ const defaultSettings: SettingsRecord = {
   theme: 'Catppuccin Mocha',
   terminalFontSize: 14,
   terminalLineHeight: 1.2,
-  terminalPadding: 0,
+  terminalPadding: 8,
   terminalCursor: 'bar',
   defaultTerm: 'xterm-256color',
   splitCommandPresentation: true,
@@ -879,7 +879,11 @@ export function App(): React.JSX.Element {
             onCloseOthers={closeOtherTabs}
             onCloseAll={closeAllTabs}
           />
-          <div className="terminal-surface" data-active-status={activeTab?.status ?? 'none'}>
+          <div
+            className="terminal-surface"
+            data-active-status={activeTab?.status ?? 'none'}
+            data-alternate-screen={activeTab && alternateScreens[activeTab.id] ? 'true' : 'false'}
+          >
             {tabs.map((tab) => (
               <TerminalPane
                 key={tab.id}

@@ -37,3 +37,30 @@ Removing the padding requires persisting a new user preference.
 - The setting is part of the versioned settings JSON, so backup/restore and the existing atomic
   write path cover it automatically.
 - No process boundary, secret access, or IPC surface changes; only the renderer layout consumes it.
+
+## Revision (2026-09-23)
+
+The original decision set the default to 0, which inverted the original complaint: the shell prompt
+then hugged the workspace edge. Reviewing the reference terminals showed their defaults are static
+and in practice non-zero - Windows Terminal `padding` is `8, 8, 8, 8`, VS Code adds 20 px of left
+padding to `.xterm`, and WezTerm defaults to 1 cell left/right and 0.5 cell top/bottom - and none of
+them vary padding by mode. Their full-screen programs therefore always carry a frame.
+
+geared-term can do better because it already tracks the alternate screen buffer. The revised
+decision supersedes items 2-3 above:
+
+1. **Default.** The schema default and `defaultSettings` value become 8, so records written before
+   the field existed resolve to the shell inset rather than the edge-to-edge layout.
+2. **Shell vs full-screen.** `terminalPadding` applies while the normal buffer is active. When the
+   active pane has entered the alternate screen buffer (`CSI ?47`, `?1047`, or `?1049`), the
+   `.terminal-surface[data-alternate-screen='true']` rule forces a 0 padding so full-screen programs
+   fill the workspace.
+3. **Wiring.** `App` derives the attribute from the existing `alternateScreens` map, which
+   `TerminalPane` populates via its alternate-screen parser handlers. Toggling the attribute resizes
+   `.terminal-host`, so the running `ResizeObserver` re-fits the active pane and informs the pty.
+
+Trade-off: entering or leaving a full-screen program changes the grid dimensions, so xterm may
+reflow the last lines of shell output once per transition. Mainstream terminals avoid that reflow by
+never changing padding, at the cost of a permanent frame around full-screen programs.
+
+Programs that do not use the alternate screen (REPLs, `ssh`, progress output) keep the inset.

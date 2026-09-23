@@ -46,8 +46,8 @@ describe('SettingsRecordSchema keybindings', () => {
 });
 
 describe('SettingsRecordSchema terminal padding', () => {
-  it('defaults to edge-to-edge padding for records saved before the field existed', () => {
-    expect(SettingsRecordSchema.parse(baseSettings).terminalPadding).toBe(0);
+  it('defaults to the shell inset for records saved before the field existed', () => {
+    expect(SettingsRecordSchema.parse(baseSettings).terminalPadding).toBe(8);
   });
 
   it('accepts integers in range and rejects invalid values', () => {

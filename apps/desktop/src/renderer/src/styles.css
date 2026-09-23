@@ -1380,12 +1380,21 @@ button:disabled {
   grid-template-rows: 1fr auto;
   gap: 12px;
   min-height: 0;
-  padding: var(--gt-terminal-padding, 0px);
+  padding: var(--gt-terminal-padding, 8px);
   overflow: auto;
   background: var(--gt-background, #0d1117);
   font-family: 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;
   font-size: var(--gt-fs-base);
   line-height: 1.8;
+}
+
+/*
+ * Full-screen programs (alternate screen buffer) paint their own background and
+ * chrome, so a frame there reads as an asymmetric gutter. The shell prompt keeps
+ * the configurable inset; on the alternate buffer the grid fills the workspace.
+ */
+.terminal-surface[data-alternate-screen='true'] {
+  padding: 0;
 }
 
 .terminal-surface > .terminal-wrapper {
