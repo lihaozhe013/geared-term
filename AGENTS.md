@@ -6,6 +6,9 @@
    must follow Conventional Commits.
 2. Before adding responsibilities to a source file over 1,000 lines, evaluate whether it should be
    split into focused modules.
+3. Cross-package imports must use workspace package names (e.g. `@geared-term/protocol`), never
+   relative paths that cross package boundaries; within a package, use relative imports (`./` for
+   siblings, at most one `../` level) rather than path aliases.
 
 Debug builds write logs into `debug-logs/` (release builds into the per-user data directory):
 `debug.log` is a summary of application warnings/errors, and `debug-{feature}.log` hold full
