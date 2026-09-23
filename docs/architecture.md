@@ -25,6 +25,7 @@ apps/
         ai/                    provider adapters, streaming, history, context, discovery
         environment/           bounded local/WSL environment probes
         files/                 validated local filesystem operations
+        llm-web/               embedded LLM web pane: WebContentsView, site policy, relay
         persistence/           SQLite profile store, JSON stores, vault rotation facade
         sftp/                  SFTP service, transfers, cd tracking, remote commands, editor file
         ssh/                   ssh2 session, host keys, authentication
@@ -41,9 +42,10 @@ apps/
         update-release.ts      nightly GitHub release parsing
         ligatures.ts           terminal font ligature probing
       preload/
+      preload-web/             sandboxed injection: site adapters and block extraction
       renderer/
         src/
-          ai/ assistant/ history/ settings/ sftp/ terminal/ terminal-snapshot/ remote-editor/
+          ai/ assistant/ history/ settings/ sftp/ terminal/ terminal-snapshot/ remote-editor/ webpane/
     e2e/                       Playwright Electron suites
     scripts/                   build, security audit, packaged smoke, nightly versioning
     resources/
@@ -73,17 +75,19 @@ Layout rules:
 
 ## 2. Process ownership
 
-| Concern                           | Owner                    | Notes                                                      |
-| --------------------------------- | ------------------------ | ---------------------------------------------------------- |
-| Window lifecycle and security     | Main                     | Renderer navigation and new windows are denied by default. |
-| PTY, SSH, SFTP, WSL processes     | Main                     | One explicit lifecycle owner per resource.                 |
-| Vault and decrypted secrets       | Main                     | Secret DTOs are never part of the preload API.             |
-| SQLite database                   | Main                     | One connection; WAL; main-process services only.           |
-| Provider HTTP and stream decoding | Main                     | Renderer sees provider-neutral events.                     |
-| xterm instance and addons         | Renderer                 | Stored outside React state; disposed with its view.        |
-| Workspace and transient UI state  | Renderer                 | Persisted through validated main-process services.         |
-| Command parsing                   | Pure package in a worker | Bounded input and conservative fallback.                   |
-| Runtime schemas                   | Shared protocol package  | Validated on both sides of every trust boundary.           |
+| Concern                           | Owner                    | Notes                                                                               |
+| --------------------------------- | ------------------------ | ----------------------------------------------------------------------------------- |
+| Window lifecycle and security     | Main                     | Renderer navigation and new windows are denied by default.                          |
+| PTY, SSH, SFTP, WSL processes     | Main                     | One explicit lifecycle owner per resource.                                          |
+| Vault and decrypted secrets       | Main                     | Secret DTOs are never part of the preload API.                                      |
+| SQLite database                   | Main                     | One connection; WAL; main-process services only.                                    |
+| Provider HTTP and stream decoding | Main                     | Renderer sees provider-neutral events.                                              |
+| xterm instance and addons         | Renderer                 | Stored outside React state; disposed with its view.                                 |
+| Workspace and transient UI state  | Renderer                 | Persisted through validated main-process services.                                  |
+| Command parsing                   | Pure package in a worker | Bounded input and conservative fallback.                                            |
+| Runtime schemas                   | Shared protocol package  | Validated on both sides of every trust boundary.                                    |
+| Embedded LLM web view             | Main                     | Own WebContentsView and isolated partition; never shares the default session.       |
+| Web command candidates            | Renderer (trusted strip) | Site preload only reports candidates; actions go through `terminal:command-action`. |
 
 ## 3. Terminal transport
 
@@ -232,9 +236,40 @@ is driven by business-named, validated IPC.
   standard Dock behavior.
 - **Update UI**: the About section of the settings window drives `updates:get-status`,
   `updates:check`, `updates:install`, and `updates:open-release` and renders the shared
-  `UpdateStatus` state machine (Section 8).
+  `UpdateStatus` state machine (Section 9).
 
-## 8. Update delivery
+## 8. Embedded LLM web pane
+
+Geared Term can host third-party LLM chat pages (ChatGPT, DeepSeek) in a
+[`WebContentsView`](https://www.electronjs.org/docs/latest/api/web-contents-view) docked inside the
+right panel. The view is a native surface, so the renderer reports a placeholder rectangle through
+`llm-web:set-bounds` and the main process sets the view bounds; the view is hidden while the web tab
+is inactive, the window is hidden, or trusted UI (dialogs, context menus, the snapshot editor) must
+appear above it.
+
+Each site runs in its own persistent partition (`persist:llm-web-<site>`) that never shares cookies,
+storage, or permission state with `session.defaultSession`, which only carries the application's own
+renderers. The main process owns every boundary decision: navigation is confined to each site's
+registered-host allowlist (sign-in hops included), `window.open` is denied except for
+adapter-declared authentication origins which open as managed child windows in the same partition,
+downloads are prevented, and a partition-scoped permission handler denies all requests. These rules
+are recorded in [ADR 0002](architecture-decisions/0002-web-llm-embedding.md).
+
+A second sandboxed preload (`src/preload-web`) runs per-site adapters in the view's isolated world.
+It observes rendered code blocks, classifies language labels, and runs the pure
+`@geared-term/command-parser` in that context to produce candidate rows with content revisions,
+reporting them through schema-validated IPC. The injected context exposes nothing to the page's main
+world and has no terminal, filesystem, process, or arbitrary-channel capability.
+
+Candidate reports are admitted only after the main process checks the sender `webContents` id, the
+site identity, and the per-site enhancement setting, and enforces a rate floor and a byte budget.
+Accepted candidates render in a trusted command-card strip in the main renderer, so the text shown
+is the exact payload sent and Copy/Insert/Run reach the terminal only through the existing
+`terminal:command-action` path with its revision and safety re-validation. Streaming and generation
+state disable Run. Adapter reports expire quickly, which drives the pane's status pill and a safe
+degrade to ordinary browsing when a site's structure is no longer recognized.
+
+## 9. Update delivery
 
 Geared Term ships unsigned nightly artifacts to a rolling GitHub `nightly` prerelease
 (`.github/workflows/nightly.yml`); each build embeds its commit SHA.
@@ -253,7 +288,7 @@ Geared Term ships unsigned nightly artifacts to a rolling GitHub `nightly` prere
 - Update failures are surfaced as bounded, redacted errors and never interrupt terminal, SFTP, or AI
   sessions.
 
-## 9. Test strategy
+## 10. Test strategy
 
 | Layer              | Tooling                           | Scope                                                              |
 | ------------------ | --------------------------------- | ------------------------------------------------------------------ |
@@ -285,19 +320,20 @@ Required verification order:
 9. packaged-app smoke tests;
 10. artifacts are produced only after every prior gate succeeds.
 
-## 10. Risk register
+## 11. Risk register
 
-| Risk                              | Detection                                 | Mitigation                                                            | Release blocker                                                |
-| --------------------------------- | ----------------------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------------- |
-| Native module ABI failure         | Packaged smoke fails                      | Rebuild `node-pty` and `better-sqlite3` for Electron ABI per platform | Any supported artifact cannot start a PTY or open the database |
-| xterm font/IME regression         | Manual matrix or buffer/render mismatch   | Font fallback fixtures, IME testing, WebGL fallback                   | Input loss, unreadable CJK, or incorrect cell geometry         |
-| Port backpressure bug             | Memory growth, latency, missing sequence  | Credit/ack protocol, stress tests, explicit overload state            | Lost terminal bytes or unbounded growth                        |
-| `ssh2` behavior gap               | Controlled-server scenario fails          | Adapter state machine, interoperability fixtures, scoped feature set  | Auth, host trust, PTY, or resize failure                       |
-| SFTP blocks terminal              | Latency/stress metrics                    | Separate channels/tasks and bounded transfer events                   | Terminal becomes unresponsive during transfer                  |
-| Changed-host handling weakens     | Host-key fixtures fail                    | Fail closed, serialize store changes, show both fingerprints          | Mismatch accepted without explicit approval                    |
-| Parser changes command meaning    | Fixture/fuzz failure                      | Shell-specific parsers and whole-block fallback                       | Runnable incorrect candidate                                   |
-| Stale command targets wrong tab   | Race E2E failure                          | Session and revision validation in main                               | Any demonstrated cross-session send                            |
-| SQLite migration corrupts data    | Migration or interrupted-write test fails | Transactional migrations, `VACUUM INTO` backups, quarantine           | Data loss or a partially migrated database                     |
-| Secret leakage                    | Log/IPC/bundle scanning                   | Main-only secrets, redaction, synthetic canary tests                  | Any plaintext secret outside approved memory path              |
-| Linux auto-unlock is weak         | `safeStorage` reports basic backend       | Reject the basic backend; no silent fallback (ADR 0001)               | Silent insecure auto-unlock                                    |
-| Unsigned update channel is abused | Release tooling or feed changes           | Nightly-only prerelease channel; SHA comparison; Windows installer    | A build can be force-downgraded or fed foreign artifacts       |
+| Risk                              | Detection                                 | Mitigation                                                             | Release blocker                                                |
+| --------------------------------- | ----------------------------------------- | ---------------------------------------------------------------------- | -------------------------------------------------------------- |
+| Native module ABI failure         | Packaged smoke fails                      | Rebuild `node-pty` and `better-sqlite3` for Electron ABI per platform  | Any supported artifact cannot start a PTY or open the database |
+| xterm font/IME regression         | Manual matrix or buffer/render mismatch   | Font fallback fixtures, IME testing, WebGL fallback                    | Input loss, unreadable CJK, or incorrect cell geometry         |
+| Port backpressure bug             | Memory growth, latency, missing sequence  | Credit/ack protocol, stress tests, explicit overload state             | Lost terminal bytes or unbounded growth                        |
+| `ssh2` behavior gap               | Controlled-server scenario fails          | Adapter state machine, interoperability fixtures, scoped feature set   | Auth, host trust, PTY, or resize failure                       |
+| SFTP blocks terminal              | Latency/stress metrics                    | Separate channels/tasks and bounded transfer events                    | Terminal becomes unresponsive during transfer                  |
+| Changed-host handling weakens     | Host-key fixtures fail                    | Fail closed, serialize store changes, show both fingerprints           | Mismatch accepted without explicit approval                    |
+| Parser changes command meaning    | Fixture/fuzz failure                      | Shell-specific parsers and whole-block fallback                        | Runnable incorrect candidate                                   |
+| Stale command targets wrong tab   | Race E2E failure                          | Session and revision validation in main                                | Any demonstrated cross-session send                            |
+| SQLite migration corrupts data    | Migration or interrupted-write test fails | Transactional migrations, `VACUUM INTO` backups, quarantine            | Data loss or a partially migrated database                     |
+| Secret leakage                    | Log/IPC/bundle scanning                   | Main-only secrets, redaction, synthetic canary tests                   | Any plaintext secret outside approved memory path              |
+| Linux auto-unlock is weak         | `safeStorage` reports basic backend       | Reject the basic backend; no silent fallback (ADR 0001)                | Silent insecure auto-unlock                                    |
+| Embedded site structure drifts    | Adapter probe and candidate reports fail  | Per-site adapters, health probe expiry, degrade to browsing (ADR 0002) | Enhancement guesses and offers Run on mismatched content       |
+| Unsigned update channel is abused | Release tooling or feed changes           | Nightly-only prerelease channel; SHA comparison; Windows installer     | A build can be force-downgraded or fed foreign artifacts       |
