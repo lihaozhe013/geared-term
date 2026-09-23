@@ -65,6 +65,6 @@ The WSL command worked when launched directly through `wsl.exe`, but the package
 session has not been verified. Run that check in the packaged UI before release.
 
 The manual OpenCode acceptance remains outstanding: on the affected Windows machine, run `opencode`,
-enter `/exit`, and confirm the PowerShell prompt returns with the terminal tab open for at least 10
-consecutive runs. Confirm no hard-error dialog and no corresponding new `conhost.exe` crash or
-`pwsh.exe` FailFast event before releasing the fix.
+enter `/exit`, and confirm the PowerShell prompt returns with the terminal tab open. Confirm no
+hard-error dialog and no corresponding new `conhost.exe` crash or `pwsh.exe` FailFast event before
+releasing the fix.
