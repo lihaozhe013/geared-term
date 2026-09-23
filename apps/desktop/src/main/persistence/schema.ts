@@ -67,7 +67,7 @@ export const defaultSettings: Settings = {
   terminalCursor: 'block',
   defaultTerm: 'xterm-256color',
   splitCommandPresentation: true,
-  allowRiskyRun: true,
+  allowRiskyRun: false,
   keepRunningInBackground: false,
   terminalContextPrecedingLines: 100,
   remoteFileCommands: 'cat\nless\nvim',
