@@ -522,6 +522,93 @@ export function AiAssistantSection({
   );
 }
 
+export function WebSection({
+  settings,
+  onSave,
+  t
+}: {
+  settings: SettingsRecord;
+  onSave: (patch: Partial<SettingsRecord>) => Promise<void>;
+  t: Translate;
+}): React.JSX.Element {
+  const [clearedSite, setClearedSite] = useState<string | null>(null);
+  const sites = [
+    { id: 'chatgpt', label: 'ChatGPT' },
+    { id: 'deepseek', label: 'DeepSeek' }
+  ] as const;
+
+  const clearSite = (site: (typeof sites)[number]): void => {
+    if (!window.confirm(t('llmWebClearDataConfirm').replace('{site}', site.label))) return;
+    void window.geared
+      .clearWebSiteData(site.id)
+      .then(() => {
+        setClearedSite(site.label);
+        setTimeout(() => setClearedSite(null), 4000);
+      })
+      .catch(() => undefined);
+  };
+
+  return (
+    <Section title={t('groupWeb')}>
+      <p className="settings-hint">{t('llmWebHint')}</p>
+      <label className="settings-check">
+        <input
+          type="checkbox"
+          checked={settings.llmWebEnabled}
+          onChange={(event) =>
+            void onSave({ llmWebEnabled: event.target.checked }).catch(() => undefined)
+          }
+        />
+        <span>{t('llmWebEnabledLabel')}</span>
+      </label>
+      <label className="settings-check">
+        <input
+          type="checkbox"
+          checked={settings.llmWebCommandEnhancement}
+          onChange={(event) =>
+            void onSave({ llmWebCommandEnhancement: event.target.checked }).catch(() => undefined)
+          }
+        />
+        <span>{t('llmWebEnhancementLabel')}</span>
+      </label>
+      {sites.map((site) => (
+        <label className="settings-check" key={site.id}>
+          <input
+            type="checkbox"
+            checked={!settings.llmWebEnhancementOffSites.includes(site.id)}
+            onChange={(event) => {
+              const off = new Set(settings.llmWebEnhancementOffSites);
+              if (event.target.checked) off.delete(site.id);
+              else off.add(site.id);
+              void onSave({ llmWebEnhancementOffSites: [...off] }).catch(() => undefined);
+            }}
+          />
+          <span>{t('llmWebSiteEnhancement').replace('{site}', site.label)}</span>
+        </label>
+      ))}
+      <Row label={t('llmWebClearData')}>
+        <div className="settings-actions-row">
+          {sites.map((site) => (
+            <button
+              type="button"
+              className="toolbar-button"
+              key={site.id}
+              onClick={() => clearSite(site)}
+            >
+              {site.label}
+            </button>
+          ))}
+        </div>
+      </Row>
+      {clearedSite ? (
+        <p className="settings-status" role="status">
+          {t('llmWebCleared').replace('{site}', clearedSite)}
+        </p>
+      ) : null}
+    </Section>
+  );
+}
+
 export function AboutSection({
   info,
   runtime,

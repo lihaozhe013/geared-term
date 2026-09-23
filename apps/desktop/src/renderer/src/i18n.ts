@@ -317,6 +317,16 @@ const messages = {
     webRevealBlock: 'Show in page',
     webTargetTerminal: 'Target terminal: {label}',
     webNoTerminal: 'No terminal session — open one to enable Insert and Run',
+    groupWeb: 'Web',
+    llmWebHint:
+      'Pages only propose commands. Insert and Run happen in this app after you choose a target terminal; site logins live in isolated storage.',
+    llmWebEnabledLabel: 'Embed LLM web pages (ChatGPT, DeepSeek) in the right panel',
+    llmWebEnhancementLabel: 'Turn shell code blocks on those pages into command rows',
+    llmWebSiteEnhancement: 'Command enhancement: {site}',
+    llmWebClearData: 'Clear sign-in and site data',
+    llmWebClearDataConfirm:
+      'Clear all {site} sign-in state and site data? Site conversations are untouched, but you must sign in again.',
+    llmWebCleared: '{site} site data cleared',
     noTerminals: 'No open terminals',
     emptyTerminalHint: 'Open a local shell or start a session from the sidebar to get started.',
     localShell: 'Local Shell',
@@ -805,6 +815,16 @@ const messages = {
     webRevealBlock: '在页面中定位',
     webTargetTerminal: '目标终端：{label}',
     webNoTerminal: '没有终端会话——请先打开一个以启用 Insert 和 Run',
+    groupWeb: '网页',
+    llmWebHint:
+      '网页只提出命令候选。Insert 与 Run 由本应用在你选定目标终端后执行；网站登录保存在隔离存储中。',
+    llmWebEnabledLabel: '在右侧面板内嵌 LLM 网页（ChatGPT、DeepSeek）',
+    llmWebEnhancementLabel: '把这些页面的 Shell 代码块转换为命令行',
+    llmWebSiteEnhancement: '命令增强：{site}',
+    llmWebClearData: '清除登录与站点数据',
+    llmWebClearDataConfirm:
+      '清除 {site} 的全部登录状态和站点数据？不会删除网站上的对话，但需要重新登录。',
+    llmWebCleared: '已清除 {site} 的站点数据',
     noTerminals: '没有打开的终端',
     emptyTerminalHint: '打开一个本地 shell，或从侧边栏启动会话即可开始使用。',
     localShell: '本地 Shell',

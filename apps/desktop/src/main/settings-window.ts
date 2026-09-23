@@ -16,6 +16,7 @@ export type SettingsCategory =
   | 'sftp'
   | 'ai-connections'
   | 'ai-assistant'
+  | 'web'
   | 'security'
   | 'about';
 

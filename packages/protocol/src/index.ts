@@ -80,6 +80,7 @@ export const SETTINGS_CATEGORIES = [
   'sftp',
   'ai-connections',
   'ai-assistant',
+  'web',
   'security',
   'about'
 ] as const;
@@ -158,9 +159,7 @@ export const LlmWebVisibleRequestSchema = z.object({ visible: z.boolean() }).str
 
 export const LlmWebSiteDataRequestSchema = z.object({ site: LlmWebSiteIdSchema }).strict();
 
-export const LlmWebRevealRequestSchema = z
-  .object({ blockId: z.string().min(1).max(128) })
-  .strict();
+export const LlmWebRevealRequestSchema = z.object({ blockId: z.string().min(1).max(128) }).strict();
 
 export const LlmWebNavigationSchema = z
   .object({

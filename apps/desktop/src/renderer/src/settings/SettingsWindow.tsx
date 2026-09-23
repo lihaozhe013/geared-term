@@ -14,6 +14,7 @@ import {
   Info,
   Keyboard,
   Lock,
+  Globe,
   Palette,
   Settings as SettingsIcon,
   SquareTerminal
@@ -27,7 +28,8 @@ import {
   AppearanceSection,
   GeneralSection,
   SftpSection,
-  TerminalSection
+  TerminalSection,
+  WebSection
 } from './sections';
 import { AiConnectionsSection } from './AiConnections';
 import { SecurityVaultSection } from './SecurityVault';
@@ -42,6 +44,7 @@ type Category =
   | 'sftp'
   | 'ai-connections'
   | 'ai-assistant'
+  | 'web'
   | 'security'
   | 'about';
 
@@ -84,8 +87,11 @@ export function SettingsWindow(): React.JSX.Element {
         next === 'ai-connections' ||
         next === 'ai-assistant' ||
         next === 'security' ||
-        next === 'shortcuts'
+        next === 'shortcuts' ||
+        next === 'web'
       ) {
+        setCategory(next);
+      } else if (next === 'web') {
         setCategory(next);
       } else if (next === 'about') {
         setCategory(next);
@@ -213,6 +219,13 @@ export function SettingsWindow(): React.JSX.Element {
           </button>
           <button
             type="button"
+            className={`settings-nav-item ${category === 'web' ? 'active' : ''}`}
+            onClick={() => setCategory('web')}
+          >
+            <Globe size={15} aria-hidden="true" /> {t('groupWeb')}
+          </button>
+          <button
+            type="button"
             className={`settings-nav-item ${category === 'security' ? 'active' : ''}`}
             onClick={() => setCategory('security')}
           >
@@ -254,6 +267,7 @@ export function SettingsWindow(): React.JSX.Element {
             {category === 'ai-assistant' ? (
               <AiAssistantSection settings={settings} onSave={save} t={t} />
             ) : null}
+            {category === 'web' ? <WebSection settings={settings} onSave={save} t={t} /> : null}
             {category === 'security' ? <SecurityVaultSection t={t} /> : null}
             {category === 'about' ? (
               <AboutSection
