@@ -131,6 +131,7 @@ import { probeEnvironment } from './environment/probe';
 import { EnvironmentManager } from './environment/manager';
 import { buildAssistantContext } from './ai/context';
 import { UpdateManager } from './update-manager';
+import { UpdateNotificationController } from './update-notification';
 
 const isDevelopment = !app.isPackaged;
 // Depth of in-flight key-capture sessions (shortcut recording in the settings
@@ -166,6 +167,7 @@ let environmentManager: EnvironmentManager;
 let sshSessions: SshSessionManager;
 let transferManager: TransferManager;
 let updateManager: UpdateManager | undefined;
+let updateNotification: UpdateNotificationController | undefined;
 const aiControllers = new Map<string, AbortController>();
 const aiHistory = new AiHistoryStore(isDevelopment ? process.cwd() : app.getPath('userData'));
 const themesDirectory = join(isDevelopment ? process.cwd() : app.getPath('userData'), 'themes');
@@ -362,6 +364,8 @@ function createWindow(): BrowserWindow {
   });
   hideNativeMenuBar(window);
   forwardWindowControlState(window);
+  window.on('show', () => updateNotification?.onMainWindowPresented());
+  window.on('restore', () => updateNotification?.onMainWindowPresented());
   let persistingWindowState = false;
 
   showWindowWhenReady(window, logger, 'main');
@@ -1268,6 +1272,8 @@ if (hasSingleInstanceLock) {
     installContentSecurityPolicy();
     updateManager = new UpdateManager(logger, __APP_COMMIT__, app.isPackaged, (status) => {
       sendToRenderer('updates:status', status);
+    }, (release) => {
+      updateNotification?.notify(release);
     });
     registerIpc();
     settingsWindow = new SettingsWindowManager(logger, isDevelopment, () => {
@@ -1276,6 +1282,13 @@ if (hasSingleInstanceLock) {
       keyCaptureDepth = 0;
       void rebuildApplicationMenu();
     });
+    updateNotification = new UpdateNotificationController(
+      logger,
+      () => mainWindow,
+      () => resolveMenuLocale(storage.settingsSnapshot().language),
+      () => settingsWindow.open('about'),
+      (parent, options) => dialog.showMessageBox(parent, options)
+    );
     historyWindow = new HistoryWindowManager(logger, isDevelopment);
     await rebuildApplicationMenu();
     trayController = new TrayController(

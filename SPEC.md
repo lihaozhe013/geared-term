@@ -697,6 +697,11 @@ reported in Settings without blocking startup.
 - **UPD-006**: The UI MUST render the validated update state machine (`idle`, `checking`,
   `up-to-date`, `available`, `downloading`, `downloaded`, `error`), including download progress and
   the install affordance when an update is ready.
+- **UPD-007**: Packaged builds MUST show a localized native prompt when an automatic check finds a
+  nightly commit SHA different from the running build. The prompt MUST be shown at most once per
+  process run, offer actions to open Settings → About or dismiss it, and wait until the main window is
+  visible when the app is hidden or minimized. Manual checks MUST continue to report through Settings
+  → About without opening a separate prompt; dismissals MUST NOT persist across restarts.
 
 ## 23. Performance and reliability
 

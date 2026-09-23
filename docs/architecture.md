@@ -246,6 +246,9 @@ Geared Term ships unsigned nightly artifacts to a rolling GitHub `nightly` prere
   check.
 - Status is published to renderers as the validated `UpdateStatus` union
   (`idle | checking | up-to-date | available | downloading | downloaded | error`).
+- `update-notification.ts` receives one automatic new-SHA notification per process run and shows a
+  localized native prompt. It opens Settings → About on request and queues the prompt until the main
+  window is shown if the app is hidden or minimized in the tray.
 - Automatic download and in-app install are Windows NSIS-installer builds only (electron-updater
   with a generic publish feed pointing at the release download URL and the `beta` channel,
   `beta.yml`). Portable Windows builds and macOS/Linux builds detect an update and offer the release

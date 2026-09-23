@@ -9,12 +9,15 @@ const releaseUrl = `https://github.com/${repository}/releases/tag/nightly`;
 const checkIntervalMs = 24 * 60 * 60 * 1000;
 
 type StatusPublisher = (status: UpdateStatus) => void;
+type NewVersionPublisher = (release: NightlyRelease) => void;
 
 export class UpdateManager {
   private status: UpdateStatus;
   private pendingRelease: NightlyRelease | undefined;
   private checkPromise: Promise<UpdateStatus> | undefined;
   private checkTimer: NodeJS.Timeout | undefined;
+  private automaticCheckRequested = false;
+  private updatePrompted = false;
   private readonly canInstall =
     process.platform === 'win32' &&
     !process.env.PORTABLE_EXECUTABLE_FILE &&
@@ -24,7 +27,8 @@ export class UpdateManager {
     private readonly logger: Logger,
     private readonly currentSha: string,
     private readonly isPackaged: boolean,
-    private readonly publishStatus: StatusPublisher
+    private readonly publishStatus: StatusPublisher,
+    private readonly publishNewVersion?: NewVersionPublisher
   ) {
     this.status = UpdateStatusSchema.parse({ state: 'idle', currentSha });
     if (this.isPackaged && this.canInstall) {
@@ -86,9 +90,11 @@ export class UpdateManager {
 
   public check(mode: 'automatic' | 'manual' = 'manual'): Promise<UpdateStatus> {
     if (!this.isPackaged) return Promise.resolve(this.status);
+    if (mode === 'automatic') this.automaticCheckRequested = true;
     if (this.checkPromise) return this.checkPromise;
     this.publish({ state: 'checking', canInstall: this.canInstall });
     this.checkPromise = this.performCheck(mode).finally(() => {
+      this.automaticCheckRequested = false;
       this.checkPromise = undefined;
     });
     return this.checkPromise;
@@ -117,18 +123,33 @@ export class UpdateManager {
       }
       if (this.canInstall) {
         if (!release.hasWindowsInstaller) {
+          this.notifyNewVersion(release);
           return this.publish({ state: 'available', canInstall: false });
         }
         const result = await autoUpdater.checkForUpdates();
+        this.notifyNewVersion(release);
         if (!result) return this.publish({ state: 'available', canInstall: false });
         if (this.status.state === 'checking') {
           this.publish({ state: 'available', canInstall: true });
         }
         return this.status;
       }
+      this.notifyNewVersion(release);
       return this.publish({ state: 'available', canInstall: false });
     } catch (error) {
       return this.fail(error instanceof Error ? error.message : String(error), mode);
+    }
+  }
+
+  private notifyNewVersion(release: NightlyRelease): void {
+    if (!this.automaticCheckRequested || this.updatePrompted || !this.publishNewVersion) return;
+    this.updatePrompted = true;
+    try {
+      this.publishNewVersion(release);
+    } catch (error) {
+      this.logger.warn('system', 'Unable to notify about a nightly update', {
+        error: error instanceof Error ? error.message : String(error)
+      });
     }
   }
 
