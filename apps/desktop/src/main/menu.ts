@@ -7,14 +7,14 @@ import {
   type KeybindingOverrides,
   type Platform
 } from '@geared-term/keybindings';
+import type { SettingsCategory } from './settings-window';
 
 export type MenuLocale = 'en-US' | 'zh-CN';
 
 export type MenuCommands = {
   onCommand: (command: string) => void;
   onOpenConfigFolder: () => void;
-  onOpenSettings: () => void;
-  onAbout: () => void;
+  onOpenSettings: (category?: SettingsCategory) => void;
 };
 
 export type MenuState = {
@@ -121,7 +121,7 @@ export function executeApplicationMenuAction(action: string, window: BrowserWind
       window.close();
       return;
     case 'about':
-      commands.onAbout();
+      commands.onOpenSettings('about');
       return;
   }
 
@@ -247,7 +247,7 @@ export function buildApplicationMenu(state: MenuState, commands: MenuCommands): 
           {
             label: 'Geared Term',
             submenu: [
-              { label: t.about, click: commands.onAbout },
+              { label: t.about, click: () => commands.onOpenSettings('about') },
               { type: 'separator' },
               { role: 'services', label: t.services },
               { type: 'separator' },
@@ -411,7 +411,12 @@ export function buildApplicationMenu(state: MenuState, commands: MenuCommands): 
     },
     ...(process.platform === 'darwin'
       ? []
-      : [{ label: t.help, submenu: [{ label: t.about, click: commands.onAbout }] }])
+      : [
+          {
+            label: t.help,
+            submenu: [{ label: t.about, click: () => commands.onOpenSettings('about') }]
+          }
+        ])
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }

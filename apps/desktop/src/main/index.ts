@@ -4,7 +4,6 @@ import {
   Menu,
   dialog,
   ipcMain,
-  nativeImage,
   safeStorage,
   screen,
   session,
@@ -224,24 +223,6 @@ function resolveMenuLocale(language: 'system' | 'en-US' | 'zh-CN'): MenuLocale {
   return app.getLocale().toLowerCase().startsWith('zh') ? 'zh-CN' : 'en-US';
 }
 
-function showAboutDialog(locale: MenuLocale): void {
-  const aboutLabels = {
-    'en-US': { title: 'About Geared Term', detail: 'A secure Electron terminal application.' },
-    'zh-CN': { title: '关于 Geared Term', detail: '一个安全的 Electron 终端应用。' }
-  } as const;
-  const iconPath = app.isPackaged
-    ? join(process.resourcesPath, 'icons', 'geared-term.png')
-    : join(__dirname, '../../resources/icons/geared-term.png');
-  const icon = nativeImage.createFromPath(iconPath);
-  void dialog.showMessageBox({
-    type: 'info',
-    title: aboutLabels[locale].title,
-    message: `Geared Term ${app.getVersion()} (${__APP_COMMIT__.slice(0, 7)})`,
-    ...(icon.isEmpty() ? {} : { icon }),
-    detail: `${aboutLabels[locale].detail}\nElectron ${process.versions.electron} · Chromium ${process.versions.chrome} · Node ${process.versions.node}`
-  });
-}
-
 async function rebuildApplicationMenu(): Promise<void> {
   const settings = storage.settingsSnapshot();
   const locale = resolveMenuLocale(settings.language);
@@ -265,8 +246,7 @@ async function rebuildApplicationMenu(): Promise<void> {
       onOpenConfigFolder: () => {
         void shell.openPath(app.getPath('userData'));
       },
-      onOpenSettings: () => settingsWindow.open(),
-      onAbout: () => showAboutDialog(locale)
+      onOpenSettings: (category) => settingsWindow.open(category)
     }
   );
 }
