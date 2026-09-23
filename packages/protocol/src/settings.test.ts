@@ -44,3 +44,27 @@ describe('SettingsRecordSchema keybindings', () => {
     expect(parsed.defaultAiConnectionId).toBe('connection-primary');
   });
 });
+
+describe('SettingsRecordSchema terminal padding', () => {
+  it('defaults to edge-to-edge padding for records saved before the field existed', () => {
+    expect(SettingsRecordSchema.parse(baseSettings).terminalPadding).toBe(0);
+  });
+
+  it('accepts integers in range and rejects invalid values', () => {
+    expect(
+      SettingsRecordSchema.parse({ ...baseSettings, terminalPadding: 12 }).terminalPadding
+    ).toBe(12);
+    expect(SettingsRecordSchema.safeParse({ ...baseSettings, terminalPadding: 32 }).success).toBe(
+      true
+    );
+    expect(SettingsRecordSchema.safeParse({ ...baseSettings, terminalPadding: 33 }).success).toBe(
+      false
+    );
+    expect(SettingsRecordSchema.safeParse({ ...baseSettings, terminalPadding: -1 }).success).toBe(
+      false
+    );
+    expect(SettingsRecordSchema.safeParse({ ...baseSettings, terminalPadding: 1.5 }).success).toBe(
+      false
+    );
+  });
+});

@@ -13,6 +13,7 @@ const messages = {
     theme: 'Terminal theme',
     fontSize: 'Font size',
     lineHeight: 'Line height',
+    terminalPadding: 'Terminal padding',
     cursor: 'Cursor style',
     cursorBlock: 'Block',
     cursorUnderline: 'Underline',
@@ -132,6 +133,8 @@ const messages = {
     fontLigatures: 'Enable font ligatures',
     fontLigaturesHint:
       'Renders programming ligatures (=>, ->, !==) as single glyphs when the terminal font provides them.',
+    terminalPaddingHint:
+      'Space between the terminal grid and the workspace edge. 0 fills the workspace; full-screen TUI programs draw inside this inset.',
     fallbackFonts: 'Fallback fonts (ordered)',
     addFallback: 'Add fallback font',
     fontScale: 'Scale',
@@ -487,6 +490,7 @@ const messages = {
     theme: '终端主题',
     fontSize: '字体大小',
     lineHeight: '行高',
+    terminalPadding: '终端内边距',
     cursor: '光标样式',
     cursorBlock: '方块',
     cursorUnderline: '下划线',
@@ -601,6 +605,8 @@ const messages = {
     terminalFontFamily: '终端字体',
     fontLigatures: '启用字体连字',
     fontLigaturesHint: '当终端字体支持时，将编程连字（=>、->、!== 等）渲染为单个字形。',
+    terminalPaddingHint:
+      '终端网格与工作区边缘之间的留白。0 表示铺满工作区；全屏 TUI 程序绘制在该留白之内。',
     fallbackFonts: '回退字体（有序）',
     addFallback: '添加回退字体',
     fontScale: '缩放',

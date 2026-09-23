@@ -1380,7 +1380,7 @@ button:disabled {
   grid-template-rows: 1fr auto;
   gap: 12px;
   min-height: 0;
-  padding: 0;
+  padding: var(--gt-terminal-padding, 0px);
   overflow: auto;
   background: var(--gt-background, #0d1117);
   font-family: 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;

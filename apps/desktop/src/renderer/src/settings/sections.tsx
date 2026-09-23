@@ -141,6 +141,7 @@ export function AppearanceSection({
       terminalFontLigatures: draft.terminalFontLigatures,
       terminalFontSize: draft.terminalFontSize,
       terminalLineHeight: draft.terminalLineHeight,
+      terminalPadding: draft.terminalPadding,
       terminalFontFallbacks: normalizeTerminalFontFallbacks(
         draft.terminalFontFamily,
         draft.terminalFontFallbacks
@@ -221,6 +222,17 @@ export function AppearanceSection({
           onChange={(value) => update('terminalLineHeight', value)}
         />
       </Row>
+      <Row label={t('terminalPadding')}>
+        <Stepper
+          value={draft.terminalPadding}
+          min={0}
+          max={32}
+          step={1}
+          format={(value) => `${value}px`}
+          onChange={(value) => update('terminalPadding', value)}
+        />
+      </Row>
+      <p className="settings-hint">{t('terminalPaddingHint')}</p>
       <div className="settings-section-body">
         <p className="settings-subheading">{t('fallbackFonts')}</p>
         <div className="settings-fallbacks">

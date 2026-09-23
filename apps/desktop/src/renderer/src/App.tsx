@@ -22,7 +22,7 @@ import {
   PanelRightOpen,
   SquareTerminal
 } from 'lucide-react';
-import { applyPalette, applyTypography, resolvePalette } from './themes';
+import { applyPalette, applyTypography, applyTerminalLayout, resolvePalette } from './themes';
 import { translate } from './i18n';
 import type { MessageKey } from './i18n';
 import { AssistantPanel } from './AssistantPanel';
@@ -69,6 +69,7 @@ const defaultSettings: SettingsRecord = {
   theme: 'Catppuccin Mocha',
   terminalFontSize: 14,
   terminalLineHeight: 1.2,
+  terminalPadding: 0,
   terminalCursor: 'bar',
   defaultTerm: 'xterm-256color',
   splitCommandPresentation: true,
@@ -326,7 +327,8 @@ export function App(): React.JSX.Element {
   useEffect(() => {
     applyPalette(palette);
     applyTypography(settings.uiFontSize, settings.uiFontFamily);
-  }, [palette, settings.uiFontFamily, settings.uiFontSize]);
+    applyTerminalLayout(settings.terminalPadding);
+  }, [palette, settings.uiFontFamily, settings.uiFontSize, settings.terminalPadding]);
 
   const discoverWsl = useCallback(async (): Promise<void> => {
     setWslLoading(true);

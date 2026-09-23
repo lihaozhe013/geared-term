@@ -18,7 +18,7 @@ import {
   Settings as SettingsIcon,
   SquareTerminal
 } from 'lucide-react';
-import { applyPalette, applyTypography, resolvePalette } from '../themes';
+import { applyPalette, applyTypography, applyTerminalLayout, resolvePalette } from '../themes';
 import { makeTranslate } from './sections';
 import type { Translate } from './sections';
 import {
@@ -114,6 +114,7 @@ export function SettingsWindow(): React.JSX.Element {
     if (!palette || !settings) return;
     applyPalette(palette);
     applyTypography(settings.uiFontSize, settings.uiFontFamily);
+    applyTerminalLayout(settings.terminalPadding);
   }, [palette, settings]);
 
   const save = async (patch: Partial<SettingsRecord>): Promise<void> => {

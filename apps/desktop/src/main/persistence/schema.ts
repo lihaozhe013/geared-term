@@ -64,6 +64,7 @@ export const defaultSettings: Settings = {
   theme: 'Catppuccin Mocha',
   terminalFontSize: 14,
   terminalLineHeight: 1.2,
+  terminalPadding: 0,
   terminalCursor: 'block',
   defaultTerm: 'xterm-256color',
   splitCommandPresentation: true,

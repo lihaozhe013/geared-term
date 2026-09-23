@@ -171,6 +171,7 @@ export const SettingsRecordSchema = z
     theme: z.string().min(1).max(160),
     terminalFontSize: z.number().min(8).max(32),
     terminalLineHeight: z.number().min(1).max(2),
+    terminalPadding: z.number().int().min(0).max(32).default(0),
     terminalCursor: z.enum(['block', 'underline', 'bar']),
     defaultTerm: z.enum(['xterm-256color', 'xterm', 'vt520', 'linux', 'screen']),
     splitCommandPresentation: z.boolean(),
