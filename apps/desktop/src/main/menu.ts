@@ -294,7 +294,7 @@ export function buildApplicationMenu(state: MenuState, commands: MenuCommands): 
         {
           label: t.settings,
           accelerator: acceleratorFor(bindings, 'app.settings'),
-          click: commands.onOpenSettings
+          click: () => commands.onOpenSettings()
         },
         { label: t.openConfigFolder, click: commands.onOpenConfigFolder },
         ...(process.platform === 'darwin'
