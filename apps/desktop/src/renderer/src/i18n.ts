@@ -317,6 +317,11 @@ const messages = {
     webRevealBlock: 'Show in page',
     webTargetTerminal: 'Target terminal: {label}',
     webNoTerminal: 'No terminal session — open one to enable Insert and Run',
+    terminalCopyContextForWeb: 'Copy for web question (selection or screen)',
+    terminalSnapshotCopyForWeb: 'Copy for web question',
+    terminalSnapshotCopied: 'Draft copied — paste it into the web page and review before sending.',
+    terminalSnapshotSensitiveHint:
+      'Review before sharing: terminals can contain tokens, hostnames, or private paths.',
     groupWeb: 'Web',
     llmWebHint:
       'Pages only propose commands. Insert and Run happen in this app after you choose a target terminal; site logins live in isolated storage.',
@@ -815,6 +820,10 @@ const messages = {
     webRevealBlock: '在页面中定位',
     webTargetTerminal: '目标终端：{label}',
     webNoTerminal: '没有终端会话——请先打开一个以启用 Insert 和 Run',
+    terminalCopyContextForWeb: '复制到网页问答（选区或屏幕）',
+    terminalSnapshotCopyForWeb: '复制到网页问答',
+    terminalSnapshotCopied: '草稿已复制——粘贴到网页并在发送前检查。',
+    terminalSnapshotSensitiveHint: '分享前请检查：终端内容可能包含令牌、主机名或私有路径。',
     groupWeb: '网页',
     llmWebHint:
       '网页只提出命令候选。Insert 与 Run 由本应用在你选定目标终端后执行；网站登录保存在隔离存储中。',

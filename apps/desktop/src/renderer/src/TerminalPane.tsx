@@ -581,10 +581,8 @@ export function TerminalPane({
           clear: translate(settings.language, 'terminalClear'),
           addSelectionToChat: translate(settings.language, 'terminalAddSelectionToChat'),
           addScreenToChat: translate(settings.language, 'terminalAddScreenToChat'),
-          openScreenSnapshotEditor: translate(
-            settings.language,
-            'terminalOpenScreenSnapshotEditor'
-          )
+          copyContextForWeb: translate(settings.language, 'terminalCopyContextForWeb'),
+          openScreenSnapshotEditor: translate(settings.language, 'terminalOpenScreenSnapshotEditor')
         },
         shortcuts: terminalShortcutsFor(keybindings, platform),
         actions: {
@@ -628,6 +626,17 @@ export function TerminalPane({
             const terminal = terminalRef.current;
             const text = terminal ? extractViewportText(terminal) : null;
             if (text) onAddToChat?.(formatChatInsert(text));
+          },
+          copyContextForWeb: () => {
+            const terminal = terminalRef.current;
+            const text = terminal
+              ? (extractSelectionText(terminal) ?? extractViewportText(terminal))
+              : null;
+            if (!text) return;
+            void navigator.clipboard.writeText(formatChatInsert(text)).catch(() => {
+              onError?.(translate(settings.language, 'errCopyCommand'));
+            });
+            terminal?.focus();
           },
           openScreenSnapshotEditor: () => {
             const terminal = terminalRef.current;

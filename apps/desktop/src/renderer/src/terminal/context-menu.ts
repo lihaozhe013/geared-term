@@ -10,6 +10,7 @@ export type TerminalMenuLabels = {
   clear: string;
   addSelectionToChat: string;
   addScreenToChat: string;
+  copyContextForWeb?: string;
   openScreenSnapshotEditor?: string;
 };
 
@@ -28,6 +29,7 @@ export type TerminalMenuActions = {
   clear: () => void;
   addSelectionToChat: () => void;
   addScreenToChat: () => void;
+  copyContextForWeb?: () => void;
   openScreenSnapshotEditor?: () => void;
 };
 
@@ -103,6 +105,13 @@ export function buildTerminalContextMenu(input: {
       run: actions.addScreenToChat
     }
   ];
+  if (labels.copyContextForWeb && actions.copyContextForWeb) {
+    items.push({
+      id: 'terminal-menu-copy-context-for-web',
+      label: labels.copyContextForWeb,
+      run: actions.copyContextForWeb
+    });
+  }
   if (labels.openScreenSnapshotEditor && actions.openScreenSnapshotEditor) {
     items.push({
       id: 'terminal-menu-open-screen-snapshot-editor',

@@ -1996,6 +1996,12 @@ button:disabled {
   white-space: nowrap;
 }
 
+.remote-editor-status .remote-editor-warning {
+  min-width: 0;
+  color: var(--gt-danger, #e5b567);
+  white-space: normal;
+}
+
 .settings-window {
   display: flex;
   min-width: 0;

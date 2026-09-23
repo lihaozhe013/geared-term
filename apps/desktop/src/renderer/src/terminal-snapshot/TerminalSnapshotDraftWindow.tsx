@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { SettingsRecord, UserTheme } from '@geared-term/protocol';
-import { Search, WrapText } from 'lucide-react';
+import { ClipboardCopy, Search, WrapText } from 'lucide-react';
 import { translate, type MessageKey } from '../i18n';
 import { applyPalette, applyTypography, resolvePalette } from '../themes';
 import { WindowTitleBar } from '../WindowTitleBar';
@@ -68,6 +68,19 @@ export function TerminalSnapshotDraftWindow(): React.JSX.Element {
     }
   };
 
+  const copyForWeb = async (): Promise<void> => {
+    if (error) return;
+    setError(null);
+    setStatus(null);
+    try {
+      const text = editorRef.current?.content() ?? '';
+      await navigator.clipboard.writeText(text);
+      setStatus(t('terminalSnapshotCopied'));
+    } catch {
+      setError(t('errCopyCommand'));
+    }
+  };
+
   return (
     <div className="remote-editor-window-shell">
       <WindowTitleBar
@@ -104,8 +117,16 @@ export function TerminalSnapshotDraftWindow(): React.JSX.Element {
                 <WrapText size={14} aria-hidden="true" />
                 {t('sftpEditorWrap')}
               </button>
-              <button type="button" className="toolbar-button" onClick={() => void addToAssistant()}>
+              <button
+                type="button"
+                className="toolbar-button"
+                onClick={() => void addToAssistant()}
+              >
                 {t('terminalSnapshotAddToAi')}
+              </button>
+              <button type="button" className="toolbar-button" onClick={() => void copyForWeb()}>
+                <ClipboardCopy size={14} aria-hidden="true" />
+                {t('terminalSnapshotCopyForWeb')}
               </button>
             </div>
           </div>
@@ -129,6 +150,7 @@ export function TerminalSnapshotDraftWindow(): React.JSX.Element {
           </div>
           <footer className="remote-editor-status">
             <span>{t('terminalSnapshotDraftDescription')}</span>
+            <span className="remote-editor-warning">{t('terminalSnapshotSensitiveHint')}</span>
           </footer>
         </main>
       )}
