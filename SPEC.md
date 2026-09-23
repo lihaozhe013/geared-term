@@ -23,8 +23,9 @@ The specification was derived from:
 
 1. the product goals of a dependable daily-use terminal with integrated file transfer and an AI
    assistant;
-2. [`docs/web-llm-page-support-requirements.md`](docs/web-llm-page-support-requirements.md), only to
-   keep that separate feature out of this product.
+2. [`docs/web-llm-page-support-requirements.md`](docs/web-llm-page-support-requirements.md), the
+   product-requirements background for the LLM web page support group below; the normative
+   requirements are the WEB rules in this specification.
 
 The implementation structure, process boundaries, transport protocol, storage design, and update
 mechanics are documented in [`docs/architecture.md`](docs/architecture.md); requirement status is
@@ -57,7 +58,6 @@ The initial release MUST:
 
 The initial release MUST NOT include:
 
-- direct embedding or DOM integration of third-party LLM websites;
 - an autonomous agent loop or unattended command execution;
 - SSH agent authentication, keyboard-interactive authentication, jump hosts, port forwarding, or
   automatic reconnect;
@@ -74,17 +74,18 @@ The initial release MUST NOT include:
 
 These decisions define behavior that a straightforward implementation might otherwise get wrong.
 
-| Area                | Geared Term requirement                                                                                                                               |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Terminal engine     | xterm.js owns VT state, display, selection, and scrollback.                                                                                           |
-| AI command action   | Copy, Insert, and Run are separate. Insert MUST never submit. Run requires an explicit click.                                                         |
-| Implicit submit     | No setting may cause inserted command text to be submitted automatically.                                                                             |
-| Command splitting   | Optional shell-aware parsing by top-level statement, with a conservative whole-block fallback.                                                        |
-| Terminal context    | Selection remains preferred; viewport and a user-bounded amount of preceding scrollback are supported with preview and truncation disclosure.         |
-| External AI consent | The first request to a normalized endpoint requires consent whether or not a snapshot is attached. Endpoint changes require renewed consent.          |
-| Workspace restore   | Window and panel layout only. Do not auto-reconnect or silently reopen live sessions.                                                                 |
-| SFTP command launch | A configured command runs against a quoted remote path only as an explicit SFTP context-menu action. It is separate from AI command Insert/Run rules. |
-| Structured storage  | Session profiles, vault-encrypted secrets, AI connections, and environment records live in one embedded SQLite database owned by the main process.    |
+| Area                | Geared Term requirement                                                                                                                                     |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Terminal engine     | xterm.js owns VT state, display, selection, and scrollback.                                                                                                 |
+| AI command action   | Copy, Insert, and Run are separate. Insert MUST never submit. Run requires an explicit click.                                                               |
+| Implicit submit     | No setting may cause inserted command text to be submitted automatically.                                                                                   |
+| Command splitting   | Optional shell-aware parsing by top-level statement, with a conservative whole-block fallback.                                                              |
+| Terminal context    | Selection remains preferred; viewport and a user-bounded amount of preceding scrollback are supported with preview and truncation disclosure.               |
+| External AI consent | The first request to a normalized endpoint requires consent whether or not a snapshot is attached. Endpoint changes require renewed consent.                |
+| Workspace restore   | Window and panel layout only. Do not auto-reconnect or silently reopen live sessions.                                                                       |
+| SFTP command launch | A configured command runs against a quoted remote path only as an explicit SFTP context-menu action. It is separate from AI command Insert/Run rules.       |
+| Structured storage  | Session profiles, vault-encrypted secrets, AI connections, and environment records live in one embedded SQLite database owned by the main process.          |
+| LLM web embedding   | Embedded third-party LLM pages only propose command candidates. Copy, Insert, and Run are triggered from trusted application UI on main-validated payloads. |
 
 ## 6. Supported release platforms
 
@@ -105,8 +106,9 @@ is not supported until its packaged application passes the same smoke tests.
 
 - **APP-001**: The main window MUST contain custom application chrome, a collapsible session
   sidebar, a terminal tab strip, the active terminal, and a collapsible right panel.
-- **APP-002**: The right panel MUST switch between Files and AI Assistant views. Files MUST render a
-  dual-pane SFTP browser for SSH sessions and a single-pane local browser for ordinary local shells.
+- **APP-002**: The right panel MUST switch between Files, environment, AI Assistant, and LLM web
+  pane views. Files MUST render a dual-pane SFTP browser for SSH sessions and a single-pane local
+  browser for ordinary local shells.
 - **APP-003**: The divider between the terminal and right panel MUST be draggable and MUST preserve
   its last usable ratio.
 - **APP-004**: The Files entry MUST classify the active session as SFTP for SSH, local for an
@@ -564,7 +566,76 @@ not currently implemented is stated as such instead of being treated as complete
 - **CMD-021**: The optional split-command display setting MUST remain available and default to off.
   Turning it on or off changes presentation only, not stored provider content or history.
 
-## 18. Settings, appearance, and localization
+## 18. LLM web page support
+
+### 18.1 Embedding and login
+
+- **WEB-001**: The application MAY host supported LLM chat websites in a dedicated web pane so users
+  can log in, converse, select models, search, and attach files as the site itself allows.
+- **WEB-002**: Embedded site content MUST run in its own WebContents and a dedicated session
+  partition isolated from application renderers. Sites MUST NOT share login or storage with the
+  application's own session, and MUST NOT gain application privileges.
+- **WEB-003**: User-completed logins MUST persist across application restarts within the site's own
+  rules. The application MUST NOT read, export, or record site passwords, cookies, tokens, or other
+  authentication material for unrelated purposes.
+- **WEB-004**: Navigation outside the site's declared allowed origins, downloads, and popups MUST be
+  denied by default. `https:` links to other origins MUST go through the validated external-browser
+  action. Third-party authentication popups MUST be allowed only for origins declared by that site's
+  adapter and MUST stay inside the site's partition.
+- **WEB-005**: The pane MUST show a non-intrusive support state. Command enhancement MUST NOT block
+  native site text input, selection, copying, scrolling, code-block copy buttons, attachments, or
+  normal conversation.
+
+### 18.2 Command candidates from web content
+
+- **WEB-006**: Rendered code blocks in answers MUST be discovered, including blocks that appear or
+  change while the site is streaming. A changed block MUST update its candidates and MUST NOT leave
+  duplicate groups or stale actions.
+- **WEB-007**: Only blocks explicitly labeled as a supported shell, or judged shell at high
+  confidence, enter splitting. Other blocks keep their original rendering with at most a whole-block
+  copy or insert fallback and MUST NOT offer Run.
+- **WEB-008**: Candidate actions MUST be presented in trusted application UI outside the embedded
+  page. The embedded page MUST NOT host Copy, Insert, or Run affordances, and page scripts MUST NOT
+  be able to trigger a terminal action.
+- **WEB-009**: The text shown on a candidate MUST be the exact payload transmitted. The main process
+  MUST re-validate content revision, shell label, parse result, run gate, and risk for web-derived
+  candidates exactly as for API-derived ones.
+- **WEB-010**: Run MUST be disabled while a block is streaming, changing, or incomplete, and while
+  the site is still generating an answer. A superseded revision MUST fail closed.
+- **WEB-011**: The original code block MUST remain viewable and selectable on the page. Enhancement
+  MUST NOT become the only copy of content, alter answer text, or hide site warnings.
+
+### 18.3 Site adapters and degradation
+
+- **WEB-012**: Each supported site MUST have its own adapter with an explicit status (`supported`,
+  `experimental`, `unavailable`, `broken`). Adapter failure MUST stay limited to that site and MUST
+  NOT affect the terminal, API AI mode, or other sites.
+- **WEB-013**: When an adapter can no longer reliably locate content or detect generation state, the
+  site's enhancement MUST degrade to ordinary browsing with a visible status rather than continue
+  offering Run actions that might target mismatched content.
+- **WEB-014**: Users MUST be able to disable embedding and command enhancement per site and clear
+  each site's stored web data.
+
+### 18.4 Terminal context to web questions
+
+- **WEB-015**: Terminal content (selection preferred, viewport, and a user-bounded amount of
+  scrollback) MUST reach the web flow only through an explicit user action. No background terminal
+  synchronization is permitted.
+- **WEB-016**: Context delivered to a web question MUST be reviewable and editable before it leaves
+  the application, MUST disclose scope and truncation, and MUST NOT auto-submit a question.
+
+### 18.5 Boundaries and privacy
+
+- **WEB-017**: Remote page content is untrusted data under the Electron security rules: it MUST NOT
+  reach the filesystem, spawn processes, write to any PTY, or read arbitrary terminal history.
+- **WEB-018**: Web pane diagnostics MUST be limited to site identifiers, feature state, counts,
+  parsed language labels, and redacted error classes. Commands, terminal text, answer text, prompts,
+  cookies, and tokens MUST NOT appear in logs.
+- **WEB-019**: The web pane MUST mount, unmount, and fail independently of the terminal core, and
+  site adaptation maintenance is acknowledged as an ongoing product cost rather than a one-time
+  integration.
+
+## 19. Settings, appearance, and localization
 
 - **SET-001**: Settings MUST cover General, Appearance, Terminal, SFTP, AI Connections, AI
   Assistant, Security & Vault, and About.
@@ -594,9 +665,9 @@ six-digit hex colors: `background`, `foreground`, and `cursor` are required; `se
 overrides a built-in theme of the same name; malformed or schema-invalid files are ignored and
 reported in Settings without blocking startup.
 
-## 19. Persistence
+## 20. Persistence
 
-### 19.1 General persistence rules
+### 20.1 General persistence rules
 
 - **DATA-001**: Settings, UI state, the structured database, vault metadata, host keys,
   environments, and history MUST each have a versioned schema or format identifier.
@@ -608,7 +679,7 @@ reported in Settings without blocking startup.
   MUST never be persisted.
 - **DATA-005**: Data paths MUST use a Geared Term namespace.
 
-### 19.2 Embedded structured storage
+### 20.2 Embedded structured storage
 
 - **DATA-006**: Session profiles, vault-encrypted secrets, AI connections, and environment records
   MUST be stored in a single embedded SQLite database owned exclusively by the main process. The
@@ -631,7 +702,7 @@ reported in Settings without blocking startup.
   in their documented versioned file stores. Moving one of these artifacts into the database
   requires a recorded architecture decision.
 
-## 20. Electron security boundary
+## 21. Electron security boundary
 
 - **SEC-001**: Every Electron `BrowserWindow` MUST use `contextIsolation: true`,
   `nodeIntegration: false`, a sandbox where compatible, and an explicit Content Security Policy.
@@ -656,7 +727,7 @@ reported in Settings without blocking startup.
 - **SEC-009**: Dependency updates, especially Electron, Chromium, `node-pty`, `better-sqlite3`,
   xterm.js, and `ssh2`, MUST be reviewed and package-smoke-tested as a compatibility set.
 
-## 21. Diagnostics and privacy
+## 22. Diagnostics and privacy
 
 - **OBS-001**: Debug builds MUST write `debug-logs/debug.log` as an application warning/error
   summary and detailed `debug-{app,ssh,terminal,assistant,system}.log` files.
@@ -671,7 +742,7 @@ reported in Settings without blocking startup.
 - **OBS-006**: Operational events MAY include opaque IDs, byte counts, durations, protocol state,
   error codes, and feature state needed to diagnose behavior.
 
-## 22. Update delivery
+## 23. Update delivery
 
 - **UPD-001**: Unstable builds MUST be distributed through a rolling nightly prerelease on the
   project's GitHub repository. Each release MUST contain the supported platform artifacts, a SHA-256
@@ -693,7 +764,7 @@ reported in Settings without blocking startup.
   `up-to-date`, `available`, `downloading`, `downloaded`, `error`), including download progress and
   the install affordance when an update is ready.
 
-## 23. Performance and reliability
+## 24. Performance and reliability
 
 - **REL-001**: Terminal output MUST bypass React reconciliation and be written to xterm.js in
   batches.
@@ -710,7 +781,7 @@ reported in Settings without blocking startup.
 - **REL-007**: Large terminal output, long scrollback, rapid resize, CJK/emoji, alternate-screen
   tools, and simultaneous SFTP or AI work MUST be included in release regression tests.
 
-## 24. Accessibility
+## 25. Accessibility
 
 - **A11Y-001**: All application controls, tabs, dialogs, command actions, settings, and status
   changes MUST be keyboard reachable and have meaningful accessible names.
@@ -722,9 +793,9 @@ reported in Settings without blocking startup.
 - **A11Y-005**: Terminal accessibility support SHOULD use xterm.js accessibility facilities without
   mirroring unlimited terminal content into React.
 
-## 25. Verification requirements
+## 26. Verification requirements
 
-### 25.1 Unit and fixture tests
+### 26.1 Unit and fixture tests
 
 At minimum, automated tests MUST cover:
 
@@ -741,12 +812,14 @@ At minimum, automated tests MUST cover:
   usage, continuation, and error classification;
 - Bash-family and PowerShell command fixtures, incomplete streaming fences, comments, prompt
   stripping, and conservative fallback;
+- web code-block discovery, language gating, deduplication, streaming stability gating, candidate
+  bounds and rate limits, adapter health probing, and per-site degradation;
 - settings, UI state, database repositories, schema migrations, vault, history, and corruption
   quarantine;
 - nightly release parsing, the update state machine, keybinding resolution and conflict detection,
   and the remote-editor and snapshot-draft window lifecycle paths.
 
-### 25.2 Integration and end-to-end tests
+### 26.2 Integration and end-to-end tests
 
 The suite MUST exercise:
 
@@ -756,6 +829,9 @@ The suite MUST exercise:
 - main/preload/renderer request and stream boundaries;
 - Insert sending no Enter and Run sending exactly one submission to the validated target;
 - tab switching and closing while data, AI, or transfers are in flight;
+- the embedded web pane against a locally served mock LLM chat fixture: candidate discovery,
+  streaming gating, trusted-UI Insert/Run delivery with revision checks, navigation and popup
+  policy, and partition isolation;
 - Files routing for Local Shell, SSH, WSL, and no-session states, including independent local-pane
   navigation and startup-cwd initialization;
 - vault create/unlock/lock/change-password/auto-unlock;
@@ -764,13 +840,13 @@ The suite MUST exercise:
 - IME, high DPI, multiple displays, alternate-screen applications, and WebGL fallback through a
   documented manual matrix where automation is insufficient.
 
-### 25.3 Traceability
+### 26.3 Traceability
 
 Every normative requirement ID MUST appear in a requirements matrix with implementation owner,
 automated test or manual procedure, evidence, and status. A feature is not complete merely because a
 module with a matching name exists.
 
-## 26. Initial release definition of done
+## 27. Initial release definition of done
 
 Geared Term's initial release is complete only when:
 
