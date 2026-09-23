@@ -13,8 +13,8 @@
   "author": "Geared Term contributors",
   "main": "./out/main/index.js",
   "scripts": {
-    "dev": "electron-vite dev",
-    "build": "electron-vite build && node scripts/verify-bundle.mjs",
+    "dev": "node scripts/stage-conpty.cjs && electron-vite dev",
+    "build": "node scripts/stage-conpty.cjs && electron-vite build && node scripts/verify-bundle.mjs",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run src --passWithNoTests",
     "test:e2e": "playwright test -c playwright.config.ts",

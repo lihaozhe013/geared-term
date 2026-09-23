@@ -1,6 +1,7 @@
 appId: dev.gearedterm.desktop
 productName: Geared Term
 copyright: Copyright © 2026 Geared Term contributors
+afterPack: ./scripts/after-pack.cjs
 directories:
   output: out/releases
   buildResources: resources

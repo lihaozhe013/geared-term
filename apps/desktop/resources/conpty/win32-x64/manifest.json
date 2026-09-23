@@ -1,0 +1,9 @@
+{
+  "version": "1.24.260402001",
+  "package": "Microsoft.Windows.Console.ConPTY.1.24.260402001.nupkg",
+  "packageSha256": "55d0962a91e0035be5696bc9e416f0a38ef9acc6110e3351d1cfad44680b9af0",
+  "files": {
+    "conpty.dll": "aeee2be15a78a0e8244496e8563e473f626d754297093d3b94934a1db4fb26fa",
+    "OpenConsole.exe": "cc557520c04a2bbda4909292e5e8929c7db38ca195de60e2548dee78e07d84bd"
+  }
+}

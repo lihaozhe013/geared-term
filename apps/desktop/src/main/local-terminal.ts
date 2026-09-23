@@ -3,7 +3,7 @@ import { existsSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { MessagePortMain } from 'electron';
-import { spawn, type IPty } from 'node-pty';
+import { spawn, type IPty, type IWindowsPtyForkOptions } from 'node-pty';
 import {
   LocalTerminalRequestSchema,
   TerminalClientMessageSchema,
@@ -27,6 +27,27 @@ type LocalSession = {
   disposeData: { dispose: () => void };
   disposeExit: { dispose: () => void };
 };
+
+export function localPtySpawnOptions(
+  request: LocalTerminalRequest,
+  cwd: string,
+  env: Record<string, string>,
+  platform = process.platform,
+  arch = process.arch
+): IWindowsPtyForkOptions {
+  return {
+    name: request.term,
+    cols: request.cols,
+    rows: request.rows,
+    cwd,
+    env,
+    ...(platform === 'win32' && arch === 'x64' ? { useConptyDll: true } : {})
+  };
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
 
 function commandFromPath(command: string): string | undefined {
   try {
@@ -124,13 +145,8 @@ export class LocalTerminalManager {
       request.args.length > 0 ? request.args : process.platform === 'darwin' ? ['-l'] : [];
     const cwd = resolveCwd(request.cwd);
     const sessionEnvironment = environment(request.term);
-    const terminal = spawn(shell, args, {
-      name: request.term,
-      cols: request.cols,
-      rows: request.rows,
-      cwd,
-      env: sessionEnvironment
-    });
+    const ptyOptions = localPtySpawnOptions(request, cwd, sessionEnvironment);
+    const terminal = spawn(shell, args, ptyOptions);
     const session: LocalSession = {
       id: request.sessionId,
       pty: terminal,
@@ -162,12 +178,24 @@ export class LocalTerminalManager {
         return;
       }
       this.sendState(session, 'exited', `exitCode=${exitCode}; signal=${signal}`);
-      session.disposeData.dispose();
-      session.disposeExit.dispose();
-      this.sessions.delete(session.id);
+      session.closed = true;
+      this.disposeSession(session);
       this.hooks.onClosed?.(session.id);
+      this.logger.info('terminal', 'Local terminal exited', {
+        sessionId: session.id,
+        exitCode,
+        signal
+      });
     });
-    this.logger.info('terminal', 'Local terminal started', { sessionId: session.id, shell });
+    this.logger.info('terminal', 'Local terminal started', {
+      sessionId: session.id,
+      shell,
+      ptyBackend: ptyOptions.useConptyDll
+        ? 'bundled-conpty'
+        : process.platform === 'win32'
+          ? 'system-conpty'
+          : 'system-pty'
+    });
   }
 
   public closeAll(): void {
@@ -179,7 +207,11 @@ export class LocalTerminalManager {
   public sendInput(sessionId: string, data: string): void {
     const session = this.sessions.get(sessionId);
     if (!session || session.closed) throw new Error('Local terminal is not available');
-    session.pty.write(data);
+    try {
+      session.pty.write(data);
+    } catch (error) {
+      this.failPtyOperation(session, 'write', error);
+    }
   }
 
   public workingDirectory(sessionId: string): string | null {
@@ -188,6 +220,9 @@ export class LocalTerminalManager {
   }
 
   private onClientMessage(session: LocalSession, rawMessage: unknown): void {
+    if (session.closed) {
+      return;
+    }
     const result = TerminalClientMessageSchema.safeParse(rawMessage);
     if (!result.success) {
       this.sendState(session, 'failed', 'Invalid terminal message');
@@ -197,11 +232,19 @@ export class LocalTerminalManager {
 
     const message = result.data;
     if (message.kind === 'input') {
-      if (!session.closed) session.pty.write(message.data);
+      try {
+        session.pty.write(message.data);
+      } catch (error) {
+        this.failPtyOperation(session, 'write', error);
+      }
       return;
     }
     if (message.kind === 'resize') {
-      if (!session.closed) session.pty.resize(message.cols, message.rows);
+      try {
+        session.pty.resize(message.cols, message.rows);
+      } catch (error) {
+        this.failPtyOperation(session, 'resize', error);
+      }
       return;
     }
     if (message.kind === 'ack') {
@@ -272,8 +315,7 @@ export class LocalTerminalManager {
     }
     this.sendState(session, 'closing', reason);
     session.closed = true;
-    session.disposeData.dispose();
-    session.disposeExit.dispose();
+    this.disposeSession(session);
     try {
       session.pty.kill();
     } catch (error) {
@@ -295,5 +337,27 @@ export class LocalTerminalManager {
     });
     session.port.close();
     this.logger.info('terminal', 'Local terminal closed', { sessionId: session.id, reason });
+  }
+
+  private failPtyOperation(session: LocalSession, operation: 'write' | 'resize', error: unknown): void {
+    if (session.closed) {
+      return;
+    }
+    const detail = `Terminal ${operation} failed: ${errorMessage(error)}`;
+    this.logger.error('terminal', 'Local terminal operation failed', {
+      sessionId: session.id,
+      operation,
+      error: errorMessage(error)
+    });
+    this.sendState(session, 'failed', detail.slice(0, 512));
+    this.close(session, `pty-${operation}-failed`);
+  }
+
+  private disposeSession(session: LocalSession): void {
+    session.disposeData.dispose();
+    session.disposeExit.dispose();
+    session.queue.length = 0;
+    session.queuedBytes = 0;
+    this.sessions.delete(session.id);
   }
 }

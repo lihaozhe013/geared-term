@@ -103,6 +103,14 @@ Binary chunks use transferable `ArrayBuffer` instances. The main process caps ou
 unacknowledged bytes, coalesces adjacent output, and defines whether overload pauses the source or
 terminates the session with a structured error. It never silently drops bytes.
 
+On Windows x64, local `node-pty` sessions use the Microsoft ConPTY runtime pinned in
+[`apps/desktop/resources/conpty/win32-x64/README.md`](../apps/desktop/resources/conpty/win32-x64/README.md).
+The development staging script and Electron `afterPack` hook verify the pinned SHA-256 digests and
+place `conpty.dll` and `OpenConsole.exe` beside each x64 `conpty.node` that the loader can select.
+Other platforms and Windows ARM64 continue to use the existing PTY backend. A local PTY natural
+exit retires the session before the renderer closes its port, so that renderer cleanup cannot kill
+an already exited process.
+
 ## 4. Session state machine
 
 All backends share this state model:
