@@ -190,6 +190,11 @@ When terminal focus is active, the following behavior is required:
   with a tray icon offering show and quit actions when the main window is closed; a second launch
   MUST re-show the hidden window. Background mode MUST default to off. macOS MUST NOT create a tray
   icon and MUST keep standard Dock behavior.
+- **APP-027**: A terminal tab label MUST show the manual rename if present, otherwise the current
+  name of the originating connection profile, otherwise the name the tab was opened with. Titles set
+  by the terminal (OSC 0/1/2) MUST NOT change the label and are surfaced as a tab hover tooltip. The
+  window title MUST follow the active tab's label (`<label> — Geared Term`) and fall back to the
+  application name when no tab is open.
 
 ## 8. Sessions and profiles
 

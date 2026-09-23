@@ -49,18 +49,28 @@ describe('nextCopyName', () => {
 });
 
 describe('tabDisplayLabel', () => {
-  it('prefers manual renames over dynamic titles', () => {
-    expect(tabDisplayLabel({ name: 'Local', manualTitle: true, dynamicTitle: 'vim' })).toBe(
-      'Local'
-    );
+  const profiles = [{ id: 'p1', name: 'web-01' }];
+
+  it('prefers manual renames over live profile names', () => {
+    expect(
+      tabDisplayLabel({ name: 'Draft', manualTitle: true, sourceProfileId: 'p1' }, profiles)
+    ).toBe('Draft');
   });
 
-  it('uses the trimmed dynamic title when not manually renamed', () => {
-    expect(tabDisplayLabel({ name: 'Local', dynamicTitle: ' vim ~ ' })).toBe('vim ~');
+  it('follows the live profile name', () => {
+    expect(tabDisplayLabel({ name: 'stale', sourceProfileId: 'p1' }, profiles)).toBe('web-01');
   });
 
-  it('falls back to the name for empty dynamic titles', () => {
-    expect(tabDisplayLabel({ name: 'Local', dynamicTitle: '   ' })).toBe('Local');
-    expect(tabDisplayLabel({ name: 'Local' })).toBe('Local');
+  it('falls back to the snapshot when the profile is gone or blank', () => {
+    expect(tabDisplayLabel({ name: 'Removed', sourceProfileId: 'p1' }, [])).toBe('Removed');
+    expect(tabDisplayLabel({ name: 'Removed', sourceProfileId: 'p1' })).toBe('Removed');
+    expect(
+      tabDisplayLabel({ name: 'Fallback', sourceProfileId: 'p1' }, [{ id: 'p1', name: '  ' }])
+    ).toBe('Fallback');
+  });
+
+  it('keeps the snapshot name for tabs not opened from a profile', () => {
+    expect(tabDisplayLabel({ name: 'Local' }, profiles)).toBe('Local');
+    expect(tabDisplayLabel({ name: 'Local', sourceProfileId: 'p9' }, profiles)).toBe('Local');
   });
 });

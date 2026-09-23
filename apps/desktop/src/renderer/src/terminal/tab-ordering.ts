@@ -1,15 +1,21 @@
 export type TitleBearingTab = {
   name: string;
   manualTitle?: boolean;
-  dynamicTitle?: string;
+  sourceProfileId?: string;
 };
 
-/** A manually renamed tab keeps its name; otherwise the shell-set (OSC)
- *  title wins over the name the tab was opened with. */
-export function tabDisplayLabel(tab: TitleBearingTab): string {
+export type ProfileLabel = { id: string; name: string };
+
+/** A manually renamed tab keeps its name; otherwise the connection profile's
+ *  live name wins over the name snapshot taken when the tab was opened.
+ *  Terminal-set (OSC) titles no longer affect the label. */
+export function tabDisplayLabel(tab: TitleBearingTab, profiles?: readonly ProfileLabel[]): string {
   if (tab.manualTitle) return tab.name;
-  const dynamic = tab.dynamicTitle?.trim();
-  return dynamic || tab.name;
+  if (tab.sourceProfileId) {
+    const live = profiles?.find((profile) => profile.id === tab.sourceProfileId)?.name.trim();
+    if (live) return live;
+  }
+  return tab.name;
 }
 
 export function moveTabById<T extends { id: string }>(

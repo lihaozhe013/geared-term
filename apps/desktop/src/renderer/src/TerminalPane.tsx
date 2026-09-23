@@ -434,7 +434,7 @@ export function TerminalPane({
         return false;
       }
     );
-    // OSC 0/1/2 titles (icon+title and title) drive the tab label.
+    // OSC 0/1/2 titles (icon+title and title) drive the tab hover tooltip.
     const titleSubscription = terminal.onTitleChange((title) => {
       onTitleChangeRef.current?.(title);
     });

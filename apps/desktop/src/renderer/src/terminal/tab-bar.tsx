@@ -5,6 +5,7 @@ import { buildTabContextMenu, type TabMenuLabels, type TabMenuShortcuts } from '
 export type TabEntry = {
   id: string;
   label: string;
+  tooltip?: string;
 };
 
 type TabBarProps = {
@@ -103,6 +104,7 @@ export function TabBar({
         return (
           <div
             key={tab.id}
+            title={tab.tooltip}
             className={`terminal-tab ${active ? 'active' : ''}${isDragSource ? ' dragging' : ''}${dropSide}`}
             draggable={!renaming || renaming.id !== tab.id}
             onDragStart={(event) => {

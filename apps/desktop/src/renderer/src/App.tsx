@@ -60,6 +60,7 @@ type TerminalTab = {
   status: TabStatus;
   manualTitle?: boolean;
   dynamicTitle?: string;
+  sourceProfileId?: string;
 };
 
 const defaultSettings: SettingsRecord = {
@@ -383,23 +384,29 @@ export function App(): React.JSX.Element {
     []
   );
 
-  const duplicateTab = useCallback((id: string): void => {
-    setTabs((current) => {
-      const source = current.find((tab) => tab.id === id);
-      if (!source) return current;
-      const sessionId = crypto.randomUUID();
-      // The copy needs a fresh sessionId: live sessions are keyed by it in
-      // the main process, and reusing one would spawn over the original.
-      const copy: TerminalTab = {
-        id: sessionId,
-        name: nextCopyName(current.map(tabDisplayLabel), tabDisplayLabel(source)),
-        status: 'starting',
-        request: { ...source.request, sessionId }
-      };
-      setActiveTabId(sessionId);
-      return insertTabAfter(current, copy, source.id);
-    });
-  }, []);
+  const duplicateTab = useCallback(
+    (id: string): void => {
+      setTabs((current) => {
+        const source = current.find((tab) => tab.id === id);
+        if (!source) return current;
+        const sessionId = crypto.randomUUID();
+        // The copy needs a fresh sessionId: live sessions are keyed by it in
+        // the main process, and reusing one would spawn over the original.
+        const copy: TerminalTab = {
+          id: sessionId,
+          name: nextCopyName(
+            current.map((tab) => tabDisplayLabel(tab, profiles)),
+            tabDisplayLabel(source, profiles)
+          ),
+          status: 'starting',
+          request: { ...source.request, sessionId }
+        };
+        setActiveTabId(sessionId);
+        return insertTabAfter(current, copy, source.id);
+      });
+    },
+    [profiles]
+  );
 
   const closeOtherTabs = useCallback((id: string): void => {
     setTabs((current) => current.filter((tab) => tab.id === id));
@@ -421,6 +428,7 @@ export function App(): React.JSX.Element {
       const tab: TerminalTab = {
         id: request.sessionId,
         name: profile.name,
+        sourceProfileId: profile.id,
         request,
         status: 'starting'
       };
@@ -785,11 +793,17 @@ export function App(): React.JSX.Element {
   const sidebarWidth = uiState.sidebarWidth ?? 240;
   const rightPanelWidth = uiState.rightPanelWidth ?? 360;
 
+  const activeLabel = activeTab ? tabDisplayLabel(activeTab, profiles) : undefined;
+
+  useEffect(() => {
+    document.title = activeLabel ? `${activeLabel} — Geared Term` : 'Geared Term';
+  }, [activeLabel]);
+
   return (
     <main className="app-shell">
       <WindowTitleBar
         title="Geared Term"
-        sessionLabel={activeTab?.name}
+        sessionLabel={activeLabel}
         platform={info?.platform}
         language={settings.language}
         theme={settings.theme}
@@ -839,7 +853,11 @@ export function App(): React.JSX.Element {
 
         <section className="terminal-card" aria-label="Terminal workspace">
           <TabBar
-            tabs={tabs.map((tab) => ({ id: tab.id, label: tabDisplayLabel(tab) }))}
+            tabs={tabs.map((tab) => ({
+              id: tab.id,
+              label: tabDisplayLabel(tab, profiles),
+              tooltip: tab.dynamicTitle?.trim() || undefined
+            }))}
             activeTabId={activeTabId}
             labels={{
               rename: t('tabRename'),
@@ -969,7 +987,7 @@ export function App(): React.JSX.Element {
               <AssistantPanel
                 hidden={uiState.rightPanel !== 'assistant'}
                 targetSessionId={activeTab?.id}
-                sessionLabel={activeTab?.name}
+                sessionLabel={activeLabel}
                 language={settings.language}
                 environmentTargetKey={environmentTarget(activeTab?.request, profiles)?.targetKey}
                 splitCommandPresentation={settings.splitCommandPresentation}
