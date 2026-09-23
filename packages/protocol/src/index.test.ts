@@ -2,6 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
   AppInfoSchema,
   DEFAULT_TERMINAL_LIGATURE_SEQUENCES,
+  LlmWebCandidatesSchema,
+  LlmWebNavigateRequestSchema,
+  LlmWebOpenRequestSchema,
+  LlmWebPaneBoundsSchema,
+  LlmWebRevealRequestSchema,
   LocalSessionRequestSchema,
   LocalWorkingDirectorySchema,
   normalizeLigatureSequences,
@@ -247,5 +252,66 @@ describe('normalizeTerminalLineEndings', () => {
       normalizeTerminalLineEndings(text)
     );
     expect(normalizeTerminalLineEndings(text)).toBe('echo "héllo 🌟"\rsecond\rthird');
+  });
+});
+
+describe('LLM web pane schemas', () => {
+  const row = {
+    rowId: `${'a'.repeat(16)}:0:0`,
+    shell: 'bash',
+    exactText: 'echo hi',
+    revision: 'b'.repeat(16),
+    stability: 'stable',
+    risk: 'normal',
+    confidence: 'high',
+    runAllowed: true
+  };
+
+  it('accepts a well-formed candidate report', () => {
+    const parsed = LlmWebCandidatesSchema.safeParse({
+      site: 'chatgpt',
+      groups: [{ blockId: `${'a'.repeat(16)}:0`, streaming: false, rows: [row] }]
+    });
+    expect(parsed.success).toBe(true);
+  });
+
+  it('rejects malformed revisions, unknown sites, and oversized group lists', () => {
+    expect(
+      LlmWebCandidatesSchema.safeParse({
+        site: 'chatgpt',
+        groups: [{ blockId: 'x', streaming: false, rows: [{ ...row, revision: 'nope' }] }]
+      }).success
+    ).toBe(false);
+    expect(LlmWebCandidatesSchema.safeParse({ site: 'claude', groups: [] }).success).toBe(false);
+    expect(
+      LlmWebCandidatesSchema.safeParse({
+        site: 'deepseek',
+        groups: Array.from({ length: 65 }, (_unused, index) => ({
+          blockId: `${'a'.repeat(16)}:${index}`,
+          streaming: false,
+          rows: [row]
+        }))
+      }).success
+    ).toBe(false);
+  });
+
+  it('bounds view bounds and reveal identifiers', () => {
+    expect(LlmWebPaneBoundsSchema.safeParse({ x: 0, y: 0, width: 800, height: 600 }).success).toBe(
+      true
+    );
+    expect(LlmWebPaneBoundsSchema.safeParse({ x: 0, y: 0, width: -4, height: 600 }).success).toBe(
+      false
+    );
+    expect(LlmWebRevealRequestSchema.safeParse({ blockId: `${'a'.repeat(16)}:1` }).success).toBe(
+      true
+    );
+    expect(LlmWebRevealRequestSchema.safeParse({ blockId: 'a'.repeat(200) }).success).toBe(false);
+  });
+
+  it('keeps the pane request objects strict', () => {
+    expect(LlmWebOpenRequestSchema.safeParse({ site: 'deepseek' }).success).toBe(true);
+    expect(LlmWebOpenRequestSchema.safeParse({ site: 'deepseek', extra: 1 }).success).toBe(false);
+    expect(LlmWebNavigateRequestSchema.safeParse({ action: 'reload' }).success).toBe(true);
+    expect(LlmWebNavigateRequestSchema.safeParse({ action: 'stop' }).success).toBe(false);
   });
 });

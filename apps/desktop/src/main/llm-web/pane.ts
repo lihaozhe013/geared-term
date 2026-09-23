@@ -12,7 +12,6 @@ import {
   LlmWebCandidatesSchema,
   LlmWebNavigationSchema,
   LlmWebPaneStatusSchema,
-  type LlmWebAdapterReport,
   type LlmWebCandidates,
   type LlmWebNavigation,
   type LlmWebPaneBounds,
@@ -22,9 +21,7 @@ import {
 } from '@geared-term/protocol';
 import type { Logger } from '../logging';
 import { LLM_WEB_SITES, siteHostAllowed, sitePopupAllowed, type LlmWebSiteConfig } from './sites';
-
-const candidatesReportIntervalMs = 150;
-const candidatesByteBudget = 2 * 1024 * 1024;
+import { AdapterHealth, CandidateRelay, enhancementActiveFor } from './relay';
 
 const partitionPoliciesInstalled = new WeakSet<Session>();
 
@@ -61,8 +58,8 @@ export class LlmWebPaneManager {
   private shown = false;
   private failed = false;
   private failureDetail = '';
-  private adapterReport: LlmWebAdapterReport | undefined;
-  private lastCandidatesAt = 0;
+  private readonly relay = new CandidateRelay();
+  private readonly health = new AdapterHealth();
   private destroyed = false;
 
   public constructor(private readonly options: LlmWebPaneOptions) {}
@@ -103,7 +100,8 @@ export class LlmWebPaneManager {
     this.site = site;
     this.failed = false;
     this.failureDetail = '';
-    this.adapterReport = undefined;
+    this.relay.reset();
+    this.health.clear(site);
     view.setBackgroundColor('#111318');
     window.contentView.addChildView(view);
     this.attachedWindow = window;
@@ -164,29 +162,24 @@ export class LlmWebPaneManager {
       return;
     }
     if (parsed.data.site !== this.site) return;
-    const settings = this.options.settings();
-    const enhancementOff =
-      !settings.llmWebCommandEnhancement ||
-      settings.llmWebEnhancementOffSites.includes(parsed.data.site);
-    if (enhancementOff) {
-      if (parsed.data.groups.length > 0) {
-        this.options.onCandidates(
-          LlmWebCandidatesSchema.parse({ site: parsed.data.site, groups: [] })
-        );
-      }
-      return;
+    const decision = this.relay.accept(
+      parsed.data,
+      this.options.settings(),
+      parsed.data.site,
+      Date.now()
+    );
+    if (decision.action === 'forward') this.options.onCandidates(decision.candidates);
+    if (decision.action === 'clear') {
+      this.options.onCandidates(
+        LlmWebCandidatesSchema.parse({ site: parsed.data.site, groups: [] })
+      );
     }
-    const now = Date.now();
-    if (now - this.lastCandidatesAt < candidatesReportIntervalMs) return;
-    this.lastCandidatesAt = now;
-    if (JSON.stringify(parsed.data).length > candidatesByteBudget) {
+    if (decision.action === 'drop' && decision.reason === 'size') {
       this.options.logger.warn('web', 'Dropped oversized candidate report', {
         site: parsed.data.site,
         groups: parsed.data.groups.length
       });
-      return;
     }
-    this.options.onCandidates(parsed.data);
   }
 
   public acceptAdapterReport(senderId: number, input: unknown): void {
@@ -200,7 +193,7 @@ export class LlmWebPaneManager {
       return;
     }
     if (parsed.data.site !== this.site) return;
-    this.adapterReport = parsed.data;
+    this.health.record(parsed.data, Date.now());
     this.emitStatus();
   }
 
@@ -258,7 +251,7 @@ export class LlmWebPaneManager {
     if (!this.view.webContents.isDestroyed()) this.view.webContents.close();
     this.view = undefined;
     this.site = undefined;
-    this.adapterReport = undefined;
+    this.relay.reset();
     this.failed = false;
   }
 
@@ -368,17 +361,13 @@ export class LlmWebPaneManager {
       detail = this.failureDetail;
     } else if (contents.isLoading()) {
       state = 'loading';
-    } else if (
-      !settings.llmWebCommandEnhancement ||
-      (this.site !== undefined && settings.llmWebEnhancementOffSites.includes(this.site))
-    ) {
+    } else if (this.site !== undefined && !enhancementActiveFor(settings, this.site)) {
       state = 'ready';
-    } else if (this.adapterReport?.chatSurface) {
-      state = 'enhanced';
-    } else if (this.adapterReport) {
-      state = 'degraded';
     } else {
-      state = 'ready';
+      const report = this.site ? this.health.get(this.site, Date.now()) : undefined;
+      if (report?.report.chatSurface) state = 'enhanced';
+      else if (report) state = 'degraded';
+      else state = 'ready';
     }
     this.options.onStatus(
       LlmWebPaneStatusSchema.parse({
