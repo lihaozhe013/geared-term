@@ -31,6 +31,30 @@ export const AppInfoSchema = z.object({
   platform: z.enum(['win32', 'darwin', 'linux', 'freebsd', 'openbsd', 'sunos', 'aix'])
 });
 
+export const UpdateStatusSchema = z
+  .object({
+    state: z.enum([
+      'idle',
+      'checking',
+      'up-to-date',
+      'available',
+      'downloading',
+      'downloaded',
+      'error'
+    ]),
+    currentSha: z.union([z.literal('unknown'), z.string().regex(/^[a-f0-9]{40}$/i)]),
+    latestSha: z
+      .string()
+      .regex(/^[a-f0-9]{40}$/i)
+      .optional(),
+    latestVersion: z.string().max(128).optional(),
+    releaseUrl: z.string().url().max(2048).optional(),
+    canInstall: z.boolean().default(false),
+    progress: z.number().min(0).max(100).optional(),
+    error: z.string().max(512).optional()
+  })
+  .strict();
+
 export const EmptyRequestSchema = z.object({}).strict();
 
 export const VaultPasswordRequestSchema = z
@@ -804,17 +828,11 @@ export const TerminalSnapshotDraftRequestSchema = z
   .object({ text: z.string().max(256 * 1024) })
   .strict();
 
-export const TerminalSnapshotDraftSchema = z
-  .object({ text: z.string().max(256 * 1024) })
-  .strict();
+export const TerminalSnapshotDraftSchema = z.object({ text: z.string().max(256 * 1024) }).strict();
 
-export const TerminalSnapshotDraftChatRequestSchema = z
-  .object({ text: z.string() })
-  .strict();
+export const TerminalSnapshotDraftChatRequestSchema = z.object({ text: z.string() }).strict();
 
-export const TerminalSnapshotDraftChatEventSchema = z
-  .object({ text: z.string() })
-  .strict();
+export const TerminalSnapshotDraftChatEventSchema = z.object({ text: z.string() }).strict();
 
 export const LocalListRequestSchema = z
   .object({
@@ -1007,6 +1025,7 @@ export const EnvironmentProbeRequestSchema = z
   });
 
 export type AppInfo = z.infer<typeof AppInfoSchema>;
+export type UpdateStatus = z.infer<typeof UpdateStatusSchema>;
 export type ErrorCode = z.infer<typeof ErrorCodeSchema>;
 export type StructuredError = z.infer<typeof StructuredErrorSchema>;
 export type TerminalPortMessage = z.infer<typeof TerminalPortMessageSchema>;
@@ -1046,9 +1065,7 @@ export type TerminalSnapshotDraft = z.infer<typeof TerminalSnapshotDraftSchema>;
 export type TerminalSnapshotDraftChatRequest = z.infer<
   typeof TerminalSnapshotDraftChatRequestSchema
 >;
-export type TerminalSnapshotDraftChatEvent = z.infer<
-  typeof TerminalSnapshotDraftChatEventSchema
->;
+export type TerminalSnapshotDraftChatEvent = z.infer<typeof TerminalSnapshotDraftChatEventSchema>;
 export type LocalListRequest = z.infer<typeof LocalListRequestSchema>;
 export type LocalSessionRequest = z.infer<typeof LocalSessionRequestSchema>;
 export type LocalWorkingDirectory = z.infer<typeof LocalWorkingDirectorySchema>;

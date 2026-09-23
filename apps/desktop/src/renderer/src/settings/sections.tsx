@@ -5,6 +5,7 @@ import type {
   InvalidThemeFile,
   RuntimeInfo,
   SettingsRecord,
+  UpdateStatus,
   TerminalFontFallbackEntry
 } from '@geared-term/protocol';
 import { FolderOpen, FolderSync, Plus } from 'lucide-react';
@@ -524,19 +525,46 @@ export function AiAssistantSection({
 export function AboutSection({
   info,
   runtime,
+  updateStatus,
+  onCheckUpdates,
+  onInstallUpdate,
+  onOpenRelease,
   t
 }: {
   info: AppInfo | null;
   runtime: RuntimeInfo | null;
+  updateStatus: UpdateStatus | null;
+  onCheckUpdates: () => Promise<void>;
+  onInstallUpdate: () => void;
+  onOpenRelease: () => void;
   t: Translate;
 }): React.JSX.Element {
+  const updateMessage = (() => {
+    switch (updateStatus?.state) {
+      case 'checking':
+        return t('checkingForUpdates');
+      case 'up-to-date':
+        return t('upToDate');
+      case 'available':
+        return `${t('updateAvailable')} (${updateStatus.latestSha?.slice(0, 7) ?? ''})`;
+      case 'downloading':
+        return t('downloadingUpdate');
+      case 'downloaded':
+        return t('downloadedUpdate');
+      case 'error':
+        return t('updateCheckFailed');
+      default:
+        return null;
+    }
+  })();
+
   return (
     <Section title={t('groupAbout')}>
       <div className="settings-about-header">
         <img className="settings-about-icon" src={gearedTermMark} alt="" aria-hidden="true" />
         <div className="settings-about-meta">
           <p className="settings-about-line">
-            {info ? `${info.name} ${info.version} (${__APP_COMMIT__})` : ''}
+            {info ? `${info.name} ${info.version} (${__APP_COMMIT__.slice(0, 7)})` : ''}
             {info ? ` · ${t('platform')}: ${info.platform}` : ''}
           </p>
           {runtime ? (
@@ -548,6 +576,37 @@ export function AboutSection({
         </div>
       </div>
       <div className="settings-actions-row">
+        {info?.isPackaged ? (
+          <>
+            <button
+              type="button"
+              className="toolbar-button"
+              disabled={updateStatus?.state === 'checking' || updateStatus?.state === 'downloading'}
+              onClick={() => void onCheckUpdates()}
+            >
+              {t('checkForUpdates')}
+            </button>
+            {updateStatus?.state === 'downloaded' && updateStatus.canInstall ? (
+              <button type="button" className="primary-button" onClick={onInstallUpdate}>
+                {t('restartToInstall')}
+              </button>
+            ) : null}
+            {updateStatus?.state !== 'downloaded' ? (
+              <button type="button" className="toolbar-button" onClick={onOpenRelease}>
+                {t('downloadNightly')}
+              </button>
+            ) : null}
+            {updateStatus?.state === 'downloading' ? (
+              <progress
+                className="update-progress"
+                max={100}
+                value={updateStatus.progress ?? 0}
+                aria-label={t('downloadingUpdate')}
+              />
+            ) : null}
+            {updateMessage ? <span className="settings-status">{updateMessage}</span> : null}
+          </>
+        ) : null}
         <button
           type="button"
           className="toolbar-button"

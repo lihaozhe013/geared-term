@@ -75,6 +75,7 @@ import {
   TerminalClientMessageSchema,
   TerminalPortMessageSchema,
   UiStateRecordSchema,
+  UpdateStatusSchema,
   WslDistributionSchema,
   type LocalTerminalRequest,
   type AiConnectionInput,
@@ -114,6 +115,7 @@ import {
   type SshProfileTerminalRequest,
   type SshTerminalRequest,
   type UiStateRecord,
+  type UpdateStatus,
   type VaultPasswordRequest,
   type WslDistribution
 } from '@geared-term/protocol';
@@ -121,6 +123,21 @@ import {
 const api = Object.freeze({
   platform: process.platform,
   getAppInfo: async () => AppInfoSchema.parse(await ipcRenderer.invoke('app:get-info', {})),
+  getUpdateStatus: async () =>
+    UpdateStatusSchema.parse(await ipcRenderer.invoke('updates:get-status')),
+  checkForUpdates: async () => UpdateStatusSchema.parse(await ipcRenderer.invoke('updates:check')),
+  installDownloadedUpdate: async () =>
+    SftpOperationResultSchema.parse(await ipcRenderer.invoke('updates:install')),
+  openNightlyRelease: async () =>
+    SftpOperationResultSchema.parse(await ipcRenderer.invoke('updates:open-release')),
+  onUpdateStatus: (listener: (status: UpdateStatus) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, payload: unknown): void => {
+      const result = UpdateStatusSchema.safeParse(payload);
+      if (result.success) listener(result.data);
+    };
+    ipcRenderer.on('updates:status', handler);
+    return () => ipcRenderer.removeListener('updates:status', handler);
+  },
   createLocalTerminal: (input: LocalTerminalRequest, onMessage: (message: unknown) => void) => {
     const request = LocalTerminalRequestSchema.parse(input);
     const channel = new MessageChannel();
@@ -446,9 +463,7 @@ const api = Object.freeze({
     );
   },
   getTerminalSnapshotDraft: async () =>
-    TerminalSnapshotDraftSchema.parse(
-      await ipcRenderer.invoke('terminal:snapshot-draft', {})
-    ),
+    TerminalSnapshotDraftSchema.parse(await ipcRenderer.invoke('terminal:snapshot-draft', {})),
   addTerminalSnapshotToAssistant: async (input: TerminalSnapshotDraftChatRequest) => {
     const request = TerminalSnapshotDraftChatRequestSchema.parse(input);
     return SftpOperationResultSchema.parse(

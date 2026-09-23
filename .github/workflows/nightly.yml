@@ -116,15 +116,42 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Set nightly application version
+        run: node apps/desktop/scripts/set-nightly-version.mjs
+        env:
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
+
       - name: Install packaged smoke-test display
         if: matrix.platform == 'linux'
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends --yes xvfb
 
-      - name: Build Windows installer and portable
+      - name: Build Windows installer and update metadata
         if: matrix.platform == 'windows'
-        run: pnpm run package:win
+        run: pnpm --filter @geared-term/desktop run build:win:nsis
+
+      - name: Build Windows portable package
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          $releases = 'apps/desktop/out/releases'
+          $manifest = Join-Path $releases 'beta.yml'
+          if (-not (Test-Path $manifest -PathType Leaf)) {
+            throw 'electron-builder did not produce beta.yml for the NSIS installer.'
+          }
+          $installer = Join-Path $releases 'geared-term-windows-x64-setup.exe'
+          if (-not (Test-Path $installer -PathType Leaf)) {
+            throw 'The NSIS installer referenced by beta.yml is missing.'
+          }
+          if (-not [regex]::IsMatch((Get-Content $manifest -Raw), 'geared-term-windows-x64-setup\.exe')) {
+            throw 'beta.yml does not reference the Windows NSIS installer.'
+          }
+          $preservedManifest = Join-Path $releases 'beta-nsis.yml'
+          Copy-Item $manifest $preservedManifest
+          pnpm --filter @geared-term/desktop run build:win:portable
+          if ($LASTEXITCODE -ne 0) { throw 'Windows portable packaging failed.' }
+          Move-Item -Force $preservedManifest $manifest
 
       - name: Build macOS DMG
         if: matrix.platform == 'macos'
@@ -215,6 +242,7 @@ jobs:
             apps/desktop/out/releases/*-setup.exe
             apps/desktop/out/releases/*-portable.exe
             apps/desktop/out/releases/*.AppImage
+            apps/desktop/out/releases/beta.yml
 
   release:
     name: Publish nightly release
@@ -253,6 +281,7 @@ jobs:
           cp -- "${windows_portables[0]}" release-assets/geared-term-windows-x64-portable.exe
           cp -- "${macos_images[0]}" release-assets/geared-term-macos-arm64.dmg
           cp -- "${linux_images[0]}" release-assets/geared-term-linux-x64.AppImage
+          cp -- staging/beta.yml release-assets/beta.yml
           (
             cd release-assets
             shasum -a 256 \
@@ -260,6 +289,7 @@ jobs:
               geared-term-windows-x64-portable.exe \
               geared-term-macos-arm64.dmg \
               geared-term-linux-x64.AppImage \
+              beta.yml \
               > SHA256SUMS.txt
           )
 
@@ -327,6 +357,7 @@ jobs:
             release-assets/geared-term-windows-x64-portable.exe \
             release-assets/geared-term-macos-arm64.dmg \
             release-assets/geared-term-linux-x64.AppImage \
+            release-assets/beta.yml \
             release-assets/SHA256SUMS.txt \
             --repo "${REPOSITORY}" \
             --clobber

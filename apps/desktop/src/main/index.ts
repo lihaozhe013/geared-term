@@ -83,6 +83,7 @@ import {
   TerminalLigatureRequestSchema,
   TerminalLigatureSequencesSchema,
   UiStateRecordSchema,
+  UpdateStatusSchema,
   VaultPasswordRequestSchema,
   VaultRotateRequestSchema,
   VaultStatusSchema,
@@ -130,6 +131,7 @@ import { discoverWsl } from './wsl/discovery';
 import { probeEnvironment } from './environment/probe';
 import { EnvironmentManager } from './environment/manager';
 import { buildAssistantContext } from './ai/context';
+import { UpdateManager } from './update-manager';
 
 const isDevelopment = !app.isPackaged;
 // Depth of in-flight key-capture sessions (shortcut recording in the settings
@@ -164,6 +166,7 @@ let storage: AppStorage;
 let environmentManager: EnvironmentManager;
 let sshSessions: SshSessionManager;
 let transferManager: TransferManager;
+let updateManager: UpdateManager | undefined;
 const aiControllers = new Map<string, AbortController>();
 const aiHistory = new AiHistoryStore(isDevelopment ? process.cwd() : app.getPath('userData'));
 const themesDirectory = join(isDevelopment ? process.cwd() : app.getPath('userData'), 'themes');
@@ -233,7 +236,7 @@ function showAboutDialog(locale: MenuLocale): void {
   void dialog.showMessageBox({
     type: 'info',
     title: aboutLabels[locale].title,
-    message: `Geared Term ${app.getVersion()} (${__APP_COMMIT__})`,
+    message: `Geared Term ${app.getVersion()} (${__APP_COMMIT__.slice(0, 7)})`,
     ...(icon.isEmpty() ? {} : { icon }),
     detail: `${aboutLabels[locale].detail}\nElectron ${process.versions.electron} · Chromium ${process.versions.chrome} · Node ${process.versions.node}`
   });
@@ -458,6 +461,24 @@ function registerIpc(): void {
       isPackaged: app.isPackaged,
       platform: process.platform
     });
+  });
+
+  ipcMain.handle('updates:get-status', () => {
+    if (!updateManager) throw new Error('Update service is unavailable');
+    return UpdateStatusSchema.parse(updateManager.getStatus());
+  });
+  ipcMain.handle('updates:check', async () => {
+    if (!updateManager) throw new Error('Update service is unavailable');
+    return UpdateStatusSchema.parse(await updateManager.check('manual'));
+  });
+  ipcMain.handle('updates:install', () => {
+    if (!updateManager) throw new Error('Update service is unavailable');
+    updateManager.installDownloadedUpdate();
+    return SftpOperationResultSchema.parse({ accepted: true });
+  });
+  ipcMain.handle('updates:open-release', async () => {
+    await shell.openExternal('https://github.com/lihaozhe013/geared-term/releases/tag/nightly');
+    return SftpOperationResultSchema.parse({ accepted: true });
   });
 
   ipcMain.handle('menu:execute', (event, action: unknown) => {
@@ -1265,6 +1286,9 @@ if (hasSingleInstanceLock) {
     );
     installSecurityHandlers();
     installContentSecurityPolicy();
+    updateManager = new UpdateManager(logger, __APP_COMMIT__, app.isPackaged, (status) => {
+      sendToRenderer('updates:status', status);
+    });
     registerIpc();
     settingsWindow = new SettingsWindowManager(logger, isDevelopment, () => {
       // Safety net: restore the application menu if the settings window closes
@@ -1284,6 +1308,7 @@ if (hasSingleInstanceLock) {
       resolveMenuLocale(storage.settingsSnapshot().language)
     );
     mainWindow = createWindow();
+    updateManager.start();
     applicationReady = true;
     if (pendingRestore) {
       pendingRestore = false;

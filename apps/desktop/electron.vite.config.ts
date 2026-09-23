@@ -11,8 +11,10 @@ const aliases = {
 const bundledDependencies = [...Object.keys(aliases), 'zod'];
 
 function resolveCommitHash(): string {
+  const workflowCommit = process.env.GITHUB_SHA?.trim();
+  if (workflowCommit && /^[a-f0-9]{40}$/iu.test(workflowCommit)) return workflowCommit;
   try {
-    return execSync('git rev-parse --short HEAD', {
+    return execSync('git rev-parse HEAD', {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore']
     }).trim();

@@ -5,6 +5,7 @@ import {
   type InvalidThemeFile,
   type RuntimeInfo,
   type SettingsRecord,
+  type UpdateStatus,
   type UserTheme
 } from '@geared-term/protocol';
 import {
@@ -50,6 +51,7 @@ export function SettingsWindow(): React.JSX.Element {
   const [invalidThemes, setInvalidThemes] = useState<InvalidThemeFile[]>([]);
   const [info, setInfo] = useState<AppInfo | null>(null);
   const [runtime, setRuntime] = useState<RuntimeInfo | null>(null);
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null);
   const [category, setCategory] = useState<Category>('general');
   const [loadError, setLoadError] = useState<string | null>(null);
   const t: Translate = makeTranslate(settings?.language ?? 'system');
@@ -93,6 +95,14 @@ export function SettingsWindow(): React.JSX.Element {
       offChanged();
       offNavigate();
     };
+  }, []);
+
+  useEffect(() => {
+    void window.geared
+      .getUpdateStatus()
+      .then(setUpdateStatus)
+      .catch(() => undefined);
+    return window.geared.onUpdateStatus(setUpdateStatus);
   }, []);
 
   const palette = useMemo(
@@ -245,7 +255,17 @@ export function SettingsWindow(): React.JSX.Element {
               <AiAssistantSection settings={settings} onSave={save} t={t} />
             ) : null}
             {category === 'security' ? <SecurityVaultSection t={t} /> : null}
-            {category === 'about' ? <AboutSection info={info} runtime={runtime} t={t} /> : null}
+            {category === 'about' ? (
+              <AboutSection
+                info={info}
+                runtime={runtime}
+                updateStatus={updateStatus}
+                onCheckUpdates={async () => setUpdateStatus(await window.geared.checkForUpdates())}
+                onInstallUpdate={() => void window.geared.installDownloadedUpdate()}
+                onOpenRelease={() => void window.geared.openNightlyRelease()}
+                t={t}
+              />
+            ) : null}
           </div>
         </section>
       </div>

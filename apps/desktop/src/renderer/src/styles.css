@@ -1751,6 +1751,12 @@ button:disabled {
   color: var(--gt-text-dim, #d8e0ee);
 }
 
+.update-progress {
+  width: 150px;
+  height: 12px;
+  accent-color: var(--gt-accent, #68a4ff);
+}
+
 .settings-about-path {
   margin: 0;
   font-size: var(--gt-fs-sm);

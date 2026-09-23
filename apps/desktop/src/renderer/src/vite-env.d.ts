@@ -55,6 +55,7 @@ import type {
   EnvironmentProbeRequest,
   EnvironmentRecord,
   UiStateRecord,
+  UpdateStatus,
   WslDistribution,
   VaultPasswordRequest,
   VaultRotateRequest,
@@ -76,6 +77,11 @@ declare global {
     geared: {
       readonly platform: NodeJS.Platform;
       getAppInfo: () => Promise<AppInfo>;
+      getUpdateStatus: () => Promise<UpdateStatus>;
+      checkForUpdates: () => Promise<UpdateStatus>;
+      installDownloadedUpdate: () => Promise<SftpOperationResult>;
+      openNightlyRelease: () => Promise<SftpOperationResult>;
+      onUpdateStatus: (listener: (status: UpdateStatus) => void) => () => void;
       createLocalTerminal: (
         input: LocalTerminalRequest,
         onMessage: (message: unknown) => void
