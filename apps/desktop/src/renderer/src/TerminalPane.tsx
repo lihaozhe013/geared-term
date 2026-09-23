@@ -55,6 +55,11 @@ export type SftpTerminalControl = {
   probeWorkingDirectory: () => Promise<string | null>;
 };
 
+export type TerminalSnapshotControl = {
+  addScreenToChat: () => void;
+  openScreenSnapshotEditor: () => void;
+};
+
 type TerminalPaneProps = {
   request: TerminalRequest;
   settings: SettingsRecord;
@@ -68,7 +73,9 @@ type TerminalPaneProps = {
   onAlternateScreen?: (active: boolean) => void;
   onTitleChange?: (title: string) => void;
   registerSftpControl?: (control: SftpTerminalControl | null) => void;
+  registerSnapshotControl?: (control: TerminalSnapshotControl | null) => void;
   onAddToChat?: (text: string) => void;
+  onError?: (message: string) => void;
 };
 
 function isSshRequest(request: TerminalRequest): request is SshTerminalRequest {
@@ -99,7 +106,9 @@ export function TerminalPane({
   onAlternateScreen,
   onTitleChange,
   registerSftpControl,
-  onAddToChat
+  registerSnapshotControl,
+  onAddToChat,
+  onError
 }: TerminalPaneProps): React.JSX.Element {
   const hostRef = useRef<HTMLDivElement>(null);
   const fitRef = useRef<FitAddon | null>(null);
@@ -118,12 +127,20 @@ export function TerminalPane({
   const onAlternateScreenRef = useRef(onAlternateScreen);
   const onTitleChangeRef = useRef(onTitleChange);
   const registerSftpControlRef = useRef(registerSftpControl);
+  const registerSnapshotControlRef = useRef(registerSnapshotControl);
+  const onAddToChatRef = useRef(onAddToChat);
+  const onErrorRef = useRef(onError);
+  const settingsRef = useRef(settings);
   const paletteRef = useRef(palette);
   activeRef.current = active;
   onStateRef.current = onState;
   onHostKeyPromptRef.current = onHostKeyPrompt;
   onAlternateScreenRef.current = onAlternateScreen;
   registerSftpControlRef.current = registerSftpControl;
+  registerSnapshotControlRef.current = registerSnapshotControl;
+  onAddToChatRef.current = onAddToChat;
+  onErrorRef.current = onError;
+  settingsRef.current = settings;
   paletteRef.current = palette;
 
   const platform = useMemo(() => normalizePlatform(window.geared.platform), []);
@@ -133,6 +150,33 @@ export function TerminalPane({
   );
   const keybindingsRef = useRef<KeybindingMap>(keybindings);
   keybindingsRef.current = keybindings;
+
+  useEffect(() => {
+    if (!active) {
+      registerSnapshotControlRef.current?.(null);
+      return;
+    }
+
+    registerSnapshotControlRef.current?.({
+      addScreenToChat: () => {
+        const terminal = terminalRef.current;
+        const text = terminal ? extractViewportText(terminal) : null;
+        if (text) onAddToChatRef.current?.(formatChatInsert(text));
+      },
+      openScreenSnapshotEditor: () => {
+        const terminal = terminalRef.current;
+        const text = terminal ? extractViewportText(terminal) : null;
+        if (!text) return;
+        void window.geared.openTerminalSnapshotEditor({ text }).catch(() => {
+          onErrorRef.current?.(
+            translate(settingsRef.current.language, 'terminalSnapshotOpenFailed')
+          );
+        });
+      }
+    });
+
+    return () => registerSnapshotControlRef.current?.(null);
+  }, [active]);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -536,7 +580,11 @@ export function TerminalPane({
           search: translate(settings.language, 'terminalSearch'),
           clear: translate(settings.language, 'terminalClear'),
           addSelectionToChat: translate(settings.language, 'terminalAddSelectionToChat'),
-          addScreenToChat: translate(settings.language, 'terminalAddScreenToChat')
+          addScreenToChat: translate(settings.language, 'terminalAddScreenToChat'),
+          openScreenSnapshotEditor: translate(
+            settings.language,
+            'terminalOpenScreenSnapshotEditor'
+          )
         },
         shortcuts: terminalShortcutsFor(keybindings, platform),
         actions: {
@@ -580,6 +628,14 @@ export function TerminalPane({
             const terminal = terminalRef.current;
             const text = terminal ? extractViewportText(terminal) : null;
             if (text) onAddToChat?.(formatChatInsert(text));
+          },
+          openScreenSnapshotEditor: () => {
+            const terminal = terminalRef.current;
+            const text = terminal ? extractViewportText(terminal) : null;
+            if (!text) return;
+            void window.geared.openTerminalSnapshotEditor({ text }).catch(() => {
+              onError?.(translate(settings.language, 'terminalSnapshotOpenFailed'));
+            });
           }
         }
       })

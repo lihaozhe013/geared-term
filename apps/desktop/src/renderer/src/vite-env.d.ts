@@ -37,6 +37,10 @@ import type {
   SftpEditorSaveRequest,
   SftpEditorSaveResult,
   SftpEditorSavedEvent,
+  TerminalSnapshotDraft,
+  TerminalSnapshotDraftRequest,
+  TerminalSnapshotDraftChatRequest,
+  TerminalSnapshotDraftChatEvent,
   SftpUploadRequest,
   LocalEntry,
   LocalMkdirRequest,
@@ -165,6 +169,16 @@ declare global {
       saveSftpEditor: (input: SftpEditorSaveRequest) => Promise<SftpEditorSaveResult>;
       setSftpEditorDirty: (dirty: boolean) => Promise<SftpOperationResult>;
       onSftpEditorSaved: (listener: (event: SftpEditorSavedEvent) => void) => () => void;
+      openTerminalSnapshotEditor: (
+        input: TerminalSnapshotDraftRequest
+      ) => Promise<SftpOperationResult>;
+      getTerminalSnapshotDraft: () => Promise<TerminalSnapshotDraft>;
+      addTerminalSnapshotToAssistant: (
+        input: TerminalSnapshotDraftChatRequest
+      ) => Promise<SftpOperationResult>;
+      onTerminalSnapshotAddToAssistant: (
+        listener: (event: TerminalSnapshotDraftChatEvent) => void
+      ) => () => void;
       sftpSendCd: (input: SftpSendCdRequest) => Promise<SftpOperationResult>;
       sftpTrackedDirectory: (sessionId: string) => Promise<string | null>;
       getDownloadsDirectory: () => Promise<string>;

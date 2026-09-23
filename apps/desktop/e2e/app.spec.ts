@@ -48,6 +48,7 @@ test('exposes exactly the documented preload surface', async () => {
   expect(keys).toEqual(
     [
       'acceptAiEndpoint',
+      'addTerminalSnapshotToAssistant',
       'beginKeyCapture',
       'cancelSftpTransfer',
       'clearAiHistory',
@@ -76,6 +77,7 @@ test('exposes exactly the documented preload surface', async () => {
       'getRuntimeInfo',
       'getSettings',
       'getSftpEditorDocument',
+      'getTerminalSnapshotDraft',
       'getTerminalLigatureSequences',
       'getUiState',
       'getVaultStatus',
@@ -99,6 +101,7 @@ test('exposes exactly the documented preload surface', async () => {
       'onSettingsNavigate',
       'onSftpCd',
       'onSftpEditorSaved',
+      'onTerminalSnapshotAddToAssistant',
       'onSftpTransferEvent',
       'onVaultChanged',
       'onWindowMaximizeChanged',
@@ -108,6 +111,7 @@ test('exposes exactly the documented preload surface', async () => {
       'openLocalPath',
       'openSettings',
       'openSftpEditor',
+      'openTerminalSnapshotEditor',
       'openThemesFolder',
       'platform',
       'probeEnvironment',

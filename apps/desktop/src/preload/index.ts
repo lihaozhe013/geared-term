@@ -47,6 +47,10 @@ import {
   SftpEditorSaveRequestSchema,
   SftpEditorSaveResultSchema,
   SftpEditorSavedEventSchema,
+  TerminalSnapshotDraftRequestSchema,
+  TerminalSnapshotDraftSchema,
+  TerminalSnapshotDraftChatRequestSchema,
+  TerminalSnapshotDraftChatEventSchema,
   LocalListRequestSchema,
   LocalSessionRequestSchema,
   LocalWorkingDirectorySchema,
@@ -101,6 +105,9 @@ import {
   type SftpEditorOpenRequest,
   type SftpEditorSaveRequest,
   type SftpEditorSavedEvent,
+  type TerminalSnapshotDraftRequest,
+  type TerminalSnapshotDraftChatRequest,
+  type TerminalSnapshotDraftChatEvent,
   type LocalMkdirRequest,
   type LocalRenameRequest,
   type TerminalCommandAction,
@@ -431,6 +438,32 @@ const api = Object.freeze({
     };
     ipcRenderer.on('sftp:editor-saved', handler);
     return () => ipcRenderer.removeListener('sftp:editor-saved', handler);
+  },
+  openTerminalSnapshotEditor: async (input: TerminalSnapshotDraftRequest) => {
+    const request = TerminalSnapshotDraftRequestSchema.parse(input);
+    return SftpOperationResultSchema.parse(
+      await ipcRenderer.invoke('terminal:snapshot-open', request)
+    );
+  },
+  getTerminalSnapshotDraft: async () =>
+    TerminalSnapshotDraftSchema.parse(
+      await ipcRenderer.invoke('terminal:snapshot-draft', {})
+    ),
+  addTerminalSnapshotToAssistant: async (input: TerminalSnapshotDraftChatRequest) => {
+    const request = TerminalSnapshotDraftChatRequestSchema.parse(input);
+    return SftpOperationResultSchema.parse(
+      await ipcRenderer.invoke('terminal:snapshot-add-to-assistant', request)
+    );
+  },
+  onTerminalSnapshotAddToAssistant: (
+    listener: (event: TerminalSnapshotDraftChatEvent) => void
+  ): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, payload: unknown): void => {
+      const result = TerminalSnapshotDraftChatEventSchema.safeParse(payload);
+      if (result.success) listener(result.data);
+    };
+    ipcRenderer.on('terminal:snapshot-add-to-assistant', handler);
+    return () => ipcRenderer.removeListener('terminal:snapshot-add-to-assistant', handler);
   },
   sftpSendCd: async (input: SftpSendCdRequest) => {
     const request = SftpSendCdRequestSchema.parse(input);

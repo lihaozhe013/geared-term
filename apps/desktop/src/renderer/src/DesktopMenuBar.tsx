@@ -49,6 +49,9 @@ type MenuLabels = {
   paste: string;
   selectAll: string;
   view: string;
+  terminalSnapshots: string;
+  addScreenSnapshotToAssistant: string;
+  openScreenSnapshotDraft: string;
   reload: string;
   devTools: string;
   actualSize: string;
@@ -87,6 +90,9 @@ const labels: Record<'en-US' | 'zh-CN', MenuLabels> = {
     paste: 'Paste',
     selectAll: 'Select all',
     view: 'View',
+    terminalSnapshots: 'Terminal snapshots',
+    addScreenSnapshotToAssistant: 'Add screen snapshot to AI',
+    openScreenSnapshotDraft: 'Open snapshot editor',
     reload: 'Reload',
     devTools: 'Toggle developer tools',
     actualSize: 'Reset terminal font size',
@@ -123,6 +129,9 @@ const labels: Record<'en-US' | 'zh-CN', MenuLabels> = {
     paste: '粘贴',
     selectAll: '全选',
     view: '视图',
+    terminalSnapshots: '终端屏幕快照',
+    addScreenSnapshotToAssistant: '将屏幕快照加入 AI',
+    openScreenSnapshotDraft: '打开快照编辑器',
     reload: '重新加载',
     devTools: '切换开发者工具',
     actualSize: '重置终端字号',
@@ -217,6 +226,18 @@ function createMenus(
         action('zoom-out', t.zoomOut, 'zoom-out', { shortcut: hint('terminal.zoomOut') }),
         separator('view-divider-2'),
         action('fullscreen', t.fullScreen, 'toggle-fullscreen'),
+        submenu('terminal-snapshots', t.terminalSnapshots, [
+          action(
+            'terminal-snapshot-to-assistant',
+            t.addScreenSnapshotToAssistant,
+            'terminal-add-screen-to-chat'
+          ),
+          action(
+            'terminal-snapshot-to-draft',
+            t.openScreenSnapshotDraft,
+            'terminal-open-screen-snapshot'
+          )
+        ]),
         submenu('panels', t.panels, [
           action('sftp', t.sftp, 'toggle-sftp'),
           action('assistant', t.assistant, 'toggle-assistant'),

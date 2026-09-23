@@ -29,8 +29,9 @@ type RemoteCodeEditorProps = {
   content: string;
   wrap: boolean;
   disabled: boolean;
+  ariaLabel?: string;
   onChanged: () => void;
-  onSave: () => void;
+  onSave?: () => void;
 };
 
 const blockedIndentCommands = new Set<unknown>([
@@ -94,7 +95,10 @@ const highlightStyle = HighlightStyle.define([
 ]);
 
 export const RemoteCodeEditor = forwardRef<RemoteCodeEditorHandle, RemoteCodeEditorProps>(
-  function RemoteCodeEditor({ name, content, wrap, disabled, onChanged, onSave }, forwardedRef) {
+  function RemoteCodeEditor(
+    { name, content, wrap, disabled, ariaLabel, onChanged, onSave },
+    forwardedRef
+  ) {
     const hostRef = useRef<HTMLDivElement | null>(null);
     const viewRef = useRef<EditorView | null>(null);
     const wrapCompartmentRef = useRef(new Compartment());
@@ -116,7 +120,7 @@ export const RemoteCodeEditor = forwardRef<RemoteCodeEditorHandle, RemoteCodeEdi
           wrapCompartmentRef.current.of(wrap ? EditorView.lineWrapping : []),
           editableCompartmentRef.current.of(EditorView.editable.of(!disabled)),
           EditorView.contentAttributes.of({
-            'aria-label': `Remote file ${name}`,
+            'aria-label': ariaLabel ?? `Remote file ${name}`,
             spellcheck: 'false'
           }),
           EditorView.updateListener.of((update) => {
@@ -129,7 +133,7 @@ export const RemoteCodeEditor = forwardRef<RemoteCodeEditorHandle, RemoteCodeEdi
                 key: 'Mod-s',
                 preventDefault: true,
                 run: () => {
-                  callbacksRef.current.onSave();
+                  callbacksRef.current.onSave?.();
                   return true;
                 }
               }

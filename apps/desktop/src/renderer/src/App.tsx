@@ -31,10 +31,15 @@ import { ProfileEditor } from './ProfileEditor';
 import { QuickSshDialog } from './QuickSshDialog';
 import { Sidebar } from './Sidebar';
 import { SftpPanel } from './SftpPanel';
-import { TerminalPane, type SftpTerminalControl } from './TerminalPane';
+import {
+  TerminalPane,
+  type SftpTerminalControl,
+  type TerminalSnapshotControl
+} from './TerminalPane';
 import { TabBar } from './terminal/tab-bar';
 import { tabShortcutsFor } from './terminal/tab-context-menu';
 import { filePanelMode } from './terminal/file-panel';
+import { formatChatInsert } from './terminal/extract';
 import {
   insertTabAfter,
   moveTabById,
@@ -219,6 +224,7 @@ export function App(): React.JSX.Element {
   const [pendingChatText, setPendingChatText] = useState<string | null>(null);
   const [vaultStatus, setVaultStatus] = useState<VaultStatus | null>(null);
   const sftpControls = useRef(new Map<string, SftpTerminalControl>());
+  const snapshotControls = useRef(new Map<string, TerminalSnapshotControl>());
 
   const t = useCallback(
     (key: MessageKey): string => translate(settings.language, key),
@@ -298,6 +304,14 @@ export function App(): React.JSX.Element {
         : { ...current, rightPanel: 'assistant', rightPanelCollapsed: false }
     );
   }, []);
+
+  useEffect(
+    () =>
+      window.geared.onTerminalSnapshotAddToAssistant(({ text }) =>
+        handleAddToChat(formatChatInsert(text))
+      ),
+    [handleAddToChat]
+  );
 
   const palette = useMemo(
     () => resolvePalette(settings.theme, userThemes),
@@ -690,6 +704,13 @@ export function App(): React.JSX.Element {
         void window.geared.saveUiState(nextState).catch(() => undefined);
         return;
       }
+      if (command === 'terminal-add-screen-to-chat' || command === 'terminal-open-screen-snapshot') {
+        const activeId = handlers.activeTabId ?? handlers.tabs[0]?.id;
+        const control = activeId ? snapshotControls.current.get(activeId) : undefined;
+        if (command === 'terminal-add-screen-to-chat') control?.addScreenToChat();
+        else control?.openScreenSnapshotEditor();
+        return;
+      }
       if (command === 'tab-close') {
         const activeId = handlers.activeTabId ?? handlers.tabs[0]?.id;
         if (activeId) handlers.closeTab(activeId);
@@ -859,7 +880,15 @@ export function App(): React.JSX.Element {
                     sftpControls.current.delete(tab.id);
                   }
                 }}
+                registerSnapshotControl={(control) => {
+                  if (control) {
+                    snapshotControls.current.set(tab.id, control);
+                  } else {
+                    snapshotControls.current.delete(tab.id);
+                  }
+                }}
                 onAddToChat={handleAddToChat}
+                onError={setError}
               />
             ))}
             {tabs.length === 0 ? (

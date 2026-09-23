@@ -2,7 +2,7 @@
 
 > Status: Current implementation baseline
 >
-> Last updated: 2026-09-22
+> Last updated: 2026-09-23
 >
 > Target repository: `geared-term`
 
@@ -283,11 +283,18 @@ not currently implemented is stated as such instead of being treated as complete
   sequences, trim trailing blank viewport lines, and preserve the active normal or alternate buffer.
   The current implementation does not provide a separate wrapped-row reconstruction step or a
   user-visible disclosure for every formatting transformation.
-- **TERM-021**: The current selection and viewport actions insert the extracted text directly into
-  the assistant composer. They do not currently show a separate source, line/character bound,
+- **TERM-021**: The selection and direct screen-to-chat actions insert the extracted text directly
+  into the assistant composer. They do not show a separate source, line/character bound,
   truncation, or preview confirmation UI before insertion.
 - **TERM-022**: Selection and viewport text inserted into the assistant are capped at 256 KiB after
   extraction.
+- **TERM-023**: The terminal context menu MUST offer a disposable editor for the active xterm
+  buffer's visible viewport as plain text. The snapshot MUST remain independent from later terminal
+  output and MUST NOT pause or change terminal input. Only one snapshot editor window may be open;
+  opening another snapshot MUST focus the existing window without replacing its draft. Adding the
+  draft to AI MUST append the full edited text to the assistant composer for the currently active
+  tab without submitting it. Closing the editor MUST discard the draft without persistence or a
+  confirmation prompt.
 
 ## 11. Local shell sessions
 

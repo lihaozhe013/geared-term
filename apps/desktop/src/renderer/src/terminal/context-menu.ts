@@ -10,6 +10,7 @@ export type TerminalMenuLabels = {
   clear: string;
   addSelectionToChat: string;
   addScreenToChat: string;
+  openScreenSnapshotEditor?: string;
 };
 
 export type TerminalMenuShortcuts = {
@@ -27,6 +28,7 @@ export type TerminalMenuActions = {
   clear: () => void;
   addSelectionToChat: () => void;
   addScreenToChat: () => void;
+  openScreenSnapshotEditor?: () => void;
 };
 
 /** Hint chords shown in the menu, derived from the resolved keybinding map so
@@ -56,7 +58,7 @@ export function buildTerminalContextMenu(input: {
   actions: TerminalMenuActions;
 }): ContextMenuItem[] {
   const { hasSelection, labels, shortcuts, actions } = input;
-  return [
+  const items: ContextMenuItem[] = [
     {
       id: 'terminal-menu-copy',
       label: labels.copy,
@@ -101,4 +103,12 @@ export function buildTerminalContextMenu(input: {
       run: actions.addScreenToChat
     }
   ];
+  if (labels.openScreenSnapshotEditor && actions.openScreenSnapshotEditor) {
+    items.push({
+      id: 'terminal-menu-open-screen-snapshot-editor',
+      label: labels.openScreenSnapshotEditor,
+      run: actions.openScreenSnapshotEditor
+    });
+  }
+  return items;
 }

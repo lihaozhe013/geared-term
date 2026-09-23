@@ -61,6 +61,10 @@ import {
   SftpEditorSaveRequestSchema,
   SftpEditorSaveResultSchema,
   SftpEditorSavedEventSchema,
+  TerminalSnapshotDraftChatEventSchema,
+  TerminalSnapshotDraftChatRequestSchema,
+  TerminalSnapshotDraftRequestSchema,
+  TerminalSnapshotDraftSchema,
   LocalListRequestSchema,
   LocalSessionRequestSchema,
   LocalWorkingDirectorySchema,
@@ -113,6 +117,7 @@ import { TransferManager } from './sftp/transfers';
 import { buildApplicationMenu, executeApplicationMenuAction, type MenuLocale } from './menu';
 import { HistoryWindowManager } from './history-window';
 import { RemoteEditorWindowManager } from './remote-editor-window';
+import { TerminalSnapshotWindowManager } from './terminal-snapshot-window';
 import { SettingsWindowManager, type SettingsCategory } from './settings-window';
 import { TrayController } from './tray';
 import {
@@ -153,6 +158,7 @@ let trayController: TrayController | undefined;
 let settingsWindow: SettingsWindowManager;
 let historyWindow: HistoryWindowManager;
 let remoteEditorWindow: RemoteEditorWindowManager;
+let terminalSnapshotWindow: TerminalSnapshotWindowManager;
 let localTerminals: LocalTerminalManager;
 let storage: AppStorage;
 let environmentManager: EnvironmentManager;
@@ -166,6 +172,13 @@ function sendToRenderer(channel: string, payload: unknown): void {
   for (const window of BrowserWindow.getAllWindows()) {
     if (!window.isDestroyed()) window.webContents.send(channel, payload);
   }
+}
+
+function sendToMainRenderer(channel: string, payload: unknown): void {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    throw new Error('The main window is unavailable');
+  }
+  mainWindow.webContents.send(channel, payload);
 }
 
 function backgroundModeEnabled(): boolean {
@@ -715,6 +728,23 @@ function registerIpc(): void {
     remoteEditorWindow.setDirty(event.sender, request.dirty);
     return SftpOperationResultSchema.parse({ accepted: true });
   });
+  ipcMain.handle('terminal:snapshot-open', (event, input: unknown) => {
+    if (BrowserWindow.fromWebContents(event.sender) !== mainWindow) {
+      throw new Error('Only the main window can open a terminal snapshot draft');
+    }
+    const request = TerminalSnapshotDraftRequestSchema.parse(input);
+    return SftpOperationResultSchema.parse(terminalSnapshotWindow.open(request));
+  });
+  ipcMain.handle('terminal:snapshot-draft', (event, input: unknown) => {
+    EmptyRequestSchema.parse(input ?? {});
+    return TerminalSnapshotDraftSchema.parse(terminalSnapshotWindow.draft(event.sender));
+  });
+  ipcMain.handle('terminal:snapshot-add-to-assistant', (event, input: unknown) => {
+    const request = TerminalSnapshotDraftChatRequestSchema.parse(input);
+    return SftpOperationResultSchema.parse(
+      terminalSnapshotWindow.addToAssistant(event.sender, request)
+    );
+  });
   ipcMain.handle('local:list', async (_event, input: unknown) => {
     const request = LocalListRequestSchema.parse(input);
     return LocalEntrySchema.array().parse(await listLocalDirectory(request.directory));
@@ -1217,6 +1247,15 @@ if (hasSingleInstanceLock) {
       getSftp: (sessionId) => sshSessions.sftpService(sessionId),
       onSaved: (event) =>
         sendToRenderer('sftp:editor-saved', SftpEditorSavedEventSchema.parse(event))
+    });
+    terminalSnapshotWindow = new TerminalSnapshotWindowManager({
+      logger,
+      isDevelopment,
+      onAddToAssistant: (text) =>
+        sendToMainRenderer(
+          'terminal:snapshot-add-to-assistant',
+          TerminalSnapshotDraftChatEventSchema.parse({ text })
+        )
     });
     process.on('uncaughtException', (error) =>
       logger.error('system', 'Uncaught exception', { error: error.message })

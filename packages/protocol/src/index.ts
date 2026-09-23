@@ -800,6 +800,22 @@ export const SftpEditorSavedEventSchema = z
   })
   .strict();
 
+export const TerminalSnapshotDraftRequestSchema = z
+  .object({ text: z.string().max(256 * 1024) })
+  .strict();
+
+export const TerminalSnapshotDraftSchema = z
+  .object({ text: z.string().max(256 * 1024) })
+  .strict();
+
+export const TerminalSnapshotDraftChatRequestSchema = z
+  .object({ text: z.string() })
+  .strict();
+
+export const TerminalSnapshotDraftChatEventSchema = z
+  .object({ text: z.string() })
+  .strict();
+
 export const LocalListRequestSchema = z
   .object({
     directory: z.string().max(4096).nullable().default(null)
@@ -1025,6 +1041,14 @@ export type SftpEditorSaveRequest = z.infer<typeof SftpEditorSaveRequestSchema>;
 export type SftpEditorSaveResult = z.infer<typeof SftpEditorSaveResultSchema>;
 export type SftpEditorDirtyRequest = z.infer<typeof SftpEditorDirtyRequestSchema>;
 export type SftpEditorSavedEvent = z.infer<typeof SftpEditorSavedEventSchema>;
+export type TerminalSnapshotDraftRequest = z.infer<typeof TerminalSnapshotDraftRequestSchema>;
+export type TerminalSnapshotDraft = z.infer<typeof TerminalSnapshotDraftSchema>;
+export type TerminalSnapshotDraftChatRequest = z.infer<
+  typeof TerminalSnapshotDraftChatRequestSchema
+>;
+export type TerminalSnapshotDraftChatEvent = z.infer<
+  typeof TerminalSnapshotDraftChatEventSchema
+>;
 export type LocalListRequest = z.infer<typeof LocalListRequestSchema>;
 export type LocalSessionRequest = z.infer<typeof LocalSessionRequestSchema>;
 export type LocalWorkingDirectory = z.infer<typeof LocalWorkingDirectorySchema>;

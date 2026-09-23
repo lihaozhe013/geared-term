@@ -69,6 +69,8 @@ export function executeApplicationMenuAction(action: string, window: BrowserWind
     case 'zoom-in':
     case 'zoom-out':
     case 'zoom-reset':
+    case 'terminal-add-screen-to-chat':
+    case 'terminal-open-screen-snapshot':
       commands.onCommand(action);
       return;
     case 'open-settings':
@@ -160,6 +162,9 @@ const labels = {
     paste: 'Paste',
     selectAll: 'Select all',
     view: 'View',
+    terminalSnapshots: 'Terminal snapshots',
+    addScreenSnapshotToAssistant: 'Add screen snapshot to AI',
+    openScreenSnapshotDraft: 'Open snapshot editor',
     reload: 'Reload',
     toggleDevTools: 'Toggle developer tools',
     resetZoom: 'Reset terminal font size',
@@ -202,6 +207,9 @@ const labels = {
     paste: '粘贴',
     selectAll: '全选',
     view: '视图',
+    terminalSnapshots: '终端屏幕快照',
+    addScreenSnapshotToAssistant: '将屏幕快照加入 AI',
+    openScreenSnapshotDraft: '打开快照编辑器',
     reload: '重新加载',
     toggleDevTools: '切换开发者工具',
     resetZoom: '重置终端字号',
@@ -331,6 +339,19 @@ export function buildApplicationMenu(state: MenuState, commands: MenuCommands): 
         },
         { type: 'separator' },
         { role: 'togglefullscreen', label: t.toggleFullscreen },
+        {
+          label: t.terminalSnapshots,
+          submenu: [
+            {
+              label: t.addScreenSnapshotToAssistant,
+              click: () => commands.onCommand('terminal-add-screen-to-chat')
+            },
+            {
+              label: t.openScreenSnapshotDraft,
+              click: () => commands.onCommand('terminal-open-screen-snapshot')
+            }
+          ]
+        },
         {
           label: t.panels,
           submenu: [
