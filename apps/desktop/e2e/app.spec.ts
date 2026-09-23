@@ -122,6 +122,7 @@ test('exposes exactly the documented preload surface', async () => {
       'probeEnvironment',
       'isWindowMaximized',
       'renameLocalPath',
+      'reorderProfiles',
       'reloadSftpEditor',
       'rotateVault',
       'runRemoteFileCommand',

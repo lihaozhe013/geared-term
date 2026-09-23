@@ -3,8 +3,8 @@ import { launchApp, openLocalTab, type AppSession } from './fixtures';
 
 let session: AppSession;
 
-const DEFAULT_PADDING = 8;
-const CUSTOM_PADDING = 12;
+const DEFAULT_PADDING = 12;
+const CUSTOM_PADDING = 16;
 
 test.beforeAll(async () => {
   session = await launchApp();

@@ -70,7 +70,7 @@ const defaultSettings: SettingsRecord = {
   theme: 'Catppuccin Mocha',
   terminalFontSize: 14,
   terminalLineHeight: 1.2,
-  terminalPadding: 8,
+  terminalPadding: 12,
   terminalCursor: 'bar',
   defaultTerm: 'xterm-256color',
   splitCommandPresentation: true,

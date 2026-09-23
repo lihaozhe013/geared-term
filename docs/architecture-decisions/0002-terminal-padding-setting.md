@@ -49,7 +49,7 @@ them vary padding by mode. Their full-screen programs therefore always carry a f
 geared-term can do better because it already tracks the alternate screen buffer. The revised
 decision supersedes items 2-3 above:
 
-1. **Default.** The schema default and `defaultSettings` value become 8, so records written before
+1. **Default.** The schema default and `defaultSettings` value become 12, so records written before
    the field existed resolve to the shell inset rather than the edge-to-edge layout.
 2. **Shell vs full-screen.** `terminalPadding` applies while the normal buffer is active. When the
    active pane has entered the alternate screen buffer (`CSI ?47`, `?1047`, or `?1049`), the
