@@ -4,6 +4,7 @@ import {
   DEFAULT_TERMINAL_LIGATURE_SEQUENCES,
   LocalSessionRequestSchema,
   LocalWorkingDirectorySchema,
+  ProfileOrderRequestSchema,
   normalizeLigatureSequences,
   normalizeTerminalLineEndings,
   SftpDownloadRequestSchema,
@@ -247,5 +248,43 @@ describe('normalizeTerminalLineEndings', () => {
       normalizeTerminalLineEndings(text)
     );
     expect(normalizeTerminalLineEndings(text)).toBe('echo "héllo 🌟"\rsecond\rthird');
+  });
+});
+
+describe('ProfileOrderRequestSchema', () => {
+  it('accepts ordered ungrouped sessions and named groups', () => {
+    expect(
+      ProfileOrderRequestSchema.parse({
+        ungroupedIds: ['u1'],
+        groups: [{ name: ' Alpha ', profileIds: ['a1', 'a2'] }]
+      })
+    ).toEqual({
+      ungroupedIds: ['u1'],
+      groups: [{ name: 'Alpha', profileIds: ['a1', 'a2'] }]
+    });
+  });
+
+  it('rejects duplicate profiles, duplicate groups, and empty groups', () => {
+    expect(
+      ProfileOrderRequestSchema.safeParse({
+        ungroupedIds: ['p1'],
+        groups: [{ name: 'Alpha', profileIds: ['p1'] }]
+      }).success
+    ).toBe(false);
+    expect(
+      ProfileOrderRequestSchema.safeParse({
+        ungroupedIds: [],
+        groups: [
+          { name: 'Alpha', profileIds: ['p1'] },
+          { name: 'Alpha', profileIds: ['p2'] }
+        ]
+      }).success
+    ).toBe(false);
+    expect(
+      ProfileOrderRequestSchema.safeParse({
+        ungroupedIds: [],
+        groups: [{ name: 'Alpha', profileIds: [] }]
+      }).success
+    ).toBe(false);
   });
 });

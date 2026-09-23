@@ -6,6 +6,8 @@ import {
   AiConnectionInputSchema,
   AiConnectionRecordSchema,
   AiResponsesModelDefaultsSchema,
+  ProfileOrderRequestSchema,
+  type ProfileOrderRequest,
   type ProfileCredentials,
   SshTerminalRequestSchema,
   type AiConnectionInput,
@@ -423,6 +425,13 @@ export class AppStorage {
       database.deleteProfile(id);
       database.sweepUnreferencedSecrets();
     });
+    return this.profileSnapshot();
+  }
+
+  public async reorderProfiles(order: ProfileOrderRequest): Promise<SessionProfile[]> {
+    const database = this.requireDatabase();
+    const request = ProfileOrderRequestSchema.parse(order);
+    database.transaction(() => database.reorderProfiles(request));
     return this.profileSnapshot();
   }
 

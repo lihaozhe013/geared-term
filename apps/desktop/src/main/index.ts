@@ -34,6 +34,7 @@ import {
   EmptyRequestSchema,
   AutoUnlockStatusSchema,
   ProfileIdRequestSchema,
+  ProfileOrderRequestSchema,
   SETTINGS_CATEGORIES,
   SessionProfileRecordSchema,
   SessionProfileSaveRequestSchema,
@@ -541,6 +542,10 @@ function registerIpc(): void {
   ipcMain.handle('profile:list', () =>
     SessionProfileRecordSchema.array().parse(storage.profileSnapshot())
   );
+  ipcMain.handle('profile:reorder', async (_event, input: unknown) => {
+    const request = ProfileOrderRequestSchema.parse(input);
+    return SessionProfileRecordSchema.array().parse(await storage.reorderProfiles(request));
+  });
   ipcMain.handle('profile:save', async (_event, input: unknown) => {
     const profile = SessionProfileRecordSchema.parse(input);
     const { secretRefs: _secretRefs, ...profileWithoutSecrets } = profile;
@@ -1270,11 +1275,17 @@ if (hasSingleInstanceLock) {
     );
     installSecurityHandlers();
     installContentSecurityPolicy();
-    updateManager = new UpdateManager(logger, __APP_COMMIT__, app.isPackaged, (status) => {
-      sendToRenderer('updates:status', status);
-    }, (release) => {
-      updateNotification?.notify(release);
-    });
+    updateManager = new UpdateManager(
+      logger,
+      __APP_COMMIT__,
+      app.isPackaged,
+      (status) => {
+        sendToRenderer('updates:status', status);
+      },
+      (release) => {
+        updateNotification?.notify(release);
+      }
+    );
     registerIpc();
     settingsWindow = new SettingsWindowManager(logger, isDevelopment, () => {
       // Safety net: restore the application menu if the settings window closes

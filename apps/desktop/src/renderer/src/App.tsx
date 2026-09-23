@@ -4,6 +4,7 @@ import { BUILTIN_THEME_NAMES, parseRemoteFileCommands } from '@geared-term/proto
 import type {
   AppInfo,
   LocalTerminalRequest,
+  ProfileOrderRequest,
   SessionProfileRecord,
   SshProfileTerminalRequest,
   SshTerminalRequest,
@@ -544,6 +545,18 @@ export function App(): React.JSX.Element {
     [t]
   );
 
+  const reorderSavedProfiles = useCallback(
+    async (order: ProfileOrderRequest): Promise<void> => {
+      try {
+        setProfiles(await window.geared.reorderProfiles(order));
+        setError(null);
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : t('errReorderProfiles'));
+      }
+    },
+    [t]
+  );
+
   const openWslDistribution = useCallback(
     (name: string): void => {
       if (!window.confirm(ta('confirmOpenWsl', { name }))) return;
@@ -714,7 +727,10 @@ export function App(): React.JSX.Element {
         void window.geared.saveUiState(nextState).catch(() => undefined);
         return;
       }
-      if (command === 'terminal-add-screen-to-chat' || command === 'terminal-open-screen-snapshot') {
+      if (
+        command === 'terminal-add-screen-to-chat' ||
+        command === 'terminal-open-screen-snapshot'
+      ) {
         const activeId = handlers.activeTabId ?? handlers.tabs[0]?.id;
         const control = activeId ? snapshotControls.current.get(activeId) : undefined;
         if (command === 'terminal-add-screen-to-chat') control?.addScreenToChat();
@@ -835,6 +851,7 @@ export function App(): React.JSX.Element {
             onOpenProfile={openProfile}
             onEditProfile={openEditProfile}
             onDeleteProfile={deleteProfileRecord}
+            onReorderProfiles={reorderSavedProfiles}
             onOpenWslDistribution={openWslDistribution}
             onRefreshWsl={() => void discoverWsl()}
             onCollapse={toggleSidebar}

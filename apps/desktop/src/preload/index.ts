@@ -21,6 +21,7 @@ import {
   EnvironmentRecordSchema,
   LocalTerminalRequestSchema,
   ProfileIdRequestSchema,
+  ProfileOrderRequestSchema,
   SessionProfileRecordSchema,
   SessionProfileSaveRequestSchema,
   SettingsOpenRequestSchema,
@@ -88,6 +89,7 @@ import {
   type EnvironmentRecord,
   type SessionProfileRecord,
   type SessionProfileSaveRequest,
+  type ProfileOrderRequest,
   type VaultRotateRequest,
   type VaultStatus,
   type SettingsRecord,
@@ -312,6 +314,12 @@ const api = Object.freeze({
   },
   listProfiles: async () =>
     SessionProfileRecordSchema.array().parse(await ipcRenderer.invoke('profile:list')),
+  reorderProfiles: async (input: ProfileOrderRequest) => {
+    const order = ProfileOrderRequestSchema.parse(input);
+    return SessionProfileRecordSchema.array().parse(
+      await ipcRenderer.invoke('profile:reorder', order)
+    );
+  },
   saveProfile: async (input: SessionProfileRecord) => {
     const profile = SessionProfileRecordSchema.parse(input);
     const { secretRefs: _secretRefs, ...profileWithoutSecrets } = profile;

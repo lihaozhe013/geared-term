@@ -16,6 +16,7 @@ import type {
   LocalTerminalRequest,
   SessionProfileRecord,
   SessionProfileSaveRequest,
+  ProfileOrderRequest,
   SettingsRecord,
   SftpDownloadRequest,
   SftpListRequest,
@@ -142,6 +143,7 @@ declare global {
         onEvent: (event: unknown) => void
       ) => { cancel: () => void };
       listProfiles: () => Promise<SessionProfileRecord[]>;
+      reorderProfiles: (input: ProfileOrderRequest) => Promise<SessionProfileRecord[]>;
       saveProfile: (input: SessionProfileRecord) => Promise<SessionProfileRecord[]>;
       saveProfileWithCredentials: (
         input: SessionProfileSaveRequest

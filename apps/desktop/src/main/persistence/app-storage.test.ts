@@ -255,4 +255,33 @@ describe('application storage', () => {
     await reloaded.load();
     expect(reloaded.profileSnapshot()).toHaveLength(1);
   });
+
+  it('keeps the saved session order after storage reload', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'geared-term-profile-order-'));
+    const storage = new AppStorage(directory, testLogger());
+    await storage.load();
+
+    const profile = (id: string, group?: string) => ({
+      id,
+      kind: 'local' as const,
+      name: id,
+      ...(group ? { group } : {}),
+      term: 'xterm-256color' as const
+    });
+    await storage.saveProfile(profile('u1'));
+    await storage.saveProfile(profile('a1', 'Alpha'));
+    await storage.saveProfile(profile('b1', 'Beta'));
+    await storage.reorderProfiles({
+      ungroupedIds: ['u1'],
+      groups: [{ name: 'Beta', profileIds: ['a1', 'b1'] }]
+    });
+
+    const reloaded = new AppStorage(directory, testLogger());
+    await reloaded.load();
+    expect(reloaded.profileSnapshot().map((item) => [item.id, item.group])).toEqual([
+      ['u1', undefined],
+      ['a1', 'Beta'],
+      ['b1', 'Beta']
+    ]);
+  });
 });

@@ -115,6 +115,48 @@ export const SessionProfileRecordSchema = z
 
 export const ProfileIdRequestSchema = z.object({ id: IdSchema }).strict();
 
+export const ProfileOrderGroupSchema = z
+  .object({
+    name: z.string().trim().min(1).max(160),
+    profileIds: z.array(IdSchema).min(1).max(1000)
+  })
+  .strict();
+
+export const ProfileOrderRequestSchema = z
+  .object({
+    ungroupedIds: z.array(IdSchema).max(1000),
+    groups: z.array(ProfileOrderGroupSchema).max(1000)
+  })
+  .strict()
+  .superRefine((value, context) => {
+    const profileIds = [
+      ...value.ungroupedIds,
+      ...value.groups.flatMap((group) => group.profileIds)
+    ];
+    if (profileIds.length > 1000) {
+      context.addIssue({
+        code: 'custom',
+        path: ['groups'],
+        message: 'At most 1000 profiles can be reordered at once'
+      });
+    }
+    if (new Set(profileIds).size !== profileIds.length) {
+      context.addIssue({
+        code: 'custom',
+        path: ['groups'],
+        message: 'A profile can only appear once in an order request'
+      });
+    }
+    const groupNames = value.groups.map((group) => group.name);
+    if (new Set(groupNames).size !== groupNames.length) {
+      context.addIssue({
+        code: 'custom',
+        path: ['groups'],
+        message: 'Group names must be unique'
+      });
+    }
+  });
+
 export const ProfileCredentialsSchema = z
   .object({
     password: z.string().max(4096).optional(),
@@ -1217,6 +1259,7 @@ export type SessionProfileRecord = z.infer<typeof SessionProfileRecordSchema>;
 export type ProfileCredentials = z.infer<typeof ProfileCredentialsSchema>;
 export type SessionProfileSaveProfile = z.infer<typeof SessionProfileSaveProfileSchema>;
 export type SessionProfileSaveRequest = z.infer<typeof SessionProfileSaveRequestSchema>;
+export type ProfileOrderRequest = z.infer<typeof ProfileOrderRequestSchema>;
 export type UiStateRecord = z.infer<typeof UiStateRecordSchema>;
 export type SettingsRecord = z.infer<typeof SettingsRecordSchema>;
 export type TerminalLigatureRequest = z.infer<typeof TerminalLigatureRequestSchema>;

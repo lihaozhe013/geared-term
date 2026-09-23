@@ -51,7 +51,7 @@ afterEach(async () => {
 });
 
 describe('profile database', () => {
-  it('creates schema version 1 and round-trips every record type', () => {
+  it('creates the current schema and round-trips every record type', () => {
     const database = new ProfileDatabase(root, logger);
     expect(database.listProfiles()).toEqual([]);
 
@@ -302,5 +302,107 @@ describe('profile database', () => {
     expect(quarantined).toBeDefined();
     const content = await readFile(join(root, quarantined as string), 'utf8');
     expect(content).toContain('garbage');
+  });
+
+  it('persists profile order, group membership, and group order', () => {
+    const database = new ProfileDatabase(root, logger);
+    const add = (id: string, group?: string): void => {
+      database.upsertProfile(
+        { id, kind: 'local', name: id, group, term: 'xterm-256color' },
+        '2026-01-01T00:00:00.000Z'
+      );
+    };
+    add('u1');
+    add('u2');
+    add('a1', 'Alpha');
+    add('a2', 'Alpha');
+    add('b1', 'Beta');
+
+    database.transaction(() =>
+      database.reorderProfiles({
+        ungroupedIds: ['u2', 'u1'],
+        groups: [
+          { name: 'Beta', profileIds: ['a1', 'b1'] },
+          { name: 'Alpha', profileIds: ['a2'] }
+        ]
+      })
+    );
+    expect(database.listProfiles().map((profile) => [profile.id, profile.group])).toEqual([
+      ['u2', undefined],
+      ['u1', undefined],
+      ['a1', 'Beta'],
+      ['b1', 'Beta'],
+      ['a2', 'Alpha']
+    ]);
+    database.close();
+
+    const reopened = new ProfileDatabase(root, logger);
+    expect(reopened.listProfiles().map((profile) => [profile.id, profile.group])).toEqual([
+      ['u2', undefined],
+      ['u1', undefined],
+      ['a1', 'Beta'],
+      ['b1', 'Beta'],
+      ['a2', 'Alpha']
+    ]);
+    reopened.close();
+  });
+
+  it('rejects stale or duplicate profile IDs without changing order', () => {
+    const database = new ProfileDatabase(root, logger);
+    database.upsertProfile(
+      { id: 'p1', kind: 'local', name: 'one', term: 'xterm-256color' },
+      '2026-01-01T00:00:00.000Z'
+    );
+    database.upsertProfile(
+      { id: 'p2', kind: 'local', name: 'two', term: 'xterm-256color' },
+      '2026-01-02T00:00:00.000Z'
+    );
+
+    expect(() => database.reorderProfiles({ ungroupedIds: ['p1', 'p1'], groups: [] })).toThrow(
+      'every saved profile exactly once'
+    );
+    expect(() => database.reorderProfiles({ ungroupedIds: ['p1', 'missing'], groups: [] })).toThrow(
+      'every saved profile exactly once'
+    );
+    expect(database.listProfiles().map((profile) => profile.id)).toEqual(['p1', 'p2']);
+    database.close();
+  });
+
+  it('backfills version 2 databases with their former sidebar order', () => {
+    const database = new ProfileDatabase(root, logger);
+    const add = (id: string, group?: string): void => {
+      database.upsertProfile(
+        { id, kind: 'local', name: id, group, term: 'xterm-256color' },
+        '2026-01-01T00:00:00.000Z'
+      );
+    };
+    add('u-late');
+    add('a-late', 'Alpha');
+    add('b-first', 'Beta');
+    add('a-first', 'Alpha');
+    add('u-first');
+    database.close();
+
+    const legacy = new Database(join(root, 'geared-term.db'));
+    const updateTime = legacy.prepare('UPDATE session_profiles SET updated_at = ? WHERE id = ?');
+    updateTime.run('2026-01-05T00:00:00.000Z', 'u-late');
+    updateTime.run('2026-01-04T00:00:00.000Z', 'a-late');
+    updateTime.run('2026-01-03T00:00:00.000Z', 'b-first');
+    updateTime.run('2026-01-02T00:00:00.000Z', 'a-first');
+    updateTime.run('2026-01-01T00:00:00.000Z', 'u-first');
+    legacy.exec('DROP TABLE session_profile_group_order');
+    legacy.exec('ALTER TABLE session_profiles DROP COLUMN sort_order');
+    legacy.prepare('UPDATE schema_info SET value = ? WHERE key = ?').run('2', 'schema_version');
+    legacy.close();
+
+    const migrated = new ProfileDatabase(root, logger);
+    expect(migrated.listProfiles().map((profile) => profile.id)).toEqual([
+      'u-first',
+      'u-late',
+      'a-first',
+      'a-late',
+      'b-first'
+    ]);
+    migrated.close();
   });
 });

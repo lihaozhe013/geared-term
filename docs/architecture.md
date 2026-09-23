@@ -171,6 +171,10 @@ purpose, algorithm, version, nonce, and tag columns), `environments`, `session_p
 `ai_connections`. Profiles and AI connections reference `secrets.id`; secret values never appear as
 row columns. The authoritative DDL is the version-1 schema in the source file.
 
+**Saved session ordering.** Migration 3 adds the session_profile_group_order table, per-profile
+ranks, and a separate rank for each named group. It backfills both from the former profile-list
+order so existing sidebars retain their visible arrangement.
+
 **Mapping rules.**
 
 - Rows map one-to-one onto the validated protocol records; JSON columns (`facts`, `models`,
@@ -182,6 +186,8 @@ row columns. The authoritative DDL is the version-1 schema in the source file.
 the profile and its referenced secrets and sweeps unreferenced secrets; deleting sweeps; master
 password rotation re-encrypts every secret row and replaces vault metadata in one transaction
 (VLT-007).
+
+Profile reordering updates group membership and all affected ranks atomically.
 
 **Migrations.** Migrations are an ordered, forward-only list in code, each wrapped in one
 transaction. Before applying a migration the store creates a backup with `VACUUM INTO` next to the

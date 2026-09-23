@@ -5,13 +5,14 @@ import Database from 'better-sqlite3';
 import type {
   AiConnectionRecord,
   EnvironmentRecord,
-  SessionProfileRecord
+  SessionProfileRecord,
+  ProfileOrderRequest
 } from '@geared-term/protocol';
 import { AiConnectionRecordSchema } from '@geared-term/protocol';
 import type { Logger } from '../logging';
 import { EncryptedSecretSchema, type EncryptedSecret } from './schema';
 
-export const profileDatabaseSchemaVersion = 2;
+export const profileDatabaseSchemaVersion = 3;
 
 type SecretRow = {
   id: string;
@@ -29,6 +30,7 @@ type ProfileRow = {
   kind: 'local' | 'wsl' | 'ssh';
   name: string;
   group_name: string | null;
+  sort_order: number;
   term: string;
   host: string | null;
   port: number | null;
@@ -65,6 +67,11 @@ type EnvironmentRow = {
   verified: number;
   detected_at: string | null;
 };
+
+function normalizeGroupName(groupName: string | null | undefined): string | null {
+  const normalized = groupName?.trim();
+  return normalized || null;
+}
 
 const migrations: Array<{ version: number; statements: string[] }> = [
   {
@@ -136,6 +143,50 @@ const migrations: Array<{ version: number; statements: string[] }> = [
       `ALTER TABLE ai_connections ADD COLUMN accepted_endpoint TEXT`,
       `UPDATE schema_info SET value = '2' WHERE key = 'schema_version'`
     ]
+  },
+  {
+    version: 3,
+    statements: [
+      `ALTER TABLE session_profiles ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0`,
+      `CREATE TABLE session_profile_group_order (
+        group_name TEXT PRIMARY KEY,
+        sort_order INTEGER NOT NULL
+      )`,
+      `UPDATE session_profiles AS profile
+       SET sort_order = (
+         SELECT COUNT(*) - 1
+         FROM session_profiles AS preceding
+         WHERE COALESCE(NULLIF(trim(preceding.group_name), ''), '') =
+               COALESCE(NULLIF(trim(profile.group_name), ''), '')
+           AND (
+             COALESCE(datetime(preceding.updated_at), '') < COALESCE(datetime(profile.updated_at), '')
+             OR (
+               COALESCE(datetime(preceding.updated_at), '') = COALESCE(datetime(profile.updated_at), '')
+               AND preceding.id <= profile.id
+             )
+           )
+       )`,
+      `WITH ranked_profiles AS (
+         SELECT trim(group_name) AS group_name, updated_at, id,
+                ROW_NUMBER() OVER (
+                  PARTITION BY trim(group_name)
+                  ORDER BY COALESCE(datetime(updated_at), ''), id
+                ) AS member_rank
+         FROM session_profiles
+         WHERE NULLIF(trim(group_name), '') IS NOT NULL
+       ),
+       ranked_groups AS (
+         SELECT group_name,
+                ROW_NUMBER() OVER (
+                  ORDER BY COALESCE(datetime(updated_at), ''), id
+                ) - 1 AS sort_order
+         FROM ranked_profiles
+         WHERE member_rank = 1
+       )
+       INSERT INTO session_profile_group_order (group_name, sort_order)
+       SELECT group_name, sort_order FROM ranked_groups`,
+      `UPDATE schema_info SET value = '3' WHERE key = 'schema_version'`
+    ]
   }
 ];
 
@@ -169,11 +220,11 @@ function createStatements(database: Database.Database) {
       `INSERT INTO session_profiles (
          id, kind, name, group_name, term, host, port, user_name, shell, arguments, cwd,
          distribution, environment_id, password_secret_id, private_key_secret_id,
-         passphrase_secret_id, updated_at
+         passphrase_secret_id, updated_at, sort_order
        ) VALUES (
          @id, @kind, @name, @group_name, @term, @host, @port, @user_name, @shell, @arguments,
          @cwd, @distribution, @environment_id, @password_secret_id, @private_key_secret_id,
-         @passphrase_secret_id, @updated_at
+         @passphrase_secret_id, @updated_at, @sort_order
        )
        ON CONFLICT(id) DO UPDATE SET
          kind = excluded.kind,
@@ -191,12 +242,63 @@ function createStatements(database: Database.Database) {
          password_secret_id = excluded.password_secret_id,
          private_key_secret_id = excluded.private_key_secret_id,
          passphrase_secret_id = excluded.passphrase_secret_id,
-         updated_at = excluded.updated_at`
+         updated_at = excluded.updated_at,
+         sort_order = excluded.sort_order`
     ),
     getProfile: database.prepare('SELECT * FROM session_profiles WHERE id = ?'),
-    allProfiles: database.prepare(
-      'SELECT * FROM session_profiles ORDER BY datetime(updated_at) ASC, id ASC'
+    allProfiles: database.prepare(`
+      SELECT profile.*
+      FROM session_profiles AS profile
+      LEFT JOIN session_profile_group_order AS group_order
+        ON group_order.group_name = NULLIF(trim(profile.group_name), '')
+      ORDER BY
+        CASE WHEN NULLIF(trim(profile.group_name), '') IS NULL THEN 0 ELSE 1 END,
+        COALESCE(group_order.sort_order, 2147483647),
+        profile.sort_order,
+        COALESCE(datetime(profile.updated_at), ''),
+        profile.id
+    `),
+    maxProfileSortOrder: database.prepare(`
+      SELECT COALESCE(MAX(sort_order), -1) AS value
+      FROM session_profiles
+      WHERE NULLIF(trim(group_name), '') IS ?
+    `),
+    profileIdsByGroup: database.prepare(`
+      SELECT id
+      FROM session_profiles
+      WHERE NULLIF(trim(group_name), '') IS ?
+      ORDER BY sort_order, COALESCE(datetime(updated_at), ''), id
+    `),
+    updateProfileGroupAndOrder: database.prepare(`
+      UPDATE session_profiles
+      SET group_name = @group_name, sort_order = @sort_order
+      WHERE id = @id
+    `),
+    groupOrder: database.prepare(
+      'SELECT sort_order FROM session_profile_group_order WHERE group_name = ?'
     ),
+    maxGroupSortOrder: database.prepare(
+      'SELECT COALESCE(MAX(sort_order), -1) AS value FROM session_profile_group_order'
+    ),
+    insertGroupOrder: database.prepare(
+      'INSERT INTO session_profile_group_order (group_name, sort_order) VALUES (?, ?)'
+    ),
+    allGroupOrders: database.prepare(
+      'SELECT group_name, sort_order FROM session_profile_group_order ORDER BY sort_order, group_name'
+    ),
+    updateGroupSortOrder: database.prepare(
+      'UPDATE session_profile_group_order SET sort_order = ? WHERE group_name = ?'
+    ),
+    deleteGroupOrder: database.prepare(
+      'DELETE FROM session_profile_group_order WHERE group_name = ?'
+    ),
+    clearGroupOrders: database.prepare('DELETE FROM session_profile_group_order'),
+    hasProfilesInGroup: database.prepare(`
+      SELECT 1
+      FROM session_profiles
+      WHERE NULLIF(trim(group_name), '') IS ?
+      LIMIT 1
+    `),
     deleteProfile: database.prepare('DELETE FROM session_profiles WHERE id = ?'),
     upsertEnvironment: database.prepare(
       `INSERT INTO environments (
@@ -390,11 +492,19 @@ export class ProfileDatabase {
   }
 
   public upsertProfile(profile: SessionProfileRecord, updatedAt: string): void {
+    const currentRow = this.statements.getProfile.get(profile.id) as ProfileRow | undefined;
+    const currentGroup = normalizeGroupName(currentRow?.group_name);
+    const groupName = normalizeGroupName(profile.group);
+    const sortOrder =
+      currentRow && currentGroup === groupName
+        ? currentRow.sort_order
+        : this.nextProfileSortOrder(groupName);
+    this.ensureGroupOrder(groupName);
     this.statements.upsertProfile.run({
       id: profile.id,
       kind: profile.kind,
       name: profile.name,
-      group_name: profile.group ?? null,
+      group_name: groupName,
       term: profile.term,
       host: profile.host ?? null,
       port: profile.port ?? null,
@@ -407,8 +517,13 @@ export class ProfileDatabase {
       password_secret_id: profile.secretRefs?.password ?? null,
       private_key_secret_id: profile.secretRefs?.privateKey ?? null,
       passphrase_secret_id: profile.secretRefs?.passphrase ?? null,
-      updated_at: updatedAt
+      updated_at: updatedAt,
+      sort_order: sortOrder
     });
+    if (currentRow && currentGroup !== groupName) {
+      this.compactProfileOrder(currentGroup);
+      this.removeEmptyGroupOrder(currentGroup);
+    }
   }
 
   public getProfileRow(id: string): SessionProfileRecord | undefined {
@@ -423,7 +538,64 @@ export class ProfileDatabase {
   }
 
   public deleteProfile(id: string): void {
+    const currentRow = this.statements.getProfile.get(id) as ProfileRow | undefined;
     this.statements.deleteProfile.run(id);
+    if (currentRow) {
+      const groupName = normalizeGroupName(currentRow.group_name);
+      this.compactProfileOrder(groupName);
+      this.removeEmptyGroupOrder(groupName);
+    }
+  }
+
+  public reorderProfiles(order: ProfileOrderRequest): void {
+    const currentProfiles = this.listProfiles();
+    const currentIds = new Set(currentProfiles.map((profile) => profile.id));
+    const orderedIds = [
+      ...order.ungroupedIds,
+      ...order.groups.flatMap((group) => group.profileIds)
+    ];
+    if (
+      orderedIds.length !== currentProfiles.length ||
+      new Set(orderedIds).size !== orderedIds.length ||
+      orderedIds.some((id) => !currentIds.has(id))
+    ) {
+      throw new Error('Profile order must include every saved profile exactly once');
+    }
+
+    const currentGroups = new Set(
+      currentProfiles
+        .map((profile) => normalizeGroupName(profile.group))
+        .filter((groupName): groupName is string => groupName !== null)
+    );
+    const requestedGroups = new Set<string>();
+    for (const group of order.groups) {
+      const name = normalizeGroupName(group.name);
+      if (!name || !currentGroups.has(name) || requestedGroups.has(name)) {
+        throw new Error('Profile order contains an unknown or duplicate group');
+      }
+      requestedGroups.add(name);
+    }
+
+    this.statements.clearGroupOrders.run();
+    order.groups.forEach((group, index) => {
+      const groupName = normalizeGroupName(group.name);
+      if (!groupName) throw new Error('Profile group name is required');
+      this.statements.insertGroupOrder.run(groupName, index);
+      group.profileIds.forEach((id, sortOrder) => {
+        this.statements.updateProfileGroupAndOrder.run({
+          id,
+          group_name: groupName,
+          sort_order: sortOrder
+        });
+      });
+    });
+    order.ungroupedIds.forEach((id, sortOrder) => {
+      this.statements.updateProfileGroupAndOrder.run({
+        id,
+        group_name: null,
+        sort_order: sortOrder
+      });
+    });
   }
 
   public upsertEnvironment(environment: EnvironmentRecord, updatedAt: string): void {
@@ -507,12 +679,46 @@ export class ProfileDatabase {
     });
   }
 
+  private nextProfileSortOrder(groupName: string | null): number {
+    const result = this.statements.maxProfileSortOrder.get(groupName) as { value: number };
+    return result.value + 1;
+  }
+
+  private ensureGroupOrder(groupName: string | null): void {
+    if (!groupName || this.statements.groupOrder.get(groupName)) return;
+    const result = this.statements.maxGroupSortOrder.get() as { value: number };
+    this.statements.insertGroupOrder.run(groupName, result.value + 1);
+  }
+
+  private compactProfileOrder(groupName: string | null): void {
+    const profileIds = this.statements.profileIdsByGroup.all(groupName) as Array<{ id: string }>;
+    profileIds.forEach(({ id }, sortOrder) => {
+      this.statements.updateProfileGroupAndOrder.run({
+        id,
+        group_name: groupName,
+        sort_order: sortOrder
+      });
+    });
+  }
+
+  private removeEmptyGroupOrder(groupName: string | null): void {
+    if (!groupName || this.statements.hasProfilesInGroup.get(groupName)) return;
+    this.statements.deleteGroupOrder.run(groupName);
+    const groups = this.statements.allGroupOrders.all() as Array<{
+      group_name: string;
+      sort_order: number;
+    }>;
+    groups.forEach((group, sortOrder) => {
+      this.statements.updateGroupSortOrder.run(sortOrder, group.group_name);
+    });
+  }
+
   private profileFromRow(row: ProfileRow): SessionProfileRecord {
     return {
       id: row.id,
       kind: row.kind,
       name: row.name,
-      group: row.group_name ?? undefined,
+      group: normalizeGroupName(row.group_name) ?? undefined,
       term: row.term as SessionProfileRecord['term'],
       host: row.host ?? undefined,
       port: row.port ?? undefined,

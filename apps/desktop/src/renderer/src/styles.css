@@ -1107,6 +1107,114 @@ button:disabled {
   background: var(--gt-hover, #1a2332);
 }
 
+.sidebar-ungrouped-drop-target {
+  display: none;
+}
+
+.sidebar-ungrouped-drop-target.active {
+  display: flex;
+  min-height: 24px;
+  align-items: center;
+  padding: 2px 8px;
+  border: 1px dashed var(--gt-border-strong, #344157);
+  border-radius: var(--gt-radius-sm);
+  color: var(--gt-text-muted, #8e9bb1);
+  font-size: var(--gt-fs-2xs);
+  text-transform: uppercase;
+}
+
+.sidebar-ungrouped-drop-target.is-drop-target {
+  border-color: var(--gt-accent, #75b9a8);
+  color: var(--gt-text, #e4eaf3);
+  background: var(--gt-hover, #1a2332);
+}
+
+.profile-row {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  align-items: center;
+}
+
+.profile-row.grouped {
+  margin-left: 16px;
+}
+
+.profile-row.dragging {
+  opacity: 0.45;
+}
+
+.profile-row.drop-before::before,
+.profile-row.drop-after::after,
+.profile-tree-heading.drop-before::before,
+.profile-tree-heading.drop-after::after {
+  position: absolute;
+  z-index: 1;
+  right: 2px;
+  left: 2px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--gt-accent, #75b9a8);
+  content: '';
+  pointer-events: none;
+}
+
+.profile-row.drop-before::before,
+.profile-tree-heading.drop-before::before {
+  top: -1px;
+}
+
+.profile-row.drop-after::after,
+.profile-tree-heading.drop-after::after {
+  bottom: -1px;
+}
+
+.profile-drag-handle {
+  display: inline-grid;
+  width: 20px;
+  min-width: 20px;
+  height: 28px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--gt-radius-sm);
+  color: var(--gt-text-muted, #71809a);
+  background: transparent;
+  cursor: grab;
+}
+
+.profile-drag-handle:hover,
+.profile-drag-handle:focus-visible {
+  color: var(--gt-text, #e4eaf3);
+  background: var(--gt-hover, #1a2332);
+}
+
+.profile-drag-handle:active {
+  cursor: grabbing;
+}
+
+.profile-tree-heading {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  border-radius: var(--gt-radius-sm);
+}
+
+.profile-tree-heading.drop-append {
+  background: var(--gt-hover, #1a2332);
+  outline: 1px solid var(--gt-accent, #75b9a8);
+}
+
+.profile-tree-heading .profile-tree-header {
+  flex: 1;
+}
+
+.profile-tree-heading .group-drag-handle {
+  width: 22px;
+  height: 24px;
+}
+
 .profile-tree-group {
   display: grid;
   gap: 1px;
@@ -1164,7 +1272,7 @@ button:disabled {
 }
 
 .profile-button.grouped {
-  padding-left: 24px;
+  padding-left: 8px;
 }
 
 .profile-button span,

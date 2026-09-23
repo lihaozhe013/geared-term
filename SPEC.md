@@ -215,6 +215,11 @@ When terminal focus is active, the following behavior is required:
   record. Deleting an SSH session MUST not delete a host environment shared with another session
   having the same `user@host:port` key.
 
+- **SES-013**: The sidebar MUST let users reorder saved sessions within and across groups and
+  reorder named group sections by dragging. Moving a session across groups MUST update its group.
+  The ungrouped section MUST remain at the top, and all manual ordering MUST persist across
+  restarts.
+
 ### 8.2 Temporary SSH connections
 
 - **SES-008**: A user MUST be able to open a one-shot SSH connection from the unlock gate or the
@@ -702,9 +707,9 @@ reported in Settings without blocking startup.
   the install affordance when an update is ready.
 - **UPD-007**: Packaged builds MUST show a localized native prompt when an automatic check finds a
   nightly commit SHA different from the running build. The prompt MUST be shown at most once per
-  process run, offer actions to open Settings → About or dismiss it, and wait until the main window is
-  visible when the app is hidden or minimized. Manual checks MUST continue to report through Settings
-  → About without opening a separate prompt; dismissals MUST NOT persist across restarts.
+  process run, offer actions to open Settings → About or dismiss it, and wait until the main window
+  is visible when the app is hidden or minimized. Manual checks MUST continue to report through
+  Settings → About without opening a separate prompt; dismissals MUST NOT persist across restarts.
 
 ## 23. Performance and reliability
 
