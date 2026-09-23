@@ -73,6 +73,12 @@ import {
   LocalRenameRequestSchema,
   LocalDeleteRequestSchema,
   LocalOpenRequestSchema,
+  LlmWebNavigateRequestSchema,
+  LlmWebOpenRequestSchema,
+  LlmWebPaneBoundsSchema,
+  LlmWebRevealRequestSchema,
+  LlmWebSiteDataRequestSchema,
+  LlmWebVisibleRequestSchema,
   RuntimeInfoSchema,
   UserThemeListSchema,
   SftpDownloadRequestSchema,
@@ -113,6 +119,7 @@ import {
 } from './files/local-files';
 import { KnownHostsStore } from './ssh/known-hosts';
 import { SshSessionManager } from './ssh/ssh-session';
+import { LlmWebPaneManager } from './llm-web/pane';
 import { buildRemoteFileCommand, quoteRemotePath } from './sftp/remote-commands';
 import { TransferManager } from './sftp/transfers';
 import { buildApplicationMenu, executeApplicationMenuAction, type MenuLocale } from './menu';
@@ -166,6 +173,7 @@ let storage: AppStorage;
 let environmentManager: EnvironmentManager;
 let sshSessions: SshSessionManager;
 let transferManager: TransferManager;
+let llmWebPane: LlmWebPaneManager;
 let updateManager: UpdateManager | undefined;
 const aiControllers = new Map<string, AbortController>();
 const aiHistory = new AiHistoryStore(isDevelopment ? process.cwd() : app.getPath('userData'));
@@ -586,6 +594,7 @@ function registerIpc(): void {
     await rebuildApplicationMenu();
     trayController?.sync(saved.keepRunningInBackground, resolveMenuLocale(saved.language));
     sendToRenderer('settings:changed', saved);
+    llmWebPane?.refreshStatus();
     return saved;
   });
   ipcMain.handle('app:open-settings', (_event, input: unknown) => {
@@ -1218,6 +1227,54 @@ function registerIpc(): void {
     await shell.openPath(aiHistory.path);
     return { opened: true };
   });
+
+  const requireMainRenderer = (senderId: number): void => {
+    if (!mainWindow || mainWindow.isDestroyed() || mainWindow.webContents.id !== senderId) {
+      throw new Error('Web pane request did not come from the main window');
+    }
+  };
+  ipcMain.handle('llm-web:open', (event, input: unknown) => {
+    requireMainRenderer(event.sender.id);
+    const request = LlmWebOpenRequestSchema.parse(input);
+    llmWebPane.open(request.site);
+    return SftpOperationResultSchema.parse({ accepted: true });
+  });
+  ipcMain.handle('llm-web:navigate', (event, input: unknown) => {
+    requireMainRenderer(event.sender.id);
+    const request = LlmWebNavigateRequestSchema.parse(input);
+    llmWebPane.navigate(request.action);
+    return SftpOperationResultSchema.parse({ accepted: true });
+  });
+  ipcMain.handle('llm-web:set-bounds', (event, input: unknown) => {
+    requireMainRenderer(event.sender.id);
+    const request = LlmWebPaneBoundsSchema.parse(input);
+    llmWebPane.setBounds(request);
+    return SftpOperationResultSchema.parse({ accepted: true });
+  });
+  ipcMain.handle('llm-web:set-visible', (event, input: unknown) => {
+    requireMainRenderer(event.sender.id);
+    const request = LlmWebVisibleRequestSchema.parse(input);
+    llmWebPane.setVisible(request.visible);
+    return SftpOperationResultSchema.parse({ accepted: true });
+  });
+  ipcMain.handle('llm-web:reveal', (event, input: unknown) => {
+    requireMainRenderer(event.sender.id);
+    const request = LlmWebRevealRequestSchema.parse(input);
+    llmWebPane.revealBlock(request.blockId);
+    return SftpOperationResultSchema.parse({ accepted: true });
+  });
+  ipcMain.handle('llm-web:clear-site-data', async (event, input: unknown) => {
+    requireMainRenderer(event.sender.id);
+    const request = LlmWebSiteDataRequestSchema.parse(input);
+    await llmWebPane.clearSiteData(request.site);
+    return SftpOperationResultSchema.parse({ accepted: true });
+  });
+  ipcMain.on('llm-web:candidates-report', (event, input: unknown) => {
+    llmWebPane?.acceptCandidates(event.sender.id, input);
+  });
+  ipcMain.on('llm-web:adapter-report', (event, input: unknown) => {
+    llmWebPane?.acceptAdapterReport(event.sender.id, input);
+  });
 }
 
 if (hasSingleInstanceLock) {
@@ -1278,6 +1335,26 @@ if (hasSingleInstanceLock) {
           TerminalSnapshotDraftChatEventSchema.parse({ text })
         )
     });
+    llmWebPane = new LlmWebPaneManager({
+      logger,
+      getMainWindow: () => mainWindow,
+      settings: () => storage.settingsSnapshot(),
+      onNavigation: (navigation) => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          sendToMainRenderer('llm-web:navigation-changed', navigation);
+        }
+      },
+      onStatus: (status) => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          sendToMainRenderer('llm-web:status-changed', status);
+        }
+      },
+      onCandidates: (candidates) => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          sendToMainRenderer('llm-web:candidates-changed', candidates);
+        }
+      }
+    });
     process.on('uncaughtException', (error) =>
       logger.error('system', 'Uncaught exception', { error: error.message })
     );
@@ -1324,6 +1401,7 @@ app.on('before-quit', (event) => {
     return;
   }
   quitRequested = true;
+  llmWebPane?.destroy();
   localTerminals?.closeAll();
   sshSessions?.closeAll();
 });

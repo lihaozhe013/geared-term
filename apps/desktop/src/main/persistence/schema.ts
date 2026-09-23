@@ -78,6 +78,9 @@ export const defaultSettings: Settings = {
   keybindings: {},
   terminalFontFallbacks: [],
   defaultAiConnectionId: null,
+  llmWebEnabled: true,
+  llmWebCommandEnhancement: true,
+  llmWebEnhancementOffSites: [],
   globalAiInstructions: ''
 };
 

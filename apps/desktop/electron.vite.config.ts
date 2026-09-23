@@ -36,7 +36,11 @@ export default defineConfig({
     build: {
       externalizeDeps: { exclude: bundledDependencies },
       rollupOptions: {
-        output: { format: 'cjs', entryFileNames: 'index.js' }
+        input: {
+          index: resolve(__dirname, 'src/preload/index.ts'),
+          web: resolve(__dirname, 'src/preload-web/index.ts')
+        },
+        output: { format: 'cjs', entryFileNames: '[name].js' }
       }
     }
   },

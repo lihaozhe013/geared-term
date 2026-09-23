@@ -67,7 +67,12 @@ import type {
   AiHistoryLoadRequest,
   AiHistoryLoadResult,
   AiHistorySaveRequest,
-  AiHistorySaved
+  AiHistorySaved,
+  LlmWebCandidates,
+  LlmWebNavigation,
+  LlmWebPaneBounds,
+  LlmWebPaneStatus,
+  LlmWebSiteId
 } from '@geared-term/protocol';
 
 declare global {
@@ -211,6 +216,17 @@ declare global {
       uploadSftp: (input: SftpUploadRequest) => Promise<SftpOperationResult>;
       downloadSftp: (input: SftpDownloadRequest) => Promise<SftpOperationResult>;
       executeCommandAction: (input: TerminalCommandAction) => Promise<{ accepted: true }>;
+      openWebPane: (site: LlmWebSiteId) => Promise<SftpOperationResult>;
+      webPaneNavigate: (
+        action: 'back' | 'forward' | 'reload' | 'home'
+      ) => Promise<SftpOperationResult>;
+      setWebPaneBounds: (bounds: LlmWebPaneBounds) => Promise<SftpOperationResult>;
+      setWebPaneVisible: (visible: boolean) => Promise<SftpOperationResult>;
+      revealWebBlock: (blockId: string) => Promise<SftpOperationResult>;
+      clearWebSiteData: (site: LlmWebSiteId) => Promise<SftpOperationResult>;
+      onWebPaneNavigation: (listener: (navigation: LlmWebNavigation) => void) => () => void;
+      onWebPaneStatus: (listener: (status: LlmWebPaneStatus) => void) => () => void;
+      onWebPaneCandidates: (listener: (candidates: LlmWebCandidates) => void) => () => void;
       getTerminalLigatureSequences: (fontFamily: string) => Promise<string[]>;
       listEnvironments: () => Promise<EnvironmentRecord[]>;
       onEnvironmentUpdated: (listener: (environment: EnvironmentRecord) => void) => () => void;

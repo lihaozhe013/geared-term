@@ -17,6 +17,7 @@ import type {
 import {
   Bot,
   FolderSync,
+  Globe,
   PanelLeftOpen,
   PanelRightClose,
   PanelRightOpen,
@@ -27,6 +28,7 @@ import { translate } from './i18n';
 import type { MessageKey } from './i18n';
 import { AssistantPanel } from './AssistantPanel';
 import { EnvironmentPanel } from './EnvironmentPanel';
+import { WebPane } from './webpane/WebPane';
 import { ProfileEditor } from './ProfileEditor';
 import { QuickSshDialog } from './QuickSshDialog';
 import { Sidebar } from './Sidebar';
@@ -82,6 +84,9 @@ const defaultSettings: SettingsRecord = {
   terminalFontFallbacks: [],
   defaultAiConnectionId: null,
   globalAiInstructions: '',
+  llmWebEnabled: true,
+  llmWebCommandEnhancement: true,
+  llmWebEnhancementOffSites: [],
   keybindings: {}
 };
 
@@ -453,7 +458,12 @@ export function App(): React.JSX.Element {
       const sidebarWidth = clampWidth(drag.startWidth + event.clientX - drag.startX, 170, 520);
       uiStateRef.current = { ...uiStateRef.current, sidebarWidth };
     } else {
-      const rightPanelWidth = clampWidth(drag.startWidth - (event.clientX - drag.startX), 280, 760);
+      const maximum = Math.max(280, Math.min(1400, window.innerWidth - 520));
+      const rightPanelWidth = clampWidth(
+        drag.startWidth - (event.clientX - drag.startX),
+        280,
+        maximum
+      );
       uiStateRef.current = { ...uiStateRef.current, rightPanelWidth };
     }
     setUiState(uiStateRef.current);
@@ -505,6 +515,17 @@ export function App(): React.JSX.Element {
   useEffect(() => {
     if (uiState.rightPanel === 'assistant' && !uiState.rightPanelCollapsed) {
       setAssistantKeepAlive(true);
+    }
+  }, [uiState.rightPanel, uiState.rightPanelCollapsed]);
+
+  // The web pane stays mounted once opened: the native view lives in the main
+  // process and the candidate subscription must survive panel switches.
+  const [webKeepAlive, setWebKeepAlive] = useState(
+    uiState.rightPanel === 'web' && !uiState.rightPanelCollapsed
+  );
+  useEffect(() => {
+    if (uiState.rightPanel === 'web' && !uiState.rightPanelCollapsed) {
+      setWebKeepAlive(true);
     }
   }, [uiState.rightPanel, uiState.rightPanelCollapsed]);
 
@@ -598,6 +619,18 @@ export function App(): React.JSX.Element {
     });
   }, [activeTab?.request, uiState, t]);
 
+  const toggleWeb = useCallback((): void => {
+    const next: UiStateRecord = {
+      ...uiState,
+      rightPanel: 'web',
+      rightPanelCollapsed: uiState.rightPanel === 'web' && !uiState.rightPanelCollapsed
+    };
+    setUiState(next);
+    void window.geared.saveUiState(next).catch((reason: unknown) => {
+      setError(reason instanceof Error ? reason.message : t('errSaveUiState'));
+    });
+  }, [uiState, t]);
+
   const saveSettings = useCallback(
     async (nextSettings: SettingsRecord): Promise<void> => {
       try {
@@ -642,6 +675,7 @@ export function App(): React.JSX.Element {
     toggleAssistant,
     toggleSftp,
     toggleEnvironment,
+    toggleWeb,
     cycleTab,
     zoomFont,
     tabs,
@@ -658,6 +692,7 @@ export function App(): React.JSX.Element {
     toggleAssistant,
     toggleSftp,
     toggleEnvironment,
+    toggleWeb,
     cycleTab,
     zoomFont,
     tabs,
@@ -691,10 +726,14 @@ export function App(): React.JSX.Element {
         handlers.toggleEnvironment();
         return;
       }
+      if (command === 'toggle-web') {
+        handlers.toggleWeb();
+        return;
+      }
       if (command === 'cycle-panels') {
-        const order = ['assistant', 'sftp', 'environment'] as const;
+        const order = ['assistant', 'sftp', 'environment', 'web'] as const;
         const index = order.indexOf(handlers.uiState.rightPanel as (typeof order)[number]);
-        const next = order[(index + 1) % order.length] as 'assistant' | 'sftp' | 'environment';
+        const next = order[(index + 1) % order.length] ?? 'assistant';
         const nextState: UiStateRecord = {
           ...handlers.uiState,
           rightPanel: next,
@@ -704,7 +743,10 @@ export function App(): React.JSX.Element {
         void window.geared.saveUiState(nextState).catch(() => undefined);
         return;
       }
-      if (command === 'terminal-add-screen-to-chat' || command === 'terminal-open-screen-snapshot') {
+      if (
+        command === 'terminal-add-screen-to-chat' ||
+        command === 'terminal-open-screen-snapshot'
+      ) {
         const activeId = handlers.activeTabId ?? handlers.tabs[0]?.id;
         const control = activeId ? snapshotControls.current.get(activeId) : undefined;
         if (command === 'terminal-add-screen-to-chat') control?.addScreenToChat();
@@ -950,6 +992,15 @@ export function App(): React.JSX.Element {
               >
                 <SquareTerminal size={13} aria-hidden="true" /> {t('panelEnvironment')}
               </button>
+              <button
+                type="button"
+                className="right-panel-pill"
+                role="tab"
+                aria-selected={uiState.rightPanel === 'web'}
+                onClick={toggleWeb}
+              >
+                <Globe size={13} aria-hidden="true" /> {t('panelWeb')}
+              </button>
               <span className="right-panel-spacer" />
               <button
                 type="button"
@@ -984,6 +1035,19 @@ export function App(): React.JSX.Element {
                 onPendingHistoryConsumed={() => setPendingHistoryId(null)}
                 pendingChatText={pendingChatText}
                 onPendingChatTextConsumed={() => setPendingChatText(null)}
+              />
+            ) : null}
+            {webKeepAlive ? (
+              <WebPane
+                hidden={uiState.rightPanel !== 'web' || uiState.rightPanelCollapsed}
+                modalOpen={
+                  showProfileEditor || showQuickSsh || Boolean(vaultStatus && !vaultStatus.unlocked)
+                }
+                enhancementEnabled={settings.llmWebEnabled && settings.llmWebCommandEnhancement}
+                targetSessionId={activeTab?.id}
+                sessionLabel={activeTab?.name}
+                allowRiskyRun={settings.allowRiskyRun}
+                language={settings.language}
               />
             ) : null}
             {uiState.rightPanel === 'sftp' &&

@@ -73,6 +73,28 @@ check(
   'preload should not tamper with webPreferences'
 );
 
+const preloadWebBundle = await readIfExists(join(desktopRoot, 'out', 'preload', 'web.js'));
+if (!preloadWebBundle) {
+  failures.push('built web-preload bundle not found in out/preload/web.js');
+} else {
+  // The embedded-site preload runs in an isolated world and must keep the
+  // page's main world free of any application bridge.
+  check(
+    '[preload-web] exposes nothing to the page world',
+    !preloadWebBundle.includes('exposeInMainWorld')
+  );
+  check(
+    '[preload-web] has no node: imports',
+    !NODE_IMPORT_PATTERN.test(preloadWebBundle),
+    'found a node: module specifier'
+  );
+  check(
+    '[preload-web] does not embed node integration flags',
+    !preloadWebBundle.includes('nodeIntegration'),
+    'web preload should not tamper with webPreferences'
+  );
+}
+
 check('[main] enforces context isolation', /contextIsolation:\s*(true|!0)/u.test(mainBundle));
 check('[main] enforces the renderer sandbox', /sandbox:\s*(true|!0)/u.test(mainBundle));
 check('[main] denies window.open', mainBundle.includes('setWindowOpenHandler'));

@@ -1,7 +1,7 @@
 import { appendFileSync, existsSync, mkdirSync, renameSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-export type LogCategory = 'app' | 'ssh' | 'terminal' | 'assistant' | 'system';
+export type LogCategory = 'app' | 'ssh' | 'terminal' | 'assistant' | 'web' | 'system';
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 const maxBytes = 2 * 1024 * 1024;

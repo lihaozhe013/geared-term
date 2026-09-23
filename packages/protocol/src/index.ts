@@ -158,6 +158,10 @@ export const LlmWebVisibleRequestSchema = z.object({ visible: z.boolean() }).str
 
 export const LlmWebSiteDataRequestSchema = z.object({ site: LlmWebSiteIdSchema }).strict();
 
+export const LlmWebRevealRequestSchema = z
+  .object({ blockId: z.string().min(1).max(128) })
+  .strict();
+
 export const LlmWebNavigationSchema = z
   .object({
     site: LlmWebSiteIdSchema.nullable(),

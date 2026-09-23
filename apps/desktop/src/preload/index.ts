@@ -59,6 +59,15 @@ import {
   LocalRenameRequestSchema,
   LocalDeleteRequestSchema,
   LocalOpenRequestSchema,
+  LlmWebCandidatesSchema,
+  LlmWebNavigationSchema,
+  LlmWebNavigateRequestSchema,
+  LlmWebOpenRequestSchema,
+  LlmWebPaneBoundsSchema,
+  LlmWebPaneStatusSchema,
+  LlmWebRevealRequestSchema,
+  LlmWebSiteDataRequestSchema,
+  LlmWebVisibleRequestSchema,
   RuntimeInfoSchema,
   UserThemeListSchema,
   SftpOperationResultSchema,
@@ -112,6 +121,11 @@ import {
   type LocalMkdirRequest,
   type LocalRenameRequest,
   type TerminalCommandAction,
+  type LlmWebCandidates,
+  type LlmWebNavigation,
+  type LlmWebPaneBounds,
+  type LlmWebPaneStatus,
+  type LlmWebSiteId,
   type SshProfileTerminalRequest,
   type SshTerminalRequest,
   type UiStateRecord,
@@ -582,6 +596,58 @@ const api = Object.freeze({
   executeCommandAction: async (input: TerminalCommandAction) => {
     const action = TerminalCommandActionSchema.parse(input);
     return ipcRenderer.invoke('terminal:command-action', action) as Promise<{ accepted: true }>;
+  },
+  openWebPane: async (site: LlmWebSiteId) => {
+    const request = LlmWebOpenRequestSchema.parse({ site });
+    return SftpOperationResultSchema.parse(await ipcRenderer.invoke('llm-web:open', request));
+  },
+  webPaneNavigate: async (action: 'back' | 'forward' | 'reload' | 'home') => {
+    const request = LlmWebNavigateRequestSchema.parse({ action });
+    return SftpOperationResultSchema.parse(await ipcRenderer.invoke('llm-web:navigate', request));
+  },
+  setWebPaneBounds: async (bounds: LlmWebPaneBounds) => {
+    const request = LlmWebPaneBoundsSchema.parse(bounds);
+    return SftpOperationResultSchema.parse(await ipcRenderer.invoke('llm-web:set-bounds', request));
+  },
+  setWebPaneVisible: async (visible: boolean) => {
+    const request = LlmWebVisibleRequestSchema.parse({ visible });
+    return SftpOperationResultSchema.parse(
+      await ipcRenderer.invoke('llm-web:set-visible', request)
+    );
+  },
+  revealWebBlock: async (blockId: string) => {
+    const request = LlmWebRevealRequestSchema.parse({ blockId });
+    return SftpOperationResultSchema.parse(await ipcRenderer.invoke('llm-web:reveal', request));
+  },
+  clearWebSiteData: async (site: LlmWebSiteId) => {
+    const request = LlmWebSiteDataRequestSchema.parse({ site });
+    return SftpOperationResultSchema.parse(
+      await ipcRenderer.invoke('llm-web:clear-site-data', request)
+    );
+  },
+  onWebPaneNavigation: (listener: (navigation: LlmWebNavigation) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, payload: unknown): void => {
+      const result = LlmWebNavigationSchema.safeParse(payload);
+      if (result.success) listener(result.data);
+    };
+    ipcRenderer.on('llm-web:navigation-changed', handler);
+    return () => ipcRenderer.removeListener('llm-web:navigation-changed', handler);
+  },
+  onWebPaneStatus: (listener: (status: LlmWebPaneStatus) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, payload: unknown): void => {
+      const result = LlmWebPaneStatusSchema.safeParse(payload);
+      if (result.success) listener(result.data);
+    };
+    ipcRenderer.on('llm-web:status-changed', handler);
+    return () => ipcRenderer.removeListener('llm-web:status-changed', handler);
+  },
+  onWebPaneCandidates: (listener: (candidates: LlmWebCandidates) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, payload: unknown): void => {
+      const result = LlmWebCandidatesSchema.safeParse(payload);
+      if (result.success) listener(result.data);
+    };
+    ipcRenderer.on('llm-web:candidates-changed', handler);
+    return () => ipcRenderer.removeListener('llm-web:candidates-changed', handler);
   },
   getTerminalLigatureSequences: async (fontFamily: string) => {
     const request = TerminalLigatureRequestSchema.parse({ fontFamily });
