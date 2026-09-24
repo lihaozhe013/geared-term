@@ -24,11 +24,14 @@ export const StructuredErrorSchema = z.object({
   details: z.record(z.string(), z.unknown()).optional()
 });
 
+export const InstallChannelSchema = z.enum(['windows-installer', 'homebrew-cask', 'manual']);
+
 export const AppInfoSchema = z.object({
   name: z.literal('Geared Term'),
   version: z.string().min(1),
   isPackaged: z.boolean(),
-  platform: z.enum(['win32', 'darwin', 'linux', 'freebsd', 'openbsd', 'sunos', 'aix'])
+  platform: z.enum(['win32', 'darwin', 'linux', 'freebsd', 'openbsd', 'sunos', 'aix']),
+  installChannel: InstallChannelSchema.default('manual')
 });
 
 export const UpdateStatusSchema = z
@@ -1074,6 +1077,7 @@ export const EnvironmentProbeRequestSchema = z
   });
 
 export type AppInfo = z.infer<typeof AppInfoSchema>;
+export type InstallChannel = z.infer<typeof InstallChannelSchema>;
 export type UpdateStatus = z.infer<typeof UpdateStatusSchema>;
 export type ErrorCode = z.infer<typeof ErrorCodeSchema>;
 export type StructuredError = z.infer<typeof StructuredErrorSchema>;

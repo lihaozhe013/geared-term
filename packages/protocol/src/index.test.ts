@@ -26,7 +26,7 @@ import {
 } from './index';
 
 describe('protocol schemas', () => {
-  it('accepts app information', () => {
+  it('accepts app information and defaults the install channel', () => {
     const result = AppInfoSchema.safeParse({
       name: 'Geared Term',
       version: '0.1.0',
@@ -34,6 +34,25 @@ describe('protocol schemas', () => {
       platform: 'win32'
     });
     expect(result.success).toBe(true);
+    if (result.success) expect(result.data.installChannel).toBe('manual');
+    expect(
+      AppInfoSchema.safeParse({
+        name: 'Geared Term',
+        version: '0.1.0',
+        isPackaged: true,
+        platform: 'darwin',
+        installChannel: 'homebrew-cask'
+      }).success
+    ).toBe(true);
+    expect(
+      AppInfoSchema.safeParse({
+        name: 'Geared Term',
+        version: '0.1.0',
+        isPackaged: true,
+        platform: 'darwin',
+        installChannel: 'apt'
+      }).success
+    ).toBe(false);
   });
 
   it('rejects an untrusted terminal message shape', () => {

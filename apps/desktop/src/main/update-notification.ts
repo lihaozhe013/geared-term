@@ -1,4 +1,5 @@
 import type { BrowserWindow, MessageBoxOptions } from 'electron';
+import type { InstallChannel } from '@geared-term/protocol';
 import type { Logger } from './logging';
 import type { MenuLocale } from './menu';
 import type { NightlyRelease } from './update-release';
@@ -17,7 +18,8 @@ export class UpdateNotificationController {
     private readonly getMainWindow: () => BrowserWindow | undefined,
     private readonly getLocale: () => MenuLocale,
     private readonly openAboutSettings: () => void,
-    private readonly showMessageBox: ShowMessageBox
+    private readonly showMessageBox: ShowMessageBox,
+    private readonly getInstallChannel: () => InstallChannel = () => 'manual'
   ) {}
 
   public notify(release: NightlyRelease): void {
@@ -46,11 +48,20 @@ export class UpdateNotificationController {
 
     this.pendingRelease = undefined;
     const chinese = this.getLocale() === 'zh-CN';
+    const commit = release.commitSha.slice(0, 7);
+    const homebrewManaged = this.getInstallChannel() === 'homebrew-cask';
+    const guidance = chinese
+      ? homebrewManaged
+        ? '\u5f53\u524d\u5b89\u88c5\u7531 Homebrew \u7ba1\u7406\uff0c\u8fd0\u884c brew upgrade --cask geared-term \u5373\u53ef\u5347\u7ea7\u3002'
+        : '\u524d\u5f80\u8bbe\u7f6e \u2192 \u5173\u4e8e\u67e5\u770b\u66f4\u65b0\u9009\u9879\u3002'
+      : homebrewManaged
+        ? 'This install is managed by Homebrew: run brew upgrade --cask geared-term to update.'
+        : 'Open Settings → About to view update options.';
     const options: MessageBoxOptions = chinese
       ? {
           type: 'info',
           title: '\u53d1\u73b0\u65b0\u7248\u672c',
-          message: `\u53d1\u73b0\u4e86\u8f83\u65b0\u7684 nightly \u7248\u672c\uff08\u63d0\u4ea4 ${release.commitSha.slice(0, 7)}\uff09\u3002\u524d\u5f80\u8bbe\u7f6e \u2192 \u5173\u4e8e\u67e5\u770b\u66f4\u65b0\u9009\u9879\u3002`,
+          message: `\u53d1\u73b0\u4e86\u8f83\u65b0\u7684 nightly \u7248\u672c\uff08\u63d0\u4ea4 ${commit}\uff09\u3002${guidance}`,
           buttons: ['\u524d\u5f80\u8bbe\u7f6e', '\u7a0d\u540e'],
           defaultId: 0,
           cancelId: 1
@@ -58,7 +69,7 @@ export class UpdateNotificationController {
       : {
           type: 'info',
           title: 'Update available',
-          message: `A newer nightly build is available (${release.commitSha.slice(0, 7)}). Open Settings → About to view update options.`,
+          message: `A newer nightly build is available (${commit}). ${guidance}`,
           buttons: ['Open Settings', 'Later'],
           defaultId: 0,
           cancelId: 1

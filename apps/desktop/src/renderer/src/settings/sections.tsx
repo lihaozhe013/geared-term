@@ -551,6 +551,8 @@ export function AiAssistantSection({
   );
 }
 
+const homebrewUpgradeCommand = 'brew upgrade --cask geared-term';
+
 export function AboutSection({
   info,
   runtime,
@@ -602,6 +604,12 @@ export function AboutSection({
             </p>
           ) : null}
           {runtime ? <p className="settings-about-path">{runtime.configDirectory}</p> : null}
+          {info?.isPackaged && info.installChannel === 'homebrew-cask' ? (
+            <p className="settings-about-path">
+              {t('homebrewUpgradeHint')}{' '}
+              <code className="settings-about-command">{homebrewUpgradeCommand}</code>
+            </p>
+          ) : null}
         </div>
       </div>
       <div className="settings-actions-row">

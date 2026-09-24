@@ -135,8 +135,12 @@ import { EnvironmentManager } from './environment/manager';
 import { buildAssistantContext } from './ai/context';
 import { UpdateManager } from './update-manager';
 import { UpdateNotificationController } from './update-notification';
+import { currentInstallChannelProbe, detectInstallChannel } from './install-channel';
 
 const isDevelopment = !app.isPackaged;
+// The delivery channel never changes during a run, so probe it once for the About panel and the
+// update prompt.
+const installChannel = detectInstallChannel(currentInstallChannelProbe());
 // Depth of in-flight key-capture sessions (shortcut recording in the settings
 // window). While positive, the application menu is detached so its registered
 // accelerators cannot swallow the keys being recorded.
@@ -446,7 +450,8 @@ function registerIpc(): void {
       name: 'Geared Term',
       version: app.getVersion(),
       isPackaged: app.isPackaged,
-      platform: process.platform
+      platform: process.platform,
+      installChannel
     });
   });
 
@@ -1311,7 +1316,8 @@ if (hasSingleInstanceLock) {
       () => mainWindow,
       () => resolveMenuLocale(storage.settingsSnapshot().language),
       () => settingsWindow.open('about'),
-      (parent, options) => dialog.showMessageBox(parent, options)
+      (parent, options) => dialog.showMessageBox(parent, options),
+      () => installChannel
     );
     historyWindow = new HistoryWindowManager(logger, isDevelopment);
     await rebuildApplicationMenu();

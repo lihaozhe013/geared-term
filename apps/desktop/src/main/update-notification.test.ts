@@ -89,4 +89,47 @@ describe('UpdateNotificationController', () => {
     );
     expect(openAboutSettings).not.toHaveBeenCalled();
   });
+
+  it('points Homebrew-managed installs at the cask upgrade command', async () => {
+    const window = makeWindow(() => true);
+    const showMessageBox = vi
+      .fn<(parent: BrowserWindow, options: MessageBoxOptions) => Promise<{ response: number }>>()
+      .mockResolvedValue({ response: 1 });
+    const homebrewController = new UpdateNotificationController(
+      makeLogger(),
+      () => window,
+      () => 'en-US',
+      vi.fn(),
+      showMessageBox,
+      () => 'homebrew-cask'
+    );
+
+    homebrewController.notify(release);
+    await vi.waitFor(() => expect(showMessageBox).toHaveBeenCalledOnce());
+
+    expect(showMessageBox).toHaveBeenCalledWith(
+      window,
+      expect.objectContaining({
+        message: expect.stringContaining('brew upgrade --cask geared-term')
+      })
+    );
+
+    showMessageBox.mockClear();
+    const manualController = new UpdateNotificationController(
+      makeLogger(),
+      () => window,
+      () => 'zh-CN',
+      vi.fn(),
+      showMessageBox
+    );
+    manualController.notify(release);
+    await vi.waitFor(() => expect(showMessageBox).toHaveBeenCalledOnce());
+
+    expect(showMessageBox).toHaveBeenCalledWith(
+      window,
+      expect.objectContaining({
+        message: expect.not.stringContaining('brew upgrade')
+      })
+    );
+  });
 });

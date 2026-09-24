@@ -1968,6 +1968,11 @@ button:disabled {
   overflow-wrap: anywhere;
 }
 
+.settings-about-command {
+  font-family: 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;
+  user-select: all;
+}
+
 /* Theme-derived syntax highlighting (replaces the fixed vendor highlight theme) */
 
 .hljs {
