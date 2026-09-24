@@ -48,7 +48,9 @@ work happens in a single window instead of scattered tools.
 
 - xterm.js rendering with WebGL, Unicode/CJK/emoji, ligature detection, and search
 - Terminal font zoom, custom font fallback chains, and configurable line height
-- Built-in dark theme plus the Catppuccin family, and user themes loaded from JSON files
+- 32 built-in themes across Geared, Catppuccin, Dracula, Tokyo Night, Gruvbox, Nord, Solarized, Rosé
+  Pine, Ayu, Kanagawa, GitHub, Atom One, Everforest, and Night Owl, plus user themes loaded from
+  JSON files
 - Rebindable keyboard shortcuts with conflict reporting
 - English and Simplified Chinese interfaces, and background-to-tray mode on Windows/Linux
 
@@ -94,6 +96,7 @@ A few things to know about nightlies:
 - [`SPEC.md`](SPEC.md) — normative behavior specification
 - [`docs/architecture.md`](docs/architecture.md) — implementation design and process boundaries
 - [`docs/requirements-matrix.md`](docs/requirements-matrix.md) — implementation status and evidence
+- [`docs/theme-sources.md`](docs/theme-sources.md) — built-in theme sources, revisions, and licenses
 
 ## License
 

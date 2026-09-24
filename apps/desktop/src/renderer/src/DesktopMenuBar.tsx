@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronRight } from 'lucide-react';
-import type { SettingsRecord } from '@geared-term/protocol';
+import { groupThemeNames, type SettingsRecord } from '@geared-term/protocol';
 import {
   formatKeybinding,
   normalizePlatform,
@@ -64,6 +64,7 @@ type MenuLabels = {
   environment: string;
   cyclePanels: string;
   theme: string;
+  customThemes: string;
   language: string;
   system: string;
   window: string;
@@ -105,6 +106,7 @@ const labels: Record<'en-US' | 'zh-CN', MenuLabels> = {
     environment: 'Environment context',
     cyclePanels: 'Cycle terminal focus',
     theme: 'Theme',
+    customThemes: 'Custom',
     language: 'Language',
     system: 'Follow system',
     window: 'Window',
@@ -144,6 +146,7 @@ const labels: Record<'en-US' | 'zh-CN', MenuLabels> = {
     environment: '环境上下文',
     cyclePanels: '循环终端焦点',
     theme: '主题',
+    customThemes: 'Custom',
     language: '语言',
     system: '跟随系统',
     window: '窗口',
@@ -185,6 +188,7 @@ function createMenus(
   bindings: KeybindingMap
 ): MenuDefinition[] {
   const t = labels[resolveLocale(language)];
+  const themeGroups = groupThemeNames(themeNames, t.customThemes);
   const hint = (command: keyof KeybindingMap): string =>
     formatKeybinding(bindings[command], normalizePlatform(window.geared.platform));
   return [
@@ -248,8 +252,14 @@ function createMenus(
         submenu(
           'themes',
           t.theme,
-          themeNames.map((name) =>
-            action(`theme-${name}`, name, `theme:${name}`, { checked: name === theme })
+          themeGroups.map((group) =>
+            submenu(
+              `theme-family-${group.id}`,
+              group.label,
+              group.themes.map((name) =>
+                action(`theme-${name}`, name, `theme:${name}`, { checked: name === theme })
+              )
+            )
           )
         ),
         submenu('languages', t.language, [
@@ -287,6 +297,17 @@ function MenuEntry({
   onAction: (action: string) => void;
 }): React.JSX.Element {
   const [submenuOpen, setSubmenuOpen] = useState(false);
+  const [submenuFlipped, setSubmenuFlipped] = useState(false);
+  const nestedPopoverRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!submenuOpen || !nestedPopoverRef.current) return;
+    const frame = requestAnimationFrame(() => {
+      const bounds = nestedPopoverRef.current?.getBoundingClientRect();
+      setSubmenuFlipped(Boolean(bounds && bounds.right > window.innerWidth));
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [submenuOpen]);
 
   if (item.kind === 'separator') {
     return <div className="desktop-menu-separator" role="separator" />;
@@ -312,7 +333,11 @@ function MenuEntry({
           <ChevronRight size={14} aria-hidden="true" />
         </button>
         {submenuOpen ? (
-          <div className="desktop-menu-popover desktop-menu-popover-nested" role="menu">
+          <div
+            ref={nestedPopoverRef}
+            className={`desktop-menu-popover desktop-menu-popover-nested${submenuFlipped ? ' desktop-menu-popover-flipped' : ''}`}
+            role="menu"
+          >
             {item.items.map((child) => (
               <MenuEntry key={child.id} item={child} onAction={onAction} />
             ))}

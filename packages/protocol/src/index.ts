@@ -942,15 +942,8 @@ export const LocalOpenRequestSchema = z
   })
   .strict();
 
-export const BUILTIN_THEME_NAMES = [
-  'Geared Dark',
-  'Midnight',
-  'Light',
-  'Catppuccin Mocha',
-  'Catppuccin Macchiato',
-  'Catppuccin Frappé',
-  'Catppuccin Latte'
-] as const;
+export { BUILTIN_THEME_GROUPS, BUILTIN_THEME_NAMES, groupThemeNames } from './theme-catalog';
+export type { BuiltinThemeGroup, ThemeMenuGroup } from './theme-catalog';
 
 const ThemeColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/u);
 

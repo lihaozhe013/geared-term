@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { normalizeTerminalFontFallbacks } from '@geared-term/protocol';
+import { groupThemeNames, normalizeTerminalFontFallbacks } from '@geared-term/protocol';
 import type {
   AppInfo,
   InvalidThemeFile,
@@ -104,6 +104,7 @@ export function AppearanceSection({
     terminalFontFallbacks: settings.terminalFontFallbacks.map((entry) => ({ ...entry }))
   }));
   const [status, setStatus] = useState<string | null>(null);
+  const themeGroups = groupThemeNames(themeNames, t('customThemes'));
 
   const update = <K extends keyof SettingsRecord>(key: K, value: SettingsRecord[K]): void => {
     setDraft((current) => ({ ...current, [key]: value }));
@@ -159,10 +160,14 @@ export function AppearanceSection({
           value={draft.theme}
           onChange={(event) => update('theme', event.target.value)}
         >
-          {themeNames.map((theme) => (
-            <option key={theme} value={theme}>
-              {theme}
-            </option>
+          {themeGroups.map((group) => (
+            <optgroup key={group.id} label={group.label}>
+              {group.themes.map((theme) => (
+                <option key={theme} value={theme}>
+                  {theme}
+                </option>
+              ))}
+            </optgroup>
           ))}
         </select>
       </Row>

@@ -203,6 +203,13 @@ textarea {
 .desktop-menu-popover-nested {
   top: -6px;
   left: calc(100% + 4px);
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+}
+
+.desktop-menu-popover-flipped {
+  right: calc(100% + 4px);
+  left: auto;
 }
 
 .desktop-menu-entry {

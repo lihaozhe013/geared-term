@@ -1,4 +1,5 @@
 import { app, BrowserWindow, Menu, type MenuItemConstructorOptions } from 'electron';
+import { groupThemeNames } from '@geared-term/protocol';
 import {
   resolveKeybindings,
   toElectronAccelerator,
@@ -368,11 +369,14 @@ export function buildApplicationMenu(state: MenuState, commands: MenuCommands): 
         },
         {
           label: t.theme,
-          submenu: state.themeNames.map((name) => ({
-            type: 'radio' as const,
-            label: name,
-            checked: name === state.theme,
-            click: () => commands.onCommand(`theme:${name}`)
+          submenu: groupThemeNames(state.themeNames, 'Custom').map((group) => ({
+            label: group.label,
+            submenu: group.themes.map((name) => ({
+              type: 'radio' as const,
+              label: name,
+              checked: name === state.theme,
+              click: () => commands.onCommand(`theme:${name}`)
+            }))
           }))
         },
         {

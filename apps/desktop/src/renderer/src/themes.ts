@@ -1,6 +1,7 @@
 import type { ISearchDecorationOptions } from '@xterm/addon-search';
 import type { ITheme } from '@xterm/xterm';
 import type { ThemeColors, UserTheme } from '@geared-term/protocol';
+import { additionalThemeColors } from './popular-theme-seeds';
 
 export type Palette = {
   background: string;
@@ -312,7 +313,10 @@ export const builtinThemes: Record<string, Palette> = {
   'Catppuccin Mocha': CATPPUCCIN_MOCHA,
   'Catppuccin Macchiato': CATPPUCCIN_MACCHIATO,
   'Catppuccin Frappé': CATPPUCCIN_FRAPPE,
-  'Catppuccin Latte': CATPPUCCIN_LATTE
+  'Catppuccin Latte': CATPPUCCIN_LATTE,
+  ...Object.fromEntries(
+    Object.entries(additionalThemeColors).map(([name, colors]) => [name, derivePalette(colors)])
+  )
 };
 
 export const builtinThemeNames = Object.keys(builtinThemes);
@@ -418,8 +422,13 @@ export function derivePalette(colors: ThemeColors): Palette {
   const bright = colors.bright ?? accent;
   const danger = colors.danger ?? (dark ? '#f38ba8' : '#d20f39');
   const neutral = dark ? '#000000' : '#ffffff';
-  const searchYellow = dark ? '#f9e2af' : '#df8e1d';
-  const searchPeach = dark ? '#fab387' : '#fe640b';
+  const ansiColors = colors.ansi?.length === 16 ? colors.ansi : undefined;
+  const searchYellow = ansiColors?.[3] ?? (dark ? '#f9e2af' : '#df8e1d');
+  const searchPeach = ansiColors
+    ? mix(ansiColors[1] as string, searchYellow, 0.55)
+    : dark
+      ? '#fab387'
+      : '#fe640b';
   return {
     background: colors.background,
     foreground: colors.foreground,

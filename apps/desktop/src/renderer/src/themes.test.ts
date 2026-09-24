@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeTerminalFontFallbacks } from '@geared-term/protocol';
+import {
+  BUILTIN_THEME_GROUPS,
+  BUILTIN_THEME_NAMES,
+  groupThemeNames,
+  normalizeTerminalFontFallbacks
+} from '@geared-term/protocol';
 import {
   builtinThemes,
   builtinThemeNames,
@@ -49,6 +54,54 @@ describe('themes', () => {
     ]) {
       expect(builtinThemeNames).toContain(name);
     }
+  });
+
+  it('keeps the shared grouped catalog in sync with all builtin palettes', () => {
+    expect(BUILTIN_THEME_NAMES).toHaveLength(32);
+    expect(new Set(BUILTIN_THEME_NAMES).size).toBe(BUILTIN_THEME_NAMES.length);
+    expect(builtinThemeNames).toEqual(BUILTIN_THEME_NAMES);
+    expect(BUILTIN_THEME_GROUPS.flatMap((group) => group.themes)).toEqual(BUILTIN_THEME_NAMES);
+  });
+
+  it('provides complete valid ANSI palettes and readable base text for every builtin', () => {
+    const contrastRatio = (foreground: string, background: string): number => {
+      const luminance = (color: string): number => {
+        const channels = color
+          .slice(1)
+          .match(/.{2}/gu)
+          ?.map((channel) => Number.parseInt(channel, 16) / 255)
+          .map((value) => (value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4));
+        if (!channels || channels.length !== 3) throw new Error(`Invalid color: ${color}`);
+        return 0.2126 * channels[0]! + 0.7152 * channels[1]! + 0.0722 * channels[2]!;
+      };
+      const values = [luminance(foreground), luminance(background)].sort((a, b) => b - a);
+      return ((values[0] ?? 0) + 0.05) / ((values[1] ?? 0) + 0.05);
+    };
+
+    for (const [name, palette] of Object.entries(builtinThemes)) {
+      expect(palette.ansi, name).toHaveLength(16);
+      for (const color of [
+        ...Object.entries(palette)
+          .filter(([key]) => key !== 'extendedAnsi' && key !== 'ansi')
+          .map(([, value]) => value as string),
+        ...palette.ansi
+      ]) {
+        expect(color, name).toMatch(/^#[0-9a-f]{6}$/iu);
+      }
+      expect(contrastRatio(palette.foreground, palette.background), name).toBeGreaterThanOrEqual(
+        4.5
+      );
+    }
+  });
+
+  it('groups user themes separately while keeping builtin overrides in their family', () => {
+    const groups = groupThemeNames(
+      [...BUILTIN_THEME_NAMES, 'Ocean Blue', 'Catppuccin Mocha'],
+      'Custom'
+    );
+    expect(groups.find((group) => group.id === 'catppuccin')?.themes).toContain('Catppuccin Mocha');
+    expect(groups.find((group) => group.id === 'custom')?.themes).toEqual(['Ocean Blue']);
+    expect(groups.flatMap((group) => group.themes)).toHaveLength(33);
   });
 
   it('derives a full coordinated palette from a minimal theme', () => {
