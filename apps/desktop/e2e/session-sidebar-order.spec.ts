@@ -180,3 +180,88 @@ test('reorders sessions and groups, moves sessions between sections, and restore
   await page.reload();
   await expect.poll(groupNames).toEqual(['Beta', 'Alpha']);
 });
+
+test('keeps the create menu inside the viewport and flips or scrolls as needed', async () => {
+  const { page } = session;
+  const trigger = page.getByRole('button', { name: 'New session profile' });
+  const menu = page.getByRole('menu', { name: 'New session profile' });
+
+  await trigger.click();
+  let triggerBox = await trigger.boundingBox();
+  let menuBox = await menu.boundingBox();
+  expect(triggerBox).not.toBeNull();
+  expect(menuBox).not.toBeNull();
+  expect(menuBox!.y).toBeGreaterThanOrEqual(triggerBox!.y + triggerBox!.height);
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+
+  await trigger.evaluate((element) => {
+    element.style.position = 'fixed';
+    element.style.top = 'calc(100vh - 34px)';
+    element.style.right = '8px';
+  });
+  await trigger.click();
+  triggerBox = await trigger.boundingBox();
+  menuBox = await menu.boundingBox();
+  expect(menuBox!.y + menuBox!.height).toBeLessThanOrEqual(triggerBox!.y + 1);
+
+  await page.setViewportSize({ width: 180, height: 140 });
+  await page.waitForFunction(() => {
+    const popup = document.querySelector<HTMLElement>('.sidebar-create-menu');
+    return Boolean(popup && popup.getBoundingClientRect().bottom <= window.innerHeight);
+  });
+  menuBox = await menu.boundingBox();
+  const viewport = await page.evaluate(() => ({ width: innerWidth, height: innerHeight }));
+  expect(menuBox!.x).toBeGreaterThanOrEqual(0);
+  expect(menuBox!.y).toBeGreaterThanOrEqual(0);
+  expect(menuBox!.x + menuBox!.width).toBeLessThanOrEqual(viewport.width);
+  expect(menuBox!.y + menuBox!.height).toBeLessThanOrEqual(viewport.height);
+  await expect.poll(() => menu.evaluate((element) => element.scrollHeight > element.clientHeight))
+    .toBe(true);
+});
+
+test('localizes the Sessions sidebar and empty-group validation in Simplified Chinese', async () => {
+  const { page } = session;
+  await page.evaluate(async () => {
+    const settings = await window.geared.getSettings();
+    await window.geared.saveSettings({ ...settings, language: 'zh-CN' });
+  });
+
+  await expect(page.getByRole('tab', { name: '会话' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '收起会话侧边栏' })).toBeVisible();
+  await expect(page.locator('.sidebar-body')).toHaveAttribute('aria-label', '已保存的会话');
+
+  await page.getByRole('button', { name: '新建会话配置' }).click();
+  await expect(page.getByRole('menuitem', { name: '新建本地会话' })).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: '新建 SSH 会话' })).toBeVisible();
+  await page.getByRole('menuitem', { name: '空分组' }).click();
+
+  const dialog = page.locator('.group-editor');
+  await dialog.getByRole('button', { name: '创建分组' }).click();
+  await expect(dialog.getByRole('alert')).toHaveText('请输入分组名称');
+  await dialog.getByLabel('分组名称').fill('示例分组');
+  await dialog.getByRole('button', { name: '创建分组' }).click();
+  await expect(dialog).toHaveCount(0);
+
+  await page.getByRole('button', { name: '新建会话配置' }).click();
+  await page.getByRole('menuitem', { name: '空分组' }).click();
+  await page.locator('.group-editor').getByLabel('分组名称').fill('示例分组');
+  await page.locator('.group-editor').getByRole('button', { name: '创建分组' }).click();
+  await expect(page.getByRole('alert')).toHaveText('已存在同名分组');
+
+  await page.locator('.group-editor').getByRole('button', { name: '取消' }).click();
+  await page.getByRole('button', { name: '分组操作: 示例分组' }).click();
+  await expect(page.getByRole('menuitem', { name: '删除分组' })).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  await page.getByRole('button', { name: '新建会话配置' }).click();
+  await page.getByRole('menuitem', { name: '新建本地会话' }).click();
+  const profileEditor = page.locator('.profile-editor');
+  await profileEditor.getByLabel('名称').fill('本地示例');
+  await profileEditor.getByRole('button', { name: '保存配置' }).click();
+  await expect(profileEditor).toHaveCount(0);
+  await expect(page.locator('.profile-kind').first()).toHaveText('本地');
+
+  await page.getByRole('button', { name: '收起会话侧边栏' }).click();
+  await page.getByRole('button', { name: '展开会话侧边栏' }).click();
+});

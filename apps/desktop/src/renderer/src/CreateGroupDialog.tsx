@@ -5,12 +5,14 @@ import { translate } from './i18n';
 import type { MessageKey } from './i18n';
 
 type CreateGroupDialogProps = {
+  existingGroupNames: readonly string[];
   language: SettingsRecord['language'];
   onCreate: (name: string) => Promise<void>;
   onClose: () => void;
 };
 
 export function CreateGroupDialog({
+  existingGroupNames,
   language,
   onCreate,
   onClose
@@ -28,13 +30,17 @@ export function CreateGroupDialog({
       setError(t('errGroupNameRequired'));
       return;
     }
+    if (existingGroupNames.includes(normalizedName)) {
+      setError(t('errGroupNameExists'));
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
       await onCreate(normalizedName);
       onClose();
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : t('errCreateGroup'));
+    } catch {
+      setError(t('errCreateGroup'));
     } finally {
       setBusy(false);
     }
@@ -70,7 +76,10 @@ export function CreateGroupDialog({
             {t('groupName')}
             <input
               value={name}
-              onChange={(event) => setName(event.target.value)}
+              onChange={(event) => {
+                setName(event.target.value);
+                setError(null);
+              }}
               maxLength={160}
               autoFocus
             />

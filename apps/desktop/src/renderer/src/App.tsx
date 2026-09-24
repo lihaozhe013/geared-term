@@ -349,8 +349,8 @@ export function App(): React.JSX.Element {
     try {
       setWslDistributions(await window.geared.discoverWsl());
       setError(null);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : t('errDiscoverWsl'));
+    } catch {
+      setError(t('errDiscoverWsl'));
     } finally {
       setWslLoading(false);
     }
@@ -458,9 +458,7 @@ export function App(): React.JSX.Element {
   const toggleSidebar = useCallback((): void => {
     const next = { ...uiState, sidebarCollapsed: !uiState.sidebarCollapsed };
     setUiState(next);
-    void window.geared.saveUiState(next).catch((reason: unknown) => {
-      setError(reason instanceof Error ? reason.message : t('errSaveUiState'));
-    });
+    void window.geared.saveUiState(next).catch(() => setError(t('errSaveUiState')));
   }, [uiState, t]);
 
   const [resizingPanel, setResizingPanel] = useState<'sidebar' | 'right' | null>(null);
@@ -555,9 +553,7 @@ export function App(): React.JSX.Element {
           setProfiles(nextProfiles);
           setProfileGroups(await window.geared.listProfileGroups());
         })
-        .catch((reason: unknown) =>
-          setError(reason instanceof Error ? reason.message : t('errDeleteSession'))
-        );
+        .catch(() => setError(t('errDeleteSession')));
     },
     [t]
   );
@@ -568,8 +564,8 @@ export function App(): React.JSX.Element {
         setProfiles(await window.geared.reorderProfiles(order));
         setProfileGroups(await window.geared.listProfileGroups());
         setError(null);
-      } catch (reason) {
-        setError(reason instanceof Error ? reason.message : t('errReorderProfiles'));
+      } catch {
+        setError(t('errReorderProfiles'));
       }
     },
     [t]
@@ -585,9 +581,7 @@ export function App(): React.JSX.Element {
       void window.geared
         .deleteProfileGroup(name)
         .then(setProfileGroups)
-        .catch((reason: unknown) =>
-          setError(reason instanceof Error ? reason.message : t('errDeleteGroup'))
-        );
+        .catch(() => setError(t('errDeleteGroup')));
     },
     [t]
   );
@@ -598,9 +592,7 @@ export function App(): React.JSX.Element {
       void window.geared
         .listProfileGroups()
         .then(setProfileGroups)
-        .catch((reason: unknown) =>
-          setError(reason instanceof Error ? reason.message : t('errLoadGroups'))
-        );
+        .catch(() => setError(t('errLoadGroups')));
     },
     [t]
   );
@@ -886,7 +878,7 @@ export function App(): React.JSX.Element {
             rightPanelOpen ? `${rightPanelWidth}px` : '40px'
           }`
         }}
-        aria-label="Workspace"
+        aria-label={t('workspace')}
       >
         {!uiState.sidebarCollapsed ? (
           <Sidebar
@@ -916,8 +908,8 @@ export function App(): React.JSX.Element {
               type="button"
               className="icon-button"
               onClick={toggleSidebar}
-              aria-label="Expand sessions sidebar"
-              title="Expand sessions sidebar"
+              aria-label={t('expandSessionsSidebar')}
+              title={t('expandSessionsSidebar')}
             >
               <PanelLeftOpen size={14} aria-hidden="true" />
             </button>
@@ -1219,6 +1211,7 @@ export function App(): React.JSX.Element {
 
       {showGroupDialog ? (
         <CreateGroupDialog
+          existingGroupNames={profileGroups}
           language={settings.language}
           onCreate={saveProfileGroups}
           onClose={() => setShowGroupDialog(false)}

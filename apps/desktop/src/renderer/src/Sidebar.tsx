@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type {
   AppInfo,
   SessionProfileRecord,
@@ -19,6 +20,7 @@ import {
 import { translate } from './i18n';
 import type { MessageKey } from './i18n';
 import { createSidebarOrder, moveSidebarGroup, moveSidebarProfile } from './sidebar-ordering';
+import { positionSidebarMenu, type SidebarMenuPosition } from './sidebar-menu-position';
 
 type SidebarTab = 'sessions' | 'wsl';
 
@@ -49,6 +51,12 @@ type SidebarDropTarget =
   | { kind: 'group-append'; name: string }
   | { kind: 'ungrouped' };
 
+const PROFILE_KIND_LABELS: Record<SessionProfileRecord['kind'], MessageKey> = {
+  local: 'profileLocal',
+  ssh: 'profileSsh',
+  wsl: 'profileWsl'
+};
+
 export function Sidebar({
   platform,
   language,
@@ -71,7 +79,9 @@ export function Sidebar({
   const [tab, setTab] = useState<SidebarTab>('sessions');
   const [collapsedGroups, setCollapsedGroups] = useState<ReadonlySet<string>>(new Set());
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
+  const [createMenuPosition, setCreateMenuPosition] = useState<SidebarMenuPosition | null>(null);
   const [groupMenu, setGroupMenu] = useState<{ name: string; x: number; y: number } | null>(null);
+  const createMenuButtonRef = useRef<HTMLButtonElement>(null);
   const createMenuRef = useRef<HTMLDivElement>(null);
   const [profileMenu, setProfileMenu] = useState<{
     x: number;
@@ -83,22 +93,53 @@ export function Sidebar({
   const [reorderingProfiles, setReorderingProfiles] = useState(false);
   const isWindows = platform === 'win32';
 
+  useLayoutEffect(() => {
+    if (!createMenuOpen) return;
+
+    const updatePosition = (): void => {
+      const button = createMenuButtonRef.current;
+      const menu = createMenuRef.current;
+      if (!button || !menu) return;
+      const anchor = button.getBoundingClientRect();
+      const bounds = menu.getBoundingClientRect();
+      setCreateMenuPosition(
+        positionSidebarMenu(
+          anchor,
+          { width: bounds.width, height: menu.scrollHeight },
+          { width: window.innerWidth, height: window.innerHeight }
+        )
+      );
+    };
+
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [createMenuOpen, language]);
+
   useEffect(() => {
     if (!createMenuOpen) return;
     const closeOnOutsideClick = (event: MouseEvent): void => {
-      if (!createMenuRef.current?.contains(event.target as Node)) setCreateMenuOpen(false);
+      const target = event.target;
+      if (
+        target instanceof Node &&
+        !createMenuButtonRef.current?.contains(target) &&
+        !createMenuRef.current?.contains(target)
+      ) {
+        setCreateMenuOpen(false);
+      }
     };
     const closeOnKeyDown = (event: KeyboardEvent): void => {
       if (event.key === 'Escape') setCreateMenuOpen(false);
     };
-    const close = (): void => setCreateMenuOpen(false);
     window.addEventListener('click', closeOnOutsideClick);
     window.addEventListener('keydown', closeOnKeyDown);
-    window.addEventListener('resize', close);
     return () => {
       window.removeEventListener('click', closeOnOutsideClick);
       window.removeEventListener('keydown', closeOnKeyDown);
-      window.removeEventListener('resize', close);
     };
   }, [createMenuOpen]);
 
@@ -295,7 +336,7 @@ export function Sidebar({
             setProfileMenu({ x: event.clientX, y: event.clientY, profile });
           }}
         >
-          <small className="profile-kind">{profile.kind}</small>
+          <small className="profile-kind">{t(PROFILE_KIND_LABELS[profile.kind])}</small>
           <span>{profile.name}</span>
         </button>
       </div>
@@ -304,7 +345,7 @@ export function Sidebar({
 
   return (
     <aside className="sidebar">
-      <div className="sidebar-switcher" role="tablist" aria-label="Sidebar panels">
+      <div className="sidebar-switcher" role="tablist" aria-label={t('sidebarPanels')}>
         <button
           type="button"
           className="sidebar-pill"
@@ -327,10 +368,11 @@ export function Sidebar({
         ) : null}
         <span className="sidebar-spacer" />
         {tab === 'sessions' ? (
-          <div className="sidebar-create-control" ref={createMenuRef}>
+          <div className="sidebar-create-control">
             <button
               type="button"
               className="icon-button"
+              ref={createMenuButtonRef}
               onClick={() => setCreateMenuOpen((open) => !open)}
               aria-label={t('newSessionProfile')}
               title={t('newSessionProfile')}
@@ -339,47 +381,14 @@ export function Sidebar({
             >
               <Plus size={14} aria-hidden="true" />
             </button>
-            {createMenuOpen ? (
-              <div className="sidebar-context-menu sidebar-create-menu" role="menu">
-                {(
-                  [
-                    ['local', 'newLocalSession'],
-                    ['ssh', 'newSshSession'],
-                    ['wsl', 'newWslSession']
-                  ] as const
-                ).map(([kind, label]) => (
-                  <button
-                    type="button"
-                    role="menuitem"
-                    key={kind}
-                    onClick={() => {
-                      setCreateMenuOpen(false);
-                      onNewProfile(kind);
-                    }}
-                  >
-                    {t(label)}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    setCreateMenuOpen(false);
-                    onCreateGroup();
-                  }}
-                >
-                  {t('emptyGroupMenuItem')}
-                </button>
-              </div>
-            ) : null}
           </div>
         ) : (
           <button
             type="button"
             className="icon-button"
             onClick={onRefreshWsl}
-            aria-label="Refresh WSL distributions"
-            title="Refresh WSL distributions"
+            aria-label={t('refreshWslDistributions')}
+            title={t('refreshWslDistributions')}
           >
             <RefreshCw
               size={14}
@@ -392,14 +401,14 @@ export function Sidebar({
           type="button"
           className="icon-button"
           onClick={onCollapse}
-          aria-label="Collapse sessions sidebar"
-          title="Collapse sessions sidebar"
+          aria-label={t('collapseSessionsSidebar')}
+          title={t('collapseSessionsSidebar')}
         >
           <PanelLeftClose size={14} aria-hidden="true" />
         </button>
       </div>
       {tab === 'sessions' ? (
-        <div className="sidebar-body" aria-label="Saved sessions">
+        <div className="sidebar-body" aria-label={t('savedSessions')}>
           {sidebarOrder.ungroupedIds.map((id) => {
             const profile = profilesById.get(id);
             return profile ? renderProfileButton(profile, false) : null;
@@ -505,14 +514,14 @@ export function Sidebar({
           ) : null}
         </div>
       ) : (
-        <div className="sidebar-body" aria-label="WSL distributions">
+        <div className="sidebar-body" aria-label={t('wslDistributions')}>
           {wslDistributions.map((distribution) => (
             <button
               type="button"
               className="profile-button"
               key={distribution.name}
               onDoubleClick={() => onOpenWslDistribution(distribution.name)}
-              title={`Double-click to open "${distribution.name}" in a new terminal`}
+              title={t('openWslDistributionHint').replace('{name}', distribution.name)}
             >
               <span>
                 {distribution.isDefault ? '★ ' : ''}
@@ -578,6 +587,53 @@ export function Sidebar({
           </button>
         </div>
       ) : null}
+      {createMenuOpen
+        ? createPortal(
+            <div
+              ref={createMenuRef}
+              className="sidebar-context-menu sidebar-create-menu"
+              role="menu"
+              aria-label={t('newSessionProfile')}
+              style={{
+                left: createMenuPosition?.left ?? 0,
+                top: createMenuPosition?.top ?? 0,
+                maxHeight: createMenuPosition?.maxHeight ?? 'calc(100vh - 16px)',
+                visibility: createMenuPosition ? 'visible' : 'hidden'
+              }}
+            >
+              {(
+                [
+                  ['local', 'newLocalSession'],
+                  ['ssh', 'newSshSession'],
+                  ['wsl', 'newWslSession']
+                ] as const
+              ).map(([kind, label]) => (
+                <button
+                  type="button"
+                  role="menuitem"
+                  key={kind}
+                  onClick={() => {
+                    setCreateMenuOpen(false);
+                    onNewProfile(kind);
+                  }}
+                >
+                  {t(label)}
+                </button>
+              ))}
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setCreateMenuOpen(false);
+                  onCreateGroup();
+                }}
+              >
+                {t('emptyGroupMenuItem')}
+              </button>
+            </div>,
+            document.body
+          )
+        : null}
     </aside>
   );
 }
