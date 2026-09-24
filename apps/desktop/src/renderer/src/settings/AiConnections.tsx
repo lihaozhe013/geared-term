@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type {
   AiConnectionInput,
   AiConnectionRecord,
@@ -8,7 +8,7 @@ import type {
   AiResponsesVerbosity,
   SettingsRecord
 } from '@geared-term/protocol';
-import { ArrowDown, ArrowUp, Bot, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Bot, Plus, RefreshCw, Search, Trash2 } from 'lucide-react';
 import {
   moveArrayItem,
   resolveActiveAiConnectionId,
@@ -16,6 +16,10 @@ import {
 } from '../ai/connection-selection';
 import { Row, Section } from './primitives';
 import type { Translate } from './sections';
+import { searchModelIds } from './model-search';
+
+const maxConfiguredModels = 256;
+const discoveredModelsPageSize = 100;
 
 type DraftModel = {
   id: string;
@@ -111,6 +115,9 @@ export function AiConnectionsSection({
   const [dirty, setDirty] = useState(false);
   const [discovering, setDiscovering] = useState(false);
   const [discovered, setDiscovered] = useState<string[]>([]);
+  const [discoveryTruncated, setDiscoveryTruncated] = useState(false);
+  const [modelSearch, setModelSearch] = useState('');
+  const [visibleDiscoveredCount, setVisibleDiscoveredCount] = useState(discoveredModelsPageSize);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pendingDefaultId, setPendingDefaultId] = useState<string | null | undefined>(undefined);
@@ -142,6 +149,12 @@ export function AiConnectionsSection({
   const configuredDefaultId =
     pendingDefaultId === undefined ? settings.defaultAiConnectionId : pendingDefaultId;
   const effectiveDefaultId = resolveDefaultAiConnectionId(connections, configuredDefaultId);
+  const matchingDiscovered = useMemo(
+    () => searchModelIds(discovered, modelSearch),
+    [discovered, modelSearch]
+  );
+  const visibleDiscovered = matchingDiscovered.slice(0, visibleDiscoveredCount);
+  const configuredModelCount = draft.models.filter((model) => model.model.trim().length > 0).length;
 
   useEffect(() => {
     if (!connectionsLoaded || pendingDefaultId !== undefined) return;
@@ -185,6 +198,9 @@ export function AiConnectionsSection({
     setDraft(record ? draftFrom(record) : createEmptyDraft(t('newConnection')));
     setDirty(false);
     setDiscovered([]);
+    setDiscoveryTruncated(false);
+    setModelSearch('');
+    setVisibleDiscoveredCount(discoveredModelsPageSize);
     setStatus(null);
     setError(null);
   };
@@ -208,6 +224,10 @@ export function AiConnectionsSection({
     const model = modelName.trim();
     if (model && draft.models.some((item) => item.model === model)) {
       if (!draft.defaultModel) patch({ defaultModel: model });
+      return;
+    }
+    if (model && configuredModelCount >= maxConfiguredModels) {
+      setError(t('modelLimitReached'));
       return;
     }
     mutateDraft((current) => ({
@@ -302,6 +322,9 @@ export function AiConnectionsSection({
       setDraft(record ? draftFrom(record) : createEmptyDraft(t('newConnection')));
       setDirty(false);
       setDiscovered([]);
+      setDiscoveryTruncated(false);
+      setModelSearch('');
+      setVisibleDiscoveredCount(discoveredModelsPageSize);
       setStatus(null);
       setError(null);
     } catch (reason) {
@@ -313,6 +336,10 @@ export function AiConnectionsSection({
     setDiscovering(true);
     setStatus(null);
     setError(null);
+    setDiscovered([]);
+    setDiscoveryTruncated(false);
+    setModelSearch('');
+    setVisibleDiscoveredCount(discoveredModelsPageSize);
     const selectedModel = draft.defaultModel || draft.models.find((item) => item.model)?.model;
     try {
       const result = draft.id
@@ -327,6 +354,7 @@ export function AiConnectionsSection({
             ...(draft.apiKey ? { apiKey: draft.apiKey } : {})
           });
       setDiscovered(result.models);
+      setDiscoveryTruncated(result.truncated);
       setStatus(
         `${t('connectionVerified')} ${t('modelsFound').replace('{count}', String(result.models.length))}`
       );
@@ -604,25 +632,96 @@ export function AiConnectionsSection({
                 ))}
               </div>
               <div className="settings-actions-row">
-                <button type="button" className="toolbar-button" onClick={() => addModel()}>
+                <button
+                  type="button"
+                  className="toolbar-button"
+                  onClick={() => addModel()}
+                  disabled={configuredModelCount >= maxConfiguredModels}
+                >
                   <Plus size={13} aria-hidden="true" /> {t('addModel')}
                 </button>
               </div>
               {discovered.length > 0 ? (
                 <>
                   <p className="settings-hint">{t('discoveredModels')}</p>
-                  <div className="chip-row">
-                    {discovered.map((model) => (
+                  <label className="discovered-model-search">
+                    <Search size={14} aria-hidden="true" />
+                    <input
+                      type="search"
+                      value={modelSearch}
+                      onChange={(event) => {
+                        setModelSearch(event.target.value);
+                        setVisibleDiscoveredCount(discoveredModelsPageSize);
+                      }}
+                      placeholder={t('searchDiscoveredModels')}
+                      aria-label={t('searchDiscoveredModels')}
+                      autoComplete="off"
+                      spellCheck={false}
+                    />
+                  </label>
+                  <p
+                    className="settings-hint discovered-model-count"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    {t('modelSearchResults')
+                      .replace('{shown}', String(visibleDiscovered.length))
+                      .replace('{count}', String(matchingDiscovered.length))}
+                  </p>
+                  {discoveryTruncated ? (
+                    <p className="settings-hint discovered-model-truncated" role="status">
+                      {t('modelsTruncated')}
+                    </p>
+                  ) : null}
+                  {matchingDiscovered.length > 0 ? (
+                    <ul className="discovered-model-list" aria-label={t('discoveredModels')}>
+                      {visibleDiscovered.map((model) => {
+                        const alreadyAdded = draft.models.some((item) => item.model === model);
+                        const atModelLimit = configuredModelCount >= maxConfiguredModels;
+                        return (
+                          <li className="discovered-model-row" key={model}>
+                            <span className="discovered-model-id" title={model}>
+                              {model}
+                            </span>
+                            <button
+                              type="button"
+                              className="toolbar-button discovered-model-add"
+                              onClick={() => addModel(model)}
+                              disabled={alreadyAdded || atModelLimit}
+                              aria-label={`${t(alreadyAdded ? 'modelAdded' : 'addModel')} ${model}`}
+                            >
+                              {alreadyAdded ? t('modelAdded') : t('addModel')}
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : (
+                    <p className="settings-hint" role="status">
+                      {t('noMatchingModels')}
+                    </p>
+                  )}
+                  {visibleDiscovered.length < matchingDiscovered.length ? (
+                    <div className="settings-actions-row">
                       <button
                         type="button"
-                        key={model}
-                        className="chip"
-                        onClick={() => addModel(model)}
+                        className="toolbar-button"
+                        onClick={() =>
+                          setVisibleDiscoveredCount((current) => current + discoveredModelsPageSize)
+                        }
                       >
-                        ＋ {model}
+                        {t('showMoreModels').replace(
+                          '{count}',
+                          String(
+                            Math.min(
+                              discoveredModelsPageSize,
+                              matchingDiscovered.length - visibleDiscovered.length
+                            )
+                          )
+                        )}
                       </button>
-                    ))}
-                  </div>
+                    </div>
+                  ) : null}
                 </>
               ) : null}
               <div className="settings-actions-row">

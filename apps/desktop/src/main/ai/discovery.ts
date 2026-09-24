@@ -1,7 +1,7 @@
 import { normalizeEndpoint, type AiProtocol } from './endpoint';
 
 const connectTimeoutMs = 15_000;
-const maxModels = 256;
+const maxModels = 4096;
 
 export type DiscoveryRequest = {
   protocol: AiProtocol;
@@ -11,7 +11,7 @@ export type DiscoveryRequest = {
   fetchImpl?: typeof fetch;
 };
 
-export type DiscoveryResult = { models: string[] };
+export type DiscoveryResult = { models: string[]; truncated: boolean };
 
 /**
  * Best-effort model discovery. Both protocols first try the OpenAI-compatible
@@ -39,9 +39,9 @@ export async function discoverModels(request: DiscoveryRequest): Promise<Discove
       });
       if (!response.ok) throw new Error(`Model discovery failed (${response.status})`);
       const payload = (await response.json()) as unknown;
-      const models = parseModelList(payload);
-      if (models.length === 0) throw new Error('Model discovery returned no models');
-      return { models };
+      const result = parseModelList(payload);
+      if (result.models.length === 0) throw new Error('Model discovery returned no models');
+      return result;
     } catch (error) {
       if (controller.signal.aborted || isTimeout(error)) throw error;
       if (request.protocol !== 'responses') throw error;
@@ -73,7 +73,7 @@ export async function discoverModels(request: DiscoveryRequest): Promise<Discove
         `Responses test request failed (${response.status})${body ? `: ${body}` : ''}`
       );
     }
-    return { models: [model] };
+    return { models: [model], truncated: false };
   } catch (error) {
     if (isTimeout(error)) throw error;
     if (controller.signal.aborted) throw new Error('Model discovery timed out');
@@ -88,7 +88,7 @@ function isTimeout(error: unknown): boolean {
   return error instanceof Error && error.message === 'Model discovery timed out';
 }
 
-function parseModelList(payload: unknown): string[] {
+function parseModelList(payload: unknown): DiscoveryResult {
   const source =
     payload && typeof payload === 'object' && Array.isArray((payload as { data?: unknown }).data)
       ? (payload as { data: unknown[] }).data
@@ -96,6 +96,7 @@ function parseModelList(payload: unknown): string[] {
         ? payload
         : [];
   const models = new Set<string>();
+  let truncated = false;
   for (const entry of source) {
     const id =
       typeof entry === 'string'
@@ -103,8 +104,12 @@ function parseModelList(payload: unknown): string[] {
         : entry && typeof entry === 'object' && typeof (entry as { id?: unknown }).id === 'string'
           ? (entry as { id: string }).id
           : undefined;
-    if (id && id.length <= 256) models.add(id);
-    if (models.size >= maxModels) break;
+    if (!id || id.length > 256 || models.has(id)) continue;
+    if (models.size >= maxModels) {
+      truncated = true;
+      break;
+    }
+    models.add(id);
   }
-  return [...models];
+  return { models: [...models], truncated };
 }

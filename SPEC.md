@@ -476,6 +476,9 @@ not currently implemented is stated as such instead of being treated as complete
   rejected.
 - **AI-005**: Chat Completions connections MUST support model discovery through `/models`. Responses
   connections MUST support a minimal, explicitly disclosed test request with storage disabled.
+  Discovery responses MUST include up to 4,096 model IDs and indicate when the provider returned
+  more than that. Settings MUST let users search discovered model IDs and add a match to the
+  connection draft without changing its saved-model limit.
 - **AI-006**: Responses models MUST support defaults for reasoning effort, verbosity, reasoning
   summary, and web search. A chat MAY override reasoning effort.
 

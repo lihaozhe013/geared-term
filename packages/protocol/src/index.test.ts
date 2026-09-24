@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   AppInfoSchema,
+  AiDiscoveredModelsSchema,
   DEFAULT_TERMINAL_LIGATURE_SEQUENCES,
   LocalSessionRequestSchema,
   LocalWorkingDirectorySchema,
@@ -41,6 +42,17 @@ describe('protocol schemas', () => {
       chunk: 42
     });
     expect(result.success).toBe(false);
+  });
+
+  it('bounds discovered model results and requires truncation metadata', () => {
+    const models = Array.from({ length: 4096 }, (_, index) => `model-${index}`);
+    expect(AiDiscoveredModelsSchema.parse({ models, truncated: true }).models).toHaveLength(4096);
+    expect(AiDiscoveredModelsSchema.safeParse({ models, truncated: false }).success).toBe(true);
+    expect(AiDiscoveredModelsSchema.safeParse({ models }).success).toBe(false);
+    expect(
+      AiDiscoveredModelsSchema.safeParse({ models: [...models, 'model-4096'], truncated: true })
+        .success
+    ).toBe(false);
   });
 
   it('bounds SFTP requests and validates remote entries', () => {

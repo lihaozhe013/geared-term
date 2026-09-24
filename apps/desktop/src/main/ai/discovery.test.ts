@@ -22,7 +22,7 @@ describe('model discovery', () => {
       baseUrl: 'http://127.0.0.1:11434/v1/',
       fetchImpl: fetchImpl as unknown as typeof fetch
     });
-    expect(result.models).toEqual(['model-a', 'model-b']);
+    expect(result).toEqual({ models: ['model-a', 'model-b'], truncated: false });
     expect(fetchImpl.mock.calls[0]?.[0]).toBe('http://127.0.0.1:11434/v1/models');
   });
 
@@ -37,7 +37,10 @@ describe('model discovery', () => {
       baseUrl: 'https://api.example.test/v1',
       fetchImpl: fetchImpl as unknown as typeof fetch
     });
-    expect(result.models).toEqual(['gpt fixture', 'o-series fixture']);
+    expect(result).toEqual({
+      models: ['gpt fixture', 'o-series fixture'],
+      truncated: false
+    });
     expect(fetchImpl.mock.calls[0]?.[0]).toBe('https://api.example.test/v1/models');
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
@@ -54,7 +57,7 @@ describe('model discovery', () => {
       apiKey: 'sk-test',
       fetchImpl: fetchImpl as unknown as typeof fetch
     });
-    expect(result.models).toEqual(['fixture-large']);
+    expect(result).toEqual({ models: ['fixture-large'], truncated: false });
     const [, init] = fetchImpl.mock.calls[1] as [string, RequestInit];
     expect(JSON.parse(String(init.body))).toEqual({
       model: 'fixture-large',
@@ -83,6 +86,36 @@ describe('model discovery', () => {
         fetchImpl: vi.fn().mockResolvedValue(jsonResponse(401, 'denied')) as unknown as typeof fetch
       })
     ).rejects.toThrow('401');
+  });
+
+  it('discovers more than 256 models and reports when the bounded result is truncated', async () => {
+    const source = Array.from({ length: 4100 }, (_, index) => ({ id: `model-${index}` }));
+    const result = await discoverModels({
+      protocol: 'chat-completions',
+      baseUrl: 'https://api.example.test/v1',
+      fetchImpl: vi
+        .fn()
+        .mockResolvedValue(jsonResponse(200, { data: source })) as unknown as typeof fetch
+    });
+
+    expect(result.models).toHaveLength(4096);
+    expect(result.models[255]).toBe('model-255');
+    expect(result.models[4095]).toBe('model-4095');
+    expect(result.truncated).toBe(true);
+  });
+
+  it('does not report truncation when the catalog exactly fits the limit', async () => {
+    const source = Array.from({ length: 4096 }, (_, index) => ({ id: `model-${index}` }));
+    const result = await discoverModels({
+      protocol: 'chat-completions',
+      baseUrl: 'https://api.example.test/v1',
+      fetchImpl: vi
+        .fn()
+        .mockResolvedValue(jsonResponse(200, { data: source })) as unknown as typeof fetch
+    });
+
+    expect(result.models).toHaveLength(4096);
+    expect(result.truncated).toBe(false);
   });
 
   it('rejects endpoints that are not HTTPS or loopback HTTP', async () => {

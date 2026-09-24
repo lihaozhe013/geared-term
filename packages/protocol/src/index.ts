@@ -362,7 +362,8 @@ export const AiDiscoverModelsRequestSchema = z
   .strict();
 
 export const AiDiscoveredModelsSchema = z.object({
-  models: z.array(z.string().min(1).max(256)).max(256)
+  models: z.array(z.string().min(1).max(256)).max(4096),
+  truncated: z.boolean()
 });
 
 export const AiHistoryIdSchema = z
