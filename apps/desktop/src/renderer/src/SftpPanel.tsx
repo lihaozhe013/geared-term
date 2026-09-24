@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   SettingsRecord,
   SftpCdEvent,
@@ -18,6 +18,8 @@ import {
 import { translate, type MessageKey } from './i18n';
 import { ContextMenu, type ContextMenuItem } from './sftp/context-menu';
 import { SftpEntryRow, remoteMeta } from './sftp/entry-row';
+import { searchFileEntries, visibleSelectedPaths } from './sftp/file-search';
+import { FileSearchInput } from './sftp/file-search-input';
 import { SftpTransferList } from './sftp/transfer-list';
 import { LocalFilePane, type UploadChoice } from './LocalFilePane';
 import {
@@ -67,6 +69,7 @@ export function SftpPanel({
     entries: []
   });
   const [remoteDraft, setRemoteDraft] = useState('.');
+  const [remoteQuery, setRemoteQuery] = useState('');
   const [remoteSelected, setRemoteSelected] = useState<Set<string>>(new Set());
   const [transfers, setTransfers] = useState<SftpTransfer[]>([]);
   const [message, setMessage] = useState<PanelMessage | null>(null);
@@ -98,6 +101,7 @@ export function SftpPanel({
     async (directory: string, reanchor: boolean): Promise<void> => {
       try {
         const result = await window.geared.listSftp({ sessionId, directory, reanchor });
+        if (remoteRef.current.directory !== result.directory) setRemoteQuery('');
         setRemote({
           directory: result.directory,
           entries: [...result.entries].sort((left, right) => {
@@ -239,6 +243,7 @@ export function SftpPanel({
   useEffect(() => {
     setRemote({ directory: '.', entries: [] });
     setRemoteDraft('.');
+    setRemoteQuery('');
     setRemoteSelected(new Set());
     anchorRemote.current = null;
     setDetached(false);
@@ -317,11 +322,27 @@ export function SftpPanel({
     return () => window.removeEventListener('blur', close);
   }, [contextMenu]);
 
+  const visibleRemoteEntries = useMemo(
+    () => searchFileEntries(remote.entries, remoteQuery),
+    [remote.entries, remoteQuery]
+  );
+  const visibleRemotePaths = visibleRemoteEntries.map((entry) => entry.path);
+  const selectedRemotePaths = visibleSelectedPaths(visibleRemoteEntries, remoteSelected);
+
+  useEffect(() => {
+    const visible = new Set(visibleRemotePaths);
+    setRemoteSelected((current) => {
+      if ([...current].every((path) => visible.has(path))) return current;
+      return new Set([...current].filter((path) => visible.has(path)));
+    });
+    if (anchorRemote.current && !visible.has(anchorRemote.current)) anchorRemote.current = null;
+  }, [visibleRemoteEntries]);
+
   const selectEntry = (
     path: string,
     event: { ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }
   ): void => {
-    const allPaths = remote.entries.map((entry) => entry.path);
+    const allPaths = visibleRemotePaths;
     setRemoteSelected((current) => {
       if (event.shiftKey) {
         const from = anchorRemote.current ? allPaths.indexOf(anchorRemote.current) : -1;
@@ -498,7 +519,7 @@ export function SftpPanel({
   };
 
   const buildMenuItems = (state: ContextMenuState): ContextMenuItem[] => {
-    const selectedPaths = [...remoteSelected];
+    const selectedPaths = selectedRemotePaths;
     const single = selectedPaths.length === 1;
     if (!state.entry) {
       return [
@@ -596,7 +617,6 @@ export function SftpPanel({
       Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, current + (event.deltaY < 0 ? 1 : -1)))
     );
   };
-  const remotePaths = remote.entries.map((entry) => entry.path);
   const statusText = detached
     ? t('sftpDetached')
     : alternateScreen
@@ -681,7 +701,7 @@ export function SftpPanel({
             <button
               type="button"
               className="icon-button"
-              onClick={() => void downloadRemote([...remoteSelected])}
+              onClick={() => void downloadRemote(selectedRemotePaths)}
               title={t('sftpDownload')}
               aria-label={t('sftpDownload')}
             >
@@ -690,7 +710,7 @@ export function SftpPanel({
             <button
               type="button"
               className="toolbar-button"
-              onClick={() => copyPaths([...remoteSelected])}
+              onClick={() => copyPaths(selectedRemotePaths)}
             >
               {t('sftpCopyPaths')}
             </button>
@@ -726,6 +746,14 @@ export function SftpPanel({
             <ArrowUp size={14} aria-hidden="true" />
           </button>
         </form>
+        <FileSearchInput
+          label={t('filesSearchRemote')}
+          query={remoteQuery}
+          onQueryChange={(query) => {
+            setRemoteQuery(query);
+            setContextMenu(null);
+          }}
+        />
         {editing ? (
           <div className="sftp-edit">
             <input
@@ -760,7 +788,7 @@ export function SftpPanel({
           onWheel={onPaneWheel}
           onContextMenu={(event) => openMenu(event, null)}
         >
-          {remote.entries.map((entry) => (
+          {visibleRemoteEntries.map((entry) => (
             <SftpEntryRow
               key={entry.path}
               entry={entry}
@@ -776,10 +804,19 @@ export function SftpPanel({
               onContextMenu={(event) => openMenu(event, entry)}
             />
           ))}
-          {remote.entries.length === 0 ? <p className="muted">{t('sftpEmpty')}</p> : null}
+          {visibleRemoteEntries.length === 0 ? (
+            <p className="muted">{remoteQuery.trim() ? t('filesNoMatches') : t('sftpEmpty')}</p>
+          ) : null}
         </div>
         <div className="sftp-footer">
-          <span>{ta('sftpItemCount', { count: `${remote.entries.length}` })}</span>
+          <span role="status" aria-live="polite">
+            {remoteQuery.trim()
+              ? ta('filesSearchCount', {
+                  shown: `${visibleRemoteEntries.length}`,
+                  count: `${remote.entries.length}`
+                })
+              : ta('sftpItemCount', { count: `${remote.entries.length}` })}
+          </span>
           {activeTransfers.length > 0 ? <span>{t('sftpTransferring')}</span> : null}
         </div>
       </section>

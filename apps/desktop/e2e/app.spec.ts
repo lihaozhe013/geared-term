@@ -1,4 +1,6 @@
 import { expect, test } from '@playwright/test';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { launchApp, openLocalTab, type AppSession } from './fixtures';
 
 let session: AppSession;
@@ -175,7 +177,7 @@ test('reports application information from the main process', async () => {
   expect(info.version).toMatch(/^\d+\.\d+\.\d+/);
 });
 
-test('opens Files as a single local pane at the shell startup cwd', async () => {
+test('opens Files as a single local pane and searches its current directory', async () => {
   const { page, app } = session;
   await openLocalTab(app);
   const terminal = page.locator('.terminal-wrapper:not([hidden])');
@@ -209,6 +211,31 @@ test('opens Files as a single local pane at the shell startup cwd', async () => 
     startupDirectory!
   );
   await expect(page.getByRole('button', { name: 'Open in file manager' })).toBeVisible();
+
+  const searchDirectory = join(session.userDataDirectory, 'files-search-fixture');
+  await mkdir(join(searchDirectory, 'nested'), { recursive: true });
+  await writeFile(join(searchDirectory, 'report.txt'), 'report');
+  await writeFile(join(searchDirectory, 'notes.txt'), 'notes');
+  await writeFile(join(searchDirectory, 'nested', 'child.txt'), 'child');
+
+  const localPane = page.locator('.local-file-pane');
+  const directoryInput = localPane.getByRole('textbox', { name: 'Local directory' });
+  await directoryInput.fill(searchDirectory);
+  await directoryInput.press('Enter');
+  await expect(
+    localPane.locator('.sftp-entry-label').filter({ hasText: 'report.txt' })
+  ).toBeVisible();
+
+  const searchInput = localPane.getByRole('searchbox', { name: 'Search local files' });
+  await searchInput.fill('rptt');
+  await expect(localPane.locator('.sftp-entry-label')).toHaveText(['report.txt']);
+  await localPane.getByRole('button', { name: 'Refresh' }).click();
+  await expect(searchInput).toHaveValue('rptt');
+
+  await searchInput.fill('nested');
+  await localPane.locator('.sftp-entry').filter({ hasText: 'nested' }).dblclick();
+  await expect(searchInput).toHaveValue('');
+  await expect(localPane.locator('.sftp-entry-label')).toHaveText(['child.txt']);
 });
 
 test('renders and executes the virtual menu on non-macOS platforms', async () => {

@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { LocalEntry, SettingsRecord } from '@geared-term/protocol';
 import { ArrowRight, ArrowUp, ExternalLink, FolderPlus, RefreshCw, Upload } from 'lucide-react';
 import { translate, type MessageKey } from './i18n';
 import { ContextMenu, type ContextMenuItem } from './sftp/context-menu';
 import { SftpEntryRow, localMeta } from './sftp/entry-row';
+import { searchFileEntries, visibleSelectedPaths } from './sftp/file-search';
+import { FileSearchInput } from './sftp/file-search-input';
 import { joinLocal, localDirname, validateEntryName, ZOOM_MAX, ZOOM_MIN } from './sftp/panel-utils';
 
 type UploadChoice = 'files' | 'folders' | 'both';
@@ -50,6 +52,7 @@ export function LocalFilePane({
   );
   const [localDirectory, setLocalDirectory] = useState<string | null>(initialDirectory);
   const [directoryDraft, setDirectoryDraft] = useState(initialDirectory ?? '');
+  const [localQuery, setLocalQuery] = useState('');
   const [localEntries, setLocalEntries] = useState<LocalEntry[]>([]);
   const [localSelected, setLocalSelected] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState<PanelMessage | null>(null);
@@ -71,6 +74,7 @@ export function LocalFilePane({
     async (directory: string | null): Promise<void> => {
       try {
         const entries = await window.geared.listLocalFiles(directory);
+        if (localRef.current !== directory) setLocalQuery('');
         setLocalEntries(entries);
         setLocalDirectory(directory);
         setDirectoryDraft(directory ?? '');
@@ -95,6 +99,7 @@ export function LocalFilePane({
   useEffect(() => {
     setLocalDirectory(initialDirectory);
     setDirectoryDraft(initialDirectory ?? '');
+    setLocalQuery('');
     setLocalEntries([]);
     setLocalSelected(new Set());
     setContextMenu(null);
@@ -117,11 +122,27 @@ export function LocalFilePane({
     return () => window.removeEventListener('blur', close);
   }, [contextMenu]);
 
+  const visibleLocalEntries = useMemo(
+    () => searchFileEntries(localEntries, localQuery),
+    [localEntries, localQuery]
+  );
+  const visibleLocalPaths = visibleLocalEntries.map((entry) => entry.path);
+  const selectedLocalPaths = visibleSelectedPaths(visibleLocalEntries, localSelected);
+
+  useEffect(() => {
+    const visible = new Set(visibleLocalPaths);
+    setLocalSelected((current) => {
+      if ([...current].every((path) => visible.has(path))) return current;
+      return new Set([...current].filter((path) => visible.has(path)));
+    });
+    if (anchorLocal.current && !visible.has(anchorLocal.current)) anchorLocal.current = null;
+  }, [visibleLocalEntries]);
+
   const selectEntry = (
     path: string,
     event: { ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }
   ): void => {
-    const allPaths = localEntries.map((entry) => entry.path);
+    const allPaths = visibleLocalPaths;
     setLocalSelected((current) => {
       if (event.shiftKey && anchorLocal.current) {
         const from = allPaths.indexOf(anchorLocal.current);
@@ -153,7 +174,7 @@ export function LocalFilePane({
     setContextMenu({ x: event.clientX, y: event.clientY, entry });
   };
 
-  const selectionOf = (): string[] => [...localSelected];
+  const selectionOf = (): string[] => selectedLocalPaths;
 
   const confirmLabel = (paths: string[]): string => {
     const names = paths.map((path) => path.split(/[\\/]/u).pop() ?? path);
@@ -381,7 +402,7 @@ export function LocalFilePane({
               type="button"
               className="icon-button"
               onClick={() => onUploadSelected(selectionOf())}
-              disabled={localSelected.size === 0}
+              disabled={selectedLocalPaths.length === 0}
               title={t('sftpUpload')}
               aria-label={t('sftpUpload')}
             >
@@ -440,6 +461,14 @@ export function LocalFilePane({
           <ArrowUp size={14} aria-hidden="true" />
         </button>
       </form>
+      <FileSearchInput
+        label={t('filesSearchLocal')}
+        query={localQuery}
+        onQueryChange={(query) => {
+          setLocalQuery(query);
+          setContextMenu(null);
+        }}
+      />
       {message ? (
         <p className={message.tone === 'error' ? 'sftp-error' : 'sftp-hint'}>{message.text}</p>
       ) : null}
@@ -473,7 +502,7 @@ export function LocalFilePane({
         onWheel={onPaneWheel}
         onContextMenu={(event) => openMenu(event, null)}
       >
-        {localEntries.map((entry) => (
+        {visibleLocalEntries.map((entry) => (
           <SftpEntryRow
             key={entry.path}
             entry={entry}
@@ -486,10 +515,19 @@ export function LocalFilePane({
             onContextMenu={(event) => openMenu(event, entry)}
           />
         ))}
-        {localEntries.length === 0 ? <p className="muted">{t('sftpNoLocalItems')}</p> : null}
+        {visibleLocalEntries.length === 0 ? (
+          <p className="muted">{localQuery.trim() ? t('filesNoMatches') : t('sftpNoLocalItems')}</p>
+        ) : null}
       </div>
       <div className="sftp-footer">
-        <span>{ta('sftpItemCount', { count: `${localEntries.length}` })}</span>
+        <span role="status" aria-live="polite">
+          {localQuery.trim()
+            ? ta('filesSearchCount', {
+                shown: `${visibleLocalEntries.length}`,
+                count: `${localEntries.length}`
+              })
+            : ta('sftpItemCount', { count: `${localEntries.length}` })}
+        </span>
       </div>
       {contextMenu ? (
         <ContextMenu

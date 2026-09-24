@@ -431,6 +431,12 @@ not currently implemented is stated as such instead of being treated as complete
 - **SFTP-014**: An SSH file context-menu action MUST open the remote file in the editor window of
   APP-024, bounded in size, and MUST reject oversized or non-file targets with a visible error
   instead of loading them.
+- **SFTP-015**: Each SSH file pane MUST provide an independent, case-insensitive fuzzy search over
+  the current directory's entries by filename, rank closer matches first, and keep source order for
+  ties. It MUST show the match count and a distinct no-match state. Refresh MUST retain the query;
+  successful directory changes MUST clear it. Filtered-out entries MUST not remain selected or be
+  targeted by bulk actions; Shift-selection MUST follow displayed order. Escape MUST clear the
+  query.
 - **LOCAL-FILES-001**: Ordinary local shell sessions MUST expose a single local file pane through
   the Files entry. WSL sessions MUST NOT reuse this pane.
 - **LOCAL-FILES-002**: The local pane MUST initially use the main process' resolved terminal startup
@@ -446,6 +452,12 @@ not currently implemented is stated as such instead of being treated as complete
 - **LOCAL-FILES-005**: Local filesystem operations MUST use the existing validated local IPC
   operations and the platform file-manager entry points; no shell command may be synthesized for
   browsing or mutation.
+- **LOCAL-FILES-006**: The local file pane MUST provide case-insensitive fuzzy search over the
+  current directory's entries by filename, rank closer matches first, and keep source order for
+  ties. It MUST show the match count and a distinct no-match state. Refresh MUST retain the query;
+  successful directory changes MUST clear it. Filtered-out entries MUST not remain selected or be
+  targeted by bulk actions; Shift-selection MUST follow displayed order. Escape MUST clear the
+  query.
 
 ## 15. Terminal environment context
 
