@@ -207,17 +207,29 @@ jobs:
             throw "Expected exactly one non-empty Windows portable, found $($portables.Count)."
           }
 
-      - name: Verify macOS DMG
+      - name: Verify macOS DMG and code signature
         if: matrix.platform == 'macos'
         shell: bash
         run: |
           set -euo pipefail
           shopt -s nullglob
-          images=(apps/desktop/out/releases/*.dmg)
+          images=(apps/desktop/out/releases/geared-term-mac-arm64-*.dmg)
           if (( ${#images[@]} != 1 )) || [[ ! -s "${images[0]}" ]]; then
-            echo "Expected exactly one non-empty macOS DMG, found ${#images[@]}."
+            echo "Expected exactly one non-empty versioned macOS DMG, found ${#images[@]}."
             exit 1
           fi
+          app='apps/desktop/out/releases/mac-arm64/Geared Term.app'
+          codesign --verify --deep --strict --verbose=2 "$app"
+          signature="$(codesign -dvv "$app" 2>&1)"
+          grep -Eq '^(Signature|Authority)=' <<<"${signature}"
+          minimum="$(/usr/libexec/PlistBuddy -c 'Print LSMinimumSystemVersion' "$app/Contents/Info.plist")"
+          case "$minimum" in
+            13.*) ;;
+            *)
+              echo "The Homebrew cask declares macOS 13 but the packaged app requires ${minimum}."
+              exit 1
+              ;;
+          esac
 
       - name: Verify Linux AppImage
         if: matrix.platform == 'linux'
@@ -254,6 +266,11 @@ jobs:
       actions: read
 
     steps:
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
       - name: Download platform packages
         uses: actions/download-artifact@v8
         with:
@@ -269,7 +286,7 @@ jobs:
 
           windows_installers=(staging/*-setup.exe)
           windows_portables=(staging/*-portable.exe)
-          macos_images=(staging/*.dmg)
+          macos_images=(staging/geared-term-mac-arm64-*.dmg)
           linux_images=(staging/*.AppImage)
           if (( ${#windows_installers[@]} != 1 )) || (( ${#windows_portables[@]} != 1 )) || (( ${#macos_images[@]} != 1 )) || (( ${#linux_images[@]} != 1 )); then
             echo "Expected exactly one package per platform, got ${#windows_installers[@]} Windows installers, ${#windows_portables[@]} Windows portables, ${#macos_images[@]} macOS and ${#linux_images[@]} Linux images."
@@ -326,6 +343,7 @@ jobs:
           releases_api="repos/${REPOSITORY}/releases"
           release_body="Automated nightly build for commit ${COMMIT_SHA}."
           release_body+=$'\n\nUnsigned development artifacts for macOS, Windows, and Linux.\n\nSHA-256 checksums are included in `SHA256SUMS.txt`.'
+          release_body+=$'\n\nmacOS users can install and upgrade through Homebrew:\n\n```sh\nbrew install --cask lihaozhe013/geared-term/geared-term\nbrew upgrade --cask geared-term\n```'
 
           if release_id="$(gh api "${releases_api}/tags/nightly" --jq '.id' 2>/dev/null)"; then
             gh api --method PATCH "${releases_api}/${release_id}" \
@@ -366,3 +384,51 @@ jobs:
             -F draft=false \
             -F prerelease=true \
             -f make_latest=false >/dev/null
+
+      - name: Sync Homebrew cask tap
+        env:
+          TAP_PUSH_TOKEN: ${{ secrets.TAP_PUSH_TOKEN }}
+          TAP_REPOSITORY: lihaozhe013/homebrew-geared-term
+          CASK_ARTIFACT: geared-term-macos-arm64.dmg
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+
+          if [[ -z "${TAP_PUSH_TOKEN}" ]]; then
+            echo "::warning::TAP_PUSH_TOKEN is not configured, so the Homebrew cask tap was not updated."
+            exit 0
+          fi
+
+          images=(staging/geared-term-mac-arm64-*.dmg)
+          if (( ${#images[@]} != 1 )); then
+            echo "Expected exactly one versioned macOS DMG to publish, found ${#images[@]}."
+            exit 1
+          fi
+          dmg_name="$(basename "${images[0]}")"
+          version="${dmg_name#geared-term-mac-arm64-}"
+          version="${version%.dmg}"
+
+          tap='tap-repository'
+          rm -rf "${tap}"
+          git clone --depth 1 \
+            "https://x-access-token:${TAP_PUSH_TOKEN}@github.com/${TAP_REPOSITORY}.git" "${tap}"
+          mkdir -p "${tap}/Casks"
+          node apps/desktop/scripts/render-homebrew-cask.mjs \
+            --dmg "${images[0]}" \
+            --artifact "${CASK_ARTIFACT}" \
+            --out "${tap}/Casks/geared-term.rb"
+
+          git -C "${tap}" config user.name 'github-actions[bot]'
+          git -C "${tap}" config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          if ! git -C "${tap}" rev-parse --verify HEAD >/dev/null 2>&1; then
+            git -C "${tap}" checkout -B main
+          fi
+          git -C "${tap}" add Casks/geared-term.rb
+          if git -C "${tap}" diff --cached --quiet; then
+            echo "Homebrew cask is already published for version ${version}."
+            exit 0
+          fi
+          git -C "${tap}" commit --message "chore(cask): bump geared-term to ${version}"
+          git -C "${tap}" push origin HEAD
+          echo "Published Homebrew cask version ${version} to ${TAP_REPOSITORY}."
