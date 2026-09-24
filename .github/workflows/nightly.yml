@@ -367,12 +367,17 @@ jobs:
               --jq '.id')"
           fi
 
-          asset_ids="$(gh api --paginate "${releases_api}/${release_id}/assets?per_page=100" --jq '.[].id')"
-          while IFS= read -r asset_id; do
-            if [[ -n "${asset_id}" ]]; then
-              gh api --method DELETE "${releases_api}/assets/${asset_id}" >/dev/null
+          # The newest versioned DMG that is already published is retained: the tap cask can still
+          # point at it until the tap's own sync workflow catches up, and deleting it would turn a
+          # stale cask into a 404 instead of a working install of the previous build.
+          assets="$(gh api --paginate "${releases_api}/${release_id}/assets?per_page=100" --jq '.[] | "\(.id) \(.name)"')"
+          retained_dmg="$(awk '$2 ~ /^geared-term-mac-arm64-.+\.dmg$/ { print $2 }' <<<"${assets}" | sort -V | tail -1)"
+          while read -r asset_id asset_name; do
+            if [[ -z "${asset_id}" || "${asset_name}" == "${retained_dmg}" ]]; then
+              continue
             fi
-          done <<< "${asset_ids}"
+            gh api --method DELETE "${releases_api}/assets/${asset_id}" >/dev/null
+          done <<< "${assets}"
 
           gh release upload nightly \
             release-assets/geared-term-windows-x64-setup.exe \
