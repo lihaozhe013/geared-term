@@ -59,7 +59,7 @@ work happens in a single window instead of scattered tools.
 | Platform       | Artifact                            |
 | -------------- | ----------------------------------- |
 | Windows x86-64 | NSIS installer and portable archive |
-| macOS arm64    | `.dmg`                              |
+| macOS arm64    | `.dmg` and Homebrew cask            |
 | Linux x86-64   | AppImage                            |
 
 ## Nightly downloads
@@ -82,14 +82,45 @@ downloaded.
 
 A few things to know about nightlies:
 
-- Nightly builds are unsigned development artifacts. macOS Gatekeeper will warn on first launch
-  because no developer signing is applied yet.
+- Nightly builds carry no Developer ID signature and no notarization. macOS bundles receive an
+  ad-hoc signature so the bundle stays internally valid, but Gatekeeper still warns on first launch.
 - The Windows installer build checks the nightly channel automatically after startup and once per
   day, downloads updates, and offers in-app installation. Portable, macOS, and Linux builds detect
-  new nightlies and link you to the release page for manual download.
+  new nightlies and link you to the release page for manual download; macOS installs from the
+  Homebrew tap below also show the `brew upgrade` command in Settings → About and in the update
+  prompt.
 - "Check for Updates" is available at any time under Settings → About.
 - Nightly quality is best-effort: each build only publishes after the full typecheck, unit test,
   Electron E2E, and packaged-startup smoke pipeline succeeds, but treat it as an unstable channel.
+
+## Homebrew (macOS)
+
+macOS nightlies are also published to the project's own tap, so you can install and upgrade them
+with Homebrew instead of downloading the DMG:
+
+```sh
+brew install --cask lihaozhe013/geared-term/geared-term
+```
+
+Use the fully qualified name for the first install: Homebrew 6 and newer only load non-official taps
+that you explicitly trust, and this form trusts just the `geared-term` cask. Afterwards the short
+form works:
+
+```sh
+brew upgrade --cask geared-term
+```
+
+`brew update` refreshes the tap, and `brew outdated --cask` reports Geared Term as soon as a newer
+nightly is published. The nightly pipeline bumps the tap automatically after each release.
+
+Notes:
+
+- The cask tracks the nightly channel, and its version matches the app version shown in Settings →
+  About (for example `0.1.1-beta.23`).
+- Because nightly bundles are only ad-hoc signed, Gatekeeper may ask for approval again after each
+  upgrade: allow the app in System Settings → Privacy & Security → Open Anyway.
+- The cask verifies the published `SHA-256` checksum, so a partially replaced release is reported
+  rather than installed.
 
 ## Documentation
 

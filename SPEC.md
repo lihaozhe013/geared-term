@@ -708,7 +708,9 @@ reported in Settings without blocking startup.
 
 - **UPD-001**: Unstable builds MUST be distributed through a rolling nightly prerelease on the
   project's GitHub repository. Each release MUST contain the supported platform artifacts, a SHA-256
-  checksum manifest, and the full commit SHA it was built from.
+  checksum manifest, and the full commit SHA it was built from. The macOS artifact MUST also be
+  published through the project's own Homebrew tap, whose cask MUST pin the nightly version and its
+  SHA-256 checksum and MUST be refreshed by the release pipeline.
 - **UPD-002**: A packaged build MUST embed its commit SHA and MUST determine freshness by comparing
   it with the current nightly release SHA. A build without a valid embedded SHA MUST report a
   structured error instead of guessing.
@@ -717,7 +719,9 @@ reported in Settings without blocking startup.
   builds MUST NOT check for updates.
 - **UPD-004**: Automatic download and in-app installation MUST be limited to the Windows NSIS
   installer build and MUST run only from an explicit user action. Portable Windows, macOS, and Linux
-  builds MUST present the release page link for manual download instead.
+  builds MUST present the release page link for manual download instead. A macOS build installed
+  through the Homebrew tap MUST additionally present the package manager upgrade command in Settings
+  → About and in the automatic update prompt, and MUST NOT execute it.
 - **UPD-005**: The updater MUST target only Geared Term's own release feed, and update traffic MUST
   NOT include user content, credentials, or identifiers beyond an ordinary release metadata request.
   Update failures MUST be bounded and redacted and MUST NOT interrupt terminal, SFTP, or AI
@@ -730,6 +734,10 @@ reported in Settings without blocking startup.
   process run, offer actions to open Settings → About or dismiss it, and wait until the main window
   is visible when the app is hidden or minimized. Manual checks MUST continue to report through
   Settings → About without opening a separate prompt; dismissals MUST NOT persist across restarts.
+- **UPD-008**: Packaged macOS bundles MUST carry a code signature that verifies, at minimum an
+  ad-hoc signature covering the whole bundle including its helpers. Builds MUST NOT advertise
+  Developer ID signing or notarization they do not perform, and the release pipeline MUST fail when
+  a packaged bundle does not verify.
 
 ## 23. Performance and reliability
 

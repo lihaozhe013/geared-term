@@ -2,7 +2,7 @@
 
 > Status: Current architecture reference
 >
-> Last updated: 2026-09-23
+> Last updated: 2026-09-24
 >
 > Governing specification: [`SPEC.md`](../SPEC.md) · Requirement status:
 > [`docs/requirements-matrix.md`](requirements-matrix.md)
@@ -30,6 +30,7 @@ apps/
         ssh/                   ssh2 session, host keys, authentication
         vault/                 encrypted secret storage
         wsl/                   distribution discovery and launch
+        install-channel.ts     delivery-channel probe (installer, Homebrew cask, manual)
         index.ts               IPC wiring, window lifecycle, update/tray integration
         logging.ts             redacted category logs with rotation
         menu.ts                native application menu
@@ -45,7 +46,8 @@ apps/
         src/
           ai/ assistant/ history/ settings/ sftp/ terminal/ terminal-snapshot/ remote-editor/
     e2e/                       Playwright Electron suites
-    scripts/                   build, security audit, packaged smoke, nightly versioning
+    scripts/                   build, security audit, packaged smoke, nightly versioning, signing
+                               and Homebrew cask rendering
     resources/
     electron-builder.yml
 packages/
@@ -107,9 +109,9 @@ On Windows x64, local `node-pty` sessions use the Microsoft ConPTY runtime pinne
 [`apps/desktop/resources/conpty/win32-x64/README.md`](../apps/desktop/resources/conpty/win32-x64/README.md).
 The development staging script and Electron `afterPack` hook verify the pinned SHA-256 digests and
 place `conpty.dll` and `OpenConsole.exe` beside each x64 `conpty.node` that the loader can select.
-Other platforms and Windows ARM64 continue to use the existing PTY backend. A local PTY natural
-exit retires the session before the renderer closes its port, so that renderer cleanup cannot kill
-an already exited process.
+Other platforms and Windows ARM64 continue to use the existing PTY backend. A local PTY natural exit
+retires the session before the renderer closes its port, so that renderer cleanup cannot kill an
+already exited process.
 
 ## 4. Session state machine
 
@@ -253,8 +255,10 @@ is driven by business-named, validated IPC.
 
 ## 8. Update delivery
 
-Geared Term ships unsigned nightly artifacts to a rolling GitHub `nightly` prerelease
-(`.github/workflows/nightly.yml`); each build embeds its commit SHA.
+Geared Term ships nightly artifacts to a rolling GitHub `nightly` prerelease
+(`.github/workflows/nightly.yml`); each build embeds its commit SHA. macOS bundles are ad-hoc signed
+by `scripts/after-pack.cjs` so the packaged bundle verifies; no Developer ID signature or
+notarization is applied, and the hook steps aside when electron-builder signs with a real identity.
 
 - `update-release.ts` fetches the `nightly` release metadata from the GitHub API and extracts the
   full commit SHA from the release body.
@@ -263,13 +267,25 @@ Geared Term ships unsigned nightly artifacts to a rolling GitHub `nightly` prere
   check.
 - Status is published to renderers as the validated `UpdateStatus` union
   (`idle | checking | up-to-date | available | downloading | downloaded | error`).
+- `install-channel.ts` probes how the running build was delivered — the Windows NSIS installer, a
+  Homebrew cask (the `Caskroom/geared-term` directory under the active Homebrew prefix), or a manual
+  download — and the result is published in `AppInfo`.
 - `update-notification.ts` receives one automatic new-SHA notification per process run and shows a
   localized native prompt. It opens Settings → About on request and queues the prompt until the main
   window is shown if the app is hidden or minimized in the tray.
 - Automatic download and in-app install are Windows NSIS-installer builds only (electron-updater
   with a generic publish feed pointing at the release download URL and the `beta` channel,
   `beta.yml`). Portable Windows builds and macOS/Linux builds detect an update and offer the release
-  page link for manual download instead.
+  page link for manual download instead; a Homebrew-managed macOS install is additionally shown the
+  `brew upgrade --cask geared-term` command, which the app never executes.
+- The macOS DMG is also published through the project's Homebrew tap
+  (`lihaozhe013/homebrew-geared-term`). The release job renders `Casks/geared-term.rb` with
+  `scripts/render-homebrew-cask.mjs`, pinning the nightly version and the artifact SHA-256, and
+  pushes it to the tap so `brew update && brew outdated --cask` reports the new build. The push uses
+  the `TAP_PUSH_TOKEN` secret (a fine-grained token scoped to the tap repository's contents) and is
+  skipped with a workflow warning when the secret is absent. The cask deliberately keeps the rolling
+  asset URL that the README links to and bumps the checksum in the same run, which `brew audit`
+  reports as an unversioned URL.
 - Update failures are surfaced as bounded, redacted errors and never interrupt terminal, SFTP, or AI
   sessions.
 
@@ -307,17 +323,17 @@ Required verification order:
 
 ## 10. Risk register
 
-| Risk                              | Detection                                 | Mitigation                                                            | Release blocker                                                |
-| --------------------------------- | ----------------------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------------- |
-| Native module ABI failure         | Packaged smoke fails                      | Rebuild `node-pty` and `better-sqlite3` for Electron ABI per platform | Any supported artifact cannot start a PTY or open the database |
-| xterm font/IME regression         | Manual matrix or buffer/render mismatch   | Font fallback fixtures, IME testing, WebGL fallback                   | Input loss, unreadable CJK, or incorrect cell geometry         |
-| Port backpressure bug             | Memory growth, latency, missing sequence  | Credit/ack protocol, stress tests, explicit overload state            | Lost terminal bytes or unbounded growth                        |
-| `ssh2` behavior gap               | Controlled-server scenario fails          | Adapter state machine, interoperability fixtures, scoped feature set  | Auth, host trust, PTY, or resize failure                       |
-| SFTP blocks terminal              | Latency/stress metrics                    | Separate channels/tasks and bounded transfer events                   | Terminal becomes unresponsive during transfer                  |
-| Changed-host handling weakens     | Host-key fixtures fail                    | Fail closed, serialize store changes, show both fingerprints          | Mismatch accepted without explicit approval                    |
-| Parser changes command meaning    | Fixture/fuzz failure                      | Shell-specific parsers and whole-block fallback                       | Runnable incorrect candidate                                   |
-| Stale command targets wrong tab   | Race E2E failure                          | Session and revision validation in main                               | Any demonstrated cross-session send                            |
-| SQLite migration corrupts data    | Migration or interrupted-write test fails | Transactional migrations, `VACUUM INTO` backups, quarantine           | Data loss or a partially migrated database                     |
-| Secret leakage                    | Log/IPC/bundle scanning                   | Main-only secrets, redaction, synthetic canary tests                  | Any plaintext secret outside approved memory path              |
-| Linux auto-unlock is weak         | `safeStorage` reports basic backend       | Reject the basic backend; no silent fallback (ADR 0001)               | Silent insecure auto-unlock                                    |
-| Unsigned update channel is abused | Release tooling or feed changes           | Nightly-only prerelease channel; SHA comparison; Windows installer    | A build can be force-downgraded or fed foreign artifacts       |
+| Risk                              | Detection                                 | Mitigation                                                                                        | Release blocker                                                |
+| --------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| Native module ABI failure         | Packaged smoke fails                      | Rebuild `node-pty` and `better-sqlite3` for Electron ABI per platform                             | Any supported artifact cannot start a PTY or open the database |
+| xterm font/IME regression         | Manual matrix or buffer/render mismatch   | Font fallback fixtures, IME testing, WebGL fallback                                               | Input loss, unreadable CJK, or incorrect cell geometry         |
+| Port backpressure bug             | Memory growth, latency, missing sequence  | Credit/ack protocol, stress tests, explicit overload state                                        | Lost terminal bytes or unbounded growth                        |
+| `ssh2` behavior gap               | Controlled-server scenario fails          | Adapter state machine, interoperability fixtures, scoped feature set                              | Auth, host trust, PTY, or resize failure                       |
+| SFTP blocks terminal              | Latency/stress metrics                    | Separate channels/tasks and bounded transfer events                                               | Terminal becomes unresponsive during transfer                  |
+| Changed-host handling weakens     | Host-key fixtures fail                    | Fail closed, serialize store changes, show both fingerprints                                      | Mismatch accepted without explicit approval                    |
+| Parser changes command meaning    | Fixture/fuzz failure                      | Shell-specific parsers and whole-block fallback                                                   | Runnable incorrect candidate                                   |
+| Stale command targets wrong tab   | Race E2E failure                          | Session and revision validation in main                                                           | Any demonstrated cross-session send                            |
+| SQLite migration corrupts data    | Migration or interrupted-write test fails | Transactional migrations, `VACUUM INTO` backups, quarantine                                       | Data loss or a partially migrated database                     |
+| Secret leakage                    | Log/IPC/bundle scanning                   | Main-only secrets, redaction, synthetic canary tests                                              | Any plaintext secret outside approved memory path              |
+| Linux auto-unlock is weak         | `safeStorage` reports basic backend       | Reject the basic backend; no silent fallback (ADR 0001)                                           | Silent insecure auto-unlock                                    |
+| Unsigned update channel is abused | Release tooling or feed changes           | Nightly-only prerelease channel; SHA comparison; Windows installer; checksum-pinned Homebrew cask | A build can be force-downgraded or fed foreign artifacts       |
