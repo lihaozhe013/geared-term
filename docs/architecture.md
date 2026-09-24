@@ -286,7 +286,9 @@ notarization is applied, and the hook steps aside when electron-builder signs wi
   skipped with a workflow warning when the secret is absent. The cask points at the immutable
   versioned DMG that the release uploads alongside the stable `geared-term-macos-arm64.dmg` link, so
   a missing or expired token leaves users on the last published version instead of failing the
-  checksum.
+  checksum. The tap repository also runs its own hourly `sync-cask.yml`, which re-renders the cask
+  from the nightly `SHA256SUMS.txt` and pushes with its own `GITHUB_TOKEN`; the release job
+  therefore retries a lost push race once and otherwise defers to that workflow.
 - Update failures are surfaced as bounded, redacted errors and never interrupt terminal, SFTP, or AI
   sessions.
 

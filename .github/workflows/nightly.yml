@@ -433,5 +433,13 @@ jobs:
             exit 0
           fi
           git -C "${tap}" commit --message "chore(cask): bump geared-term to ${version}"
-          git -C "${tap}" push origin HEAD
+          # The tap repository also re-renders this cask hourly on its own, so losing a push race
+          # must not fail the release: retry once, then leave the catch-up to that workflow.
+          if ! git -C "${tap}" push origin HEAD; then
+            git -C "${tap}" pull --rebase origin main || true
+            if ! git -C "${tap}" push origin HEAD; then
+              echo "::warning::Could not push the Homebrew cask to ${TAP_REPOSITORY}; its own sync workflow will publish version ${version}."
+              exit 0
+            fi
+          fi
           echo "Published Homebrew cask version ${version} to ${TAP_REPOSITORY}."
