@@ -47,11 +47,11 @@ describe('SettingsRecordSchema keybindings', () => {
 
 describe('SettingsRecordSchema terminal padding', () => {
   it('defaults to the shell inset for records saved before the field existed', () => {
-    expect(SettingsRecordSchema.parse(baseSettings).terminalPadding).toBe(8);
+    expect(SettingsRecordSchema.parse(baseSettings).terminalPadding).toBe(14);
   });
 
   it('defaults full-screen padding for records saved before the field existed', () => {
-    expect(SettingsRecordSchema.parse(baseSettings).fullScreenTerminalPadding).toBe(8);
+    expect(SettingsRecordSchema.parse(baseSettings).fullScreenTerminalPadding).toBe(14);
   });
 
   it('accepts integers in range and rejects invalid values', () => {

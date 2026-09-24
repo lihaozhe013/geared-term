@@ -3,8 +3,8 @@ import { launchApp, openLocalTab, type AppSession } from './fixtures';
 
 let session: AppSession;
 
-const DEFAULT_SHELL_PADDING = 12;
-const DEFAULT_FULL_SCREEN_PADDING = 8;
+const DEFAULT_SHELL_PADDING = 14;
+const DEFAULT_FULL_SCREEN_PADDING = 14;
 const CUSTOM_SHELL_PADDING = 16;
 const CUSTOM_FULL_SCREEN_PADDING = 20;
 
@@ -75,7 +75,7 @@ async function expectPadding(expected: number): Promise<void> {
   await expect.poll(async () => (await measure()).padding, { timeout: 10_000 }).toBe(expected);
 }
 
-test('shell prompt keeps its existing default padding', async () => {
+test('shell prompt uses the default padding', async () => {
   const geometry = await measure();
   expect(geometry.alternate).toBe(false);
   expect(geometry.padding).toBe(DEFAULT_SHELL_PADDING);

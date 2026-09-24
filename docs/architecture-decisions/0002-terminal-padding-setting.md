@@ -83,3 +83,9 @@ replaced with an independent full-screen setting:
 
 The settings apply uniformly to all programs detected in the alternate screen buffer. Programs that
 do not enter that buffer continue to use normal-buffer padding.
+
+## Revision (2026-09-24, defaults)
+
+The 8 px full-screen default proved too small in use. Both normal-buffer and full-screen padding now
+default to 14 px in new settings and when older records omit the corresponding field. Explicitly
+stored values remain user preferences and are preserved.
