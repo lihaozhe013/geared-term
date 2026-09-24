@@ -114,7 +114,7 @@ export function SettingsWindow(): React.JSX.Element {
     if (!palette || !settings) return;
     applyPalette(palette);
     applyTypography(settings.uiFontSize, settings.uiFontFamily);
-    applyTerminalLayout(settings.terminalPadding);
+    applyTerminalLayout(settings.terminalPadding, settings.fullScreenTerminalPadding);
   }, [palette, settings]);
 
   const save = async (patch: Partial<SettingsRecord>): Promise<void> => {

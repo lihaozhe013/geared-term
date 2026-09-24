@@ -64,3 +64,22 @@ reflow the last lines of shell output once per transition. Mainstream terminals 
 never changing padding, at the cost of a permanent frame around full-screen programs.
 
 Programs that do not use the alternate screen (REPLs, `ssh`, progress output) keep the inset.
+
+## Revision (2026-09-24)
+
+Full-screen programs such as lazygit and tmux can benefit from a smaller frame than the shell, and
+some TUI applications provide no internal padding control. The zero-padding policy is therefore
+replaced with an independent full-screen setting:
+
+1. **Field.** `SettingsRecord` gains `fullScreenTerminalPadding`, an integer number of logical
+   pixels in the range 0-32. It defaults to 8 in the schema and new settings, so existing records
+   parse without a migration.
+2. **Application.** Normal-buffer `terminalPadding` remains unchanged. The alternate-screen CSS rule
+   uses `fullScreenTerminalPadding`; changing either setting resizes the terminal host and the
+   existing `ResizeObserver` re-fits the active pane.
+3. **Presentation.** Settings - Appearance exposes the full-screen padding beside the normal-buffer
+   setting. Both values are validated by the existing settings schema and persisted in the current
+   settings JSON.
+
+The settings apply uniformly to all programs detected in the alternate screen buffer. Programs that
+do not enter that buffer continue to use normal-buffer padding.

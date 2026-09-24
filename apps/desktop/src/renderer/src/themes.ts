@@ -535,10 +535,16 @@ export function applyTypography(uiFontSize: number, uiFontFamily: string): void 
   }
 }
 
-/* The terminal keeps its own padding because full-screen TUIs paint the cell
-   grid edge to edge; styles.css reads this from .terminal-surface. */
-export function applyTerminalLayout(terminalPadding: number): void {
+/* The terminal surface reads both padding values from these custom properties. */
+export function applyTerminalLayout(
+  terminalPadding: number,
+  fullScreenTerminalPadding: number
+): void {
   document.documentElement.style.setProperty('--gt-terminal-padding', `${terminalPadding}px`);
+  document.documentElement.style.setProperty(
+    '--gt-full-screen-terminal-padding',
+    `${fullScreenTerminalPadding}px`
+  );
 }
 
 export function buildSearchDecorations(palette: Palette): ISearchDecorationOptions {

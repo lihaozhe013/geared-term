@@ -65,6 +65,7 @@ export const defaultSettings: Settings = {
   terminalFontSize: 14,
   terminalLineHeight: 1.2,
   terminalPadding: 12,
+  fullScreenTerminalPadding: 8,
   terminalCursor: 'block',
   defaultTerm: 'xterm-256color',
   splitCommandPresentation: true,

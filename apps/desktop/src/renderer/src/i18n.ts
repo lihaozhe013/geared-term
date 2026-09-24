@@ -14,6 +14,7 @@ const messages = {
     fontSize: 'Font size',
     lineHeight: 'Line height',
     terminalPadding: 'Terminal padding',
+    fullScreenTerminalPadding: 'Full-screen program padding',
     cursor: 'Cursor style',
     cursorBlock: 'Block',
     cursorUnderline: 'Underline',
@@ -133,8 +134,9 @@ const messages = {
     fontLigatures: 'Enable font ligatures',
     fontLigaturesHint:
       'Renders programming ligatures (=>, ->, !==) as single glyphs when the terminal font provides them.',
-    terminalPaddingHint:
-      'Inset around the shell prompt. Full-screen programs (vim, lazygit, tmux) always fill the workspace; 0 makes the shell edge to edge too.',
+    terminalPaddingHint: 'Inset around the shell prompt; 0 makes the shell edge to edge.',
+    fullScreenTerminalPaddingHint:
+      'Inset around full-screen terminal programs such as vim, lazygit, and tmux; 0 lets them fill the workspace.',
     fallbackFonts: 'Fallback fonts (ordered)',
     addFallback: 'Add fallback font',
     fontScale: 'Scale',
@@ -495,6 +497,7 @@ const messages = {
     fontSize: '字体大小',
     lineHeight: '行高',
     terminalPadding: '终端内边距',
+    fullScreenTerminalPadding: '全屏程序内边距',
     cursor: '光标样式',
     cursorBlock: '方块',
     cursorUnderline: '下划线',
@@ -609,8 +612,9 @@ const messages = {
     terminalFontFamily: '终端字体',
     fontLigatures: '启用字体连字',
     fontLigaturesHint: '当终端字体支持时，将编程连字（=>、->、!== 等）渲染为单个字形。',
-    terminalPaddingHint:
-      'shell 提示符周围的留白。全屏程序（vim、lazygit、tmux 等）始终铺满工作区；设为 0 时 shell 也贴边。',
+    terminalPaddingHint: 'shell 提示符周围的留白；设为 0 时 shell 也贴边。',
+    fullScreenTerminalPaddingHint:
+      'vim、lazygit、tmux 等全屏终端程序周围的留白；设为 0 时程序铺满工作区。',
     fallbackFonts: '回退字体（有序）',
     addFallback: '添加回退字体',
     fontScale: '缩放',

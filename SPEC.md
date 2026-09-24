@@ -579,15 +579,16 @@ not currently implemented is stated as such instead of being treated as complete
 - **SET-001**: Settings MUST cover General, Appearance, Terminal, SFTP, AI Connections, AI
   Assistant, Security & Vault, and About.
 - **SET-002**: User settings MUST include language, theme, UI font/family/size, terminal primary and
-  ordered fallback fonts, terminal font size, line height, terminal padding, cursor style, default
-  TERM, command-split presentation, global AI instructions, SFTP open commands, and terminal-context
-  bounds.
+  ordered fallback fonts, terminal font size, line height, normal-buffer and full-screen terminal
+  padding, cursor style, default TERM, command-split presentation, global AI instructions, SFTP open
+  commands, and terminal-context bounds.
 - **SET-003**: Terminal fallback fonts MUST support optional scale and horizontal/vertical
   adjustments, preserve order, and remove blanks, duplicates, and the primary font.
 - **SET-004**: Font sizes MUST remain within 8-32 logical pixels and terminal line height within
-  1.00-2.00 in stable 0.05 steps. Terminal padding MUST remain an integer between 0 and 32 logical
-  pixels and MUST default to 8 for the shell buffer. While the alternate screen buffer is active,
-  the padding MUST be ignored so full-screen programs fill the workspace.
+  1.00-2.00 in stable 0.05 steps. Normal-buffer and full-screen terminal padding MUST each remain an
+  integer between 0 and 32 logical pixels. Full-screen terminal padding MUST default to 8. The
+  normal-buffer padding MUST apply only while the normal buffer is active; full-screen padding MUST
+  apply while the alternate screen buffer is active.
 - **SET-005**: Built-in themes MUST include a dark default theme and the four Catppuccin variants.
   UI, terminal, selection, cursor, search, and code highlighting colors MUST remain coordinated.
 - **SET-006**: User theme JSON files MUST be loadable from a documented theme directory. A valid

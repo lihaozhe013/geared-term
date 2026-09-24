@@ -3,8 +3,10 @@ import { launchApp, openLocalTab, type AppSession } from './fixtures';
 
 let session: AppSession;
 
-const DEFAULT_PADDING = 12;
-const CUSTOM_PADDING = 16;
+const DEFAULT_SHELL_PADDING = 12;
+const DEFAULT_FULL_SCREEN_PADDING = 8;
+const CUSTOM_SHELL_PADDING = 16;
+const CUSTOM_FULL_SCREEN_PADDING = 20;
 
 test.beforeAll(async () => {
   session = await launchApp();
@@ -20,11 +22,17 @@ test.afterAll(async () => {
   await session.app.close();
 });
 
-async function setTerminalPadding(padding: number): Promise<void> {
-  await session.page.evaluate(async (next) => {
-    const settings = await window.geared.getSettings();
-    await window.geared.saveSettings({ ...settings, terminalPadding: next });
-  }, padding);
+async function setPadding(
+  field: 'terminalPadding' | 'fullScreenTerminalPadding',
+  padding: number
+): Promise<void> {
+  await session.page.evaluate(
+    async (next) => {
+      const settings = await window.geared.getSettings();
+      await window.geared.saveSettings({ ...settings, [next.field]: next.padding });
+    },
+    { field, padding }
+  );
 }
 
 // `node -e` keeps the escape sequence portable across the pwsh/cmd/bash shells a
@@ -67,29 +75,47 @@ async function expectPadding(expected: number): Promise<void> {
   await expect.poll(async () => (await measure()).padding, { timeout: 10_000 }).toBe(expected);
 }
 
-test('shell prompt keeps the default padding', async () => {
+test('shell prompt keeps its existing default padding', async () => {
   const geometry = await measure();
   expect(geometry.alternate).toBe(false);
-  expect(geometry.padding).toBe(DEFAULT_PADDING);
-  expect(geometry.insetLeft).toBeCloseTo(DEFAULT_PADDING, 0);
-  expect(geometry.insetTop).toBeCloseTo(DEFAULT_PADDING, 0);
+  expect(geometry.padding).toBe(DEFAULT_SHELL_PADDING);
+  expect(geometry.insetLeft).toBeCloseTo(DEFAULT_SHELL_PADDING, 0);
+  expect(geometry.insetTop).toBeCloseTo(DEFAULT_SHELL_PADDING, 0);
 });
 
-test('full-screen programs fill the workspace and restore the shell padding', async () => {
-  await setTerminalPadding(CUSTOM_PADDING);
-  await expectPadding(CUSTOM_PADDING);
-
+test('full-screen programs use their own padding and restore the shell padding', async () => {
   await emitMode('h');
   await expect.poll(async () => (await measure()).alternate, { timeout: 15_000 }).toBe(true);
+  await expectPadding(DEFAULT_FULL_SCREEN_PADDING);
+  let fullScreen = await measure();
+  expect(fullScreen.insetLeft).toBeCloseTo(DEFAULT_FULL_SCREEN_PADDING, 0);
+  expect(fullScreen.insetTop).toBeCloseTo(DEFAULT_FULL_SCREEN_PADDING, 0);
+
+  await emitMode('l');
+  await expect.poll(async () => (await measure()).alternate, { timeout: 15_000 }).toBe(false);
+  await expectPadding(DEFAULT_SHELL_PADDING);
+
+  await setPadding('terminalPadding', CUSTOM_SHELL_PADDING);
+  await setPadding('fullScreenTerminalPadding', CUSTOM_FULL_SCREEN_PADDING);
+  await expectPadding(CUSTOM_SHELL_PADDING);
+  await emitMode('h');
+  await expect.poll(async () => (await measure()).alternate, { timeout: 15_000 }).toBe(true);
+  await expectPadding(CUSTOM_FULL_SCREEN_PADDING);
+  fullScreen = await measure();
+  expect(fullScreen.insetLeft).toBeCloseTo(CUSTOM_FULL_SCREEN_PADDING, 0);
+  expect(fullScreen.insetTop).toBeCloseTo(CUSTOM_FULL_SCREEN_PADDING, 0);
+
+  await setPadding('fullScreenTerminalPadding', 0);
   await expectPadding(0);
-  const fullScreen = await measure();
+  fullScreen = await measure();
   expect(fullScreen.insetLeft).toBeCloseTo(0, 0);
   expect(fullScreen.insetTop).toBeCloseTo(0, 0);
 
   await emitMode('l');
   await expect.poll(async () => (await measure()).alternate, { timeout: 15_000 }).toBe(false);
-  await expectPadding(CUSTOM_PADDING);
+  await expectPadding(CUSTOM_SHELL_PADDING);
 
-  await setTerminalPadding(DEFAULT_PADDING);
-  await expectPadding(DEFAULT_PADDING);
+  await setPadding('terminalPadding', DEFAULT_SHELL_PADDING);
+  await setPadding('fullScreenTerminalPadding', DEFAULT_FULL_SCREEN_PADDING);
+  await expectPadding(DEFAULT_SHELL_PADDING);
 });

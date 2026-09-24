@@ -50,6 +50,10 @@ describe('SettingsRecordSchema terminal padding', () => {
     expect(SettingsRecordSchema.parse(baseSettings).terminalPadding).toBe(8);
   });
 
+  it('defaults full-screen padding for records saved before the field existed', () => {
+    expect(SettingsRecordSchema.parse(baseSettings).fullScreenTerminalPadding).toBe(8);
+  });
+
   it('accepts integers in range and rejects invalid values', () => {
     expect(
       SettingsRecordSchema.parse({ ...baseSettings, terminalPadding: 12 }).terminalPadding
@@ -66,5 +70,27 @@ describe('SettingsRecordSchema terminal padding', () => {
     expect(SettingsRecordSchema.safeParse({ ...baseSettings, terminalPadding: 1.5 }).success).toBe(
       false
     );
+  });
+
+  it('accepts full-screen padding in range and rejects invalid values', () => {
+    expect(
+      SettingsRecordSchema.parse({ ...baseSettings, fullScreenTerminalPadding: 12 })
+        .fullScreenTerminalPadding
+    ).toBe(12);
+    expect(
+      SettingsRecordSchema.safeParse({ ...baseSettings, fullScreenTerminalPadding: 0 }).success
+    ).toBe(true);
+    expect(
+      SettingsRecordSchema.safeParse({ ...baseSettings, fullScreenTerminalPadding: 32 }).success
+    ).toBe(true);
+    expect(
+      SettingsRecordSchema.safeParse({ ...baseSettings, fullScreenTerminalPadding: 33 }).success
+    ).toBe(false);
+    expect(
+      SettingsRecordSchema.safeParse({ ...baseSettings, fullScreenTerminalPadding: -1 }).success
+    ).toBe(false);
+    expect(
+      SettingsRecordSchema.safeParse({ ...baseSettings, fullScreenTerminalPadding: 1.5 }).success
+    ).toBe(false);
   });
 });

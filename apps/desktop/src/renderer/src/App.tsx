@@ -71,6 +71,7 @@ const defaultSettings: SettingsRecord = {
   terminalFontSize: 14,
   terminalLineHeight: 1.2,
   terminalPadding: 12,
+  fullScreenTerminalPadding: 8,
   terminalCursor: 'bar',
   defaultTerm: 'xterm-256color',
   splitCommandPresentation: true,
@@ -328,8 +329,14 @@ export function App(): React.JSX.Element {
   useEffect(() => {
     applyPalette(palette);
     applyTypography(settings.uiFontSize, settings.uiFontFamily);
-    applyTerminalLayout(settings.terminalPadding);
-  }, [palette, settings.uiFontFamily, settings.uiFontSize, settings.terminalPadding]);
+    applyTerminalLayout(settings.terminalPadding, settings.fullScreenTerminalPadding);
+  }, [
+    palette,
+    settings.uiFontFamily,
+    settings.uiFontSize,
+    settings.terminalPadding,
+    settings.fullScreenTerminalPadding
+  ]);
 
   const discoverWsl = useCallback(async (): Promise<void> => {
     setWslLoading(true);

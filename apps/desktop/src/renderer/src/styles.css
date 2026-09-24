@@ -1497,12 +1497,11 @@ button:disabled {
 }
 
 /*
- * Full-screen programs (alternate screen buffer) paint their own background and
- * chrome, so a frame there reads as an asymmetric gutter. The shell prompt keeps
- * the configurable inset; on the alternate buffer the grid fills the workspace.
+ * Alternate-screen programs use a separate inset so their application chrome
+ * can breathe without changing the shell prompt layout.
  */
 .terminal-surface[data-alternate-screen='true'] {
-  padding: 0;
+  padding: var(--gt-full-screen-terminal-padding, 8px);
 }
 
 .terminal-surface > .terminal-wrapper {
