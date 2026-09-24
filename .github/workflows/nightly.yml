@@ -427,6 +427,12 @@ jobs:
             --dmg "${images[0]}" \
             --out "${tap}/Casks/geared-term.rb"
 
+          # A renderer that silently writes nothing would look like "already published" below.
+          if ! grep -q "^  version \"${version}\"$" "${tap}/Casks/geared-term.rb"; then
+            echo "::error::The rendered cask does not pin version ${version}."
+            exit 1
+          fi
+
           git -C "${tap}" config user.name 'github-actions[bot]'
           git -C "${tap}" config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           if ! git -C "${tap}" rev-parse --verify HEAD >/dev/null 2>&1; then
