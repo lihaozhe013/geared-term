@@ -710,7 +710,9 @@ reported in Settings without blocking startup.
   project's GitHub repository. Each release MUST contain the supported platform artifacts, a SHA-256
   checksum manifest, and the full commit SHA it was built from. The macOS artifact MUST also be
   published through the project's own Homebrew tap, whose cask MUST pin the nightly version and its
-  SHA-256 checksum and MUST be refreshed by the release pipeline.
+  SHA-256 checksum and MUST be refreshed by the release pipeline. The cask MUST reference the
+  immutable versioned macOS artifact so a pinned checksum cannot drift while the rolling release is
+  replaced.
 - **UPD-002**: A packaged build MUST embed its commit SHA and MUST determine freshness by comparing
   it with the current nightly release SHA. A build without a valid embedded SHA MUST report a
   structured error instead of guessing.

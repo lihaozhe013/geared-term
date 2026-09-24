@@ -283,9 +283,10 @@ notarization is applied, and the hook steps aside when electron-builder signs wi
   `scripts/render-homebrew-cask.mjs`, pinning the nightly version and the artifact SHA-256, and
   pushes it to the tap so `brew update && brew outdated --cask` reports the new build. The push uses
   the `TAP_PUSH_TOKEN` secret (a fine-grained token scoped to the tap repository's contents) and is
-  skipped with a workflow warning when the secret is absent. The cask deliberately keeps the rolling
-  asset URL that the README links to and bumps the checksum in the same run, which `brew audit`
-  reports as an unversioned URL.
+  skipped with a workflow warning when the secret is absent. The cask points at the immutable
+  versioned DMG that the release uploads alongside the stable `geared-term-macos-arm64.dmg` link, so
+  a missing or expired token leaves users on the last published version instead of failing the
+  checksum.
 - Update failures are surfaced as bounded, redacted errors and never interrupt terminal, SFTP, or AI
   sessions.
 

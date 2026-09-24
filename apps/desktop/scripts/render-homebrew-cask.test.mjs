@@ -22,7 +22,7 @@ describe('Homebrew cask rendering', () => {
     expect(cask).toContain('cask "geared-term" do');
     expect(cask).toContain('version "0.1.1-beta.23"');
     expect(cask).toContain(`sha256 "${sha256}"`);
-    expect(cask).toContain('# The nightly release replaces this artifact in place');
+    expect(cask).toContain('# Rendered by the geared-term nightly workflow');
     expect(cask).toContain(
       'url "https://github.com/lihaozhe013/geared-term/releases/download/nightly/geared-term-mac-arm64-#{version}.dmg"'
     );

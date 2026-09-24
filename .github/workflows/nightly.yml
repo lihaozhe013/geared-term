@@ -293,10 +293,13 @@ jobs:
             exit 1
           fi
 
+          macos_versioned_image="$(basename -- "${macos_images[0]}")"
           mkdir -p release-assets
           cp -- "${windows_installers[0]}" release-assets/geared-term-windows-x64-setup.exe
           cp -- "${windows_portables[0]}" release-assets/geared-term-windows-x64-portable.exe
           cp -- "${macos_images[0]}" release-assets/geared-term-macos-arm64.dmg
+          # The versioned DMG is immutable, which is what the Homebrew cask checksum pins to.
+          cp -- "${macos_images[0]}" "release-assets/${macos_versioned_image}"
           cp -- "${linux_images[0]}" release-assets/geared-term-linux-x64.AppImage
           cp -- staging/beta.yml release-assets/beta.yml
           (
@@ -305,6 +308,7 @@ jobs:
               geared-term-windows-x64-setup.exe \
               geared-term-windows-x64-portable.exe \
               geared-term-macos-arm64.dmg \
+              "${macos_versioned_image}" \
               geared-term-linux-x64.AppImage \
               beta.yml \
               > SHA256SUMS.txt
@@ -374,6 +378,7 @@ jobs:
             release-assets/geared-term-windows-x64-setup.exe \
             release-assets/geared-term-windows-x64-portable.exe \
             release-assets/geared-term-macos-arm64.dmg \
+            release-assets/geared-term-mac-arm64-*.dmg \
             release-assets/geared-term-linux-x64.AppImage \
             release-assets/beta.yml \
             release-assets/SHA256SUMS.txt \
@@ -389,7 +394,6 @@ jobs:
         env:
           TAP_PUSH_TOKEN: ${{ secrets.TAP_PUSH_TOKEN }}
           TAP_REPOSITORY: lihaozhe013/homebrew-geared-term
-          CASK_ARTIFACT: geared-term-macos-arm64.dmg
         shell: bash
         run: |
           set -euo pipefail
@@ -416,7 +420,6 @@ jobs:
           mkdir -p "${tap}/Casks"
           node apps/desktop/scripts/render-homebrew-cask.mjs \
             --dmg "${images[0]}" \
-            --artifact "${CASK_ARTIFACT}" \
             --out "${tap}/Casks/geared-term.rb"
 
           git -C "${tap}" config user.name 'github-actions[bot]'

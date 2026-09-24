@@ -40,8 +40,8 @@ export function renderCask({ version, sha256, repository, tag, arch, artifact })
   }
   return `cask "geared-term" do
   version "${version}"
-  # The nightly release replaces this artifact in place, so the release pipeline bumps the checksum
-  # together with the version.
+  # Rendered by the geared-term nightly workflow; the URL pins the immutable versioned DMG so the
+  # checksum cannot drift while the rolling release is replaced.
   sha256 "${sha256}"
 
   url "https://github.com/${repository}/releases/download/${tag}/${assetName}"
