@@ -347,6 +347,49 @@ describe('profile database', () => {
     reopened.close();
   });
 
+  it('persists empty groups, keeps them after their last profile moves out, and deletes only empty groups', () => {
+    const database = new ProfileDatabase(root, logger);
+    database.transaction(() => database.createProfileGroup('Empty'));
+    database.upsertProfile(
+      { id: 'p1', kind: 'local', name: 'one', group: 'Busy', term: 'xterm-256color' },
+      '2026-01-01T00:00:00.000Z'
+    );
+
+    expect(database.listProfileGroups()).toEqual(['Empty', 'Busy']);
+    expect(() => database.transaction(() => database.createProfileGroup('Empty'))).toThrow(
+      'already exists'
+    );
+    expect(() => database.transaction(() => database.deleteProfileGroup('Busy'))).toThrow(
+      'Only empty profile groups'
+    );
+    expect(() =>
+      database.reorderProfiles({
+        ungroupedIds: [],
+        groups: [{ name: 'Busy', profileIds: ['p1'] }]
+      })
+    ).toThrow('every saved group exactly once');
+    expect(database.listProfileGroups()).toEqual(['Empty', 'Busy']);
+
+    database.transaction(() =>
+      database.reorderProfiles({
+        ungroupedIds: ['p1'],
+        groups: [
+          { name: 'Empty', profileIds: [] },
+          { name: 'Busy', profileIds: [] }
+        ]
+      })
+    );
+    expect(database.listProfileGroups()).toEqual(['Empty', 'Busy']);
+    expect(database.listProfiles()[0]?.group).toBeUndefined();
+    database.close();
+
+    const reopened = new ProfileDatabase(root, logger);
+    expect(reopened.listProfileGroups()).toEqual(['Empty', 'Busy']);
+    reopened.transaction(() => reopened.deleteProfileGroup('Empty'));
+    expect(reopened.listProfileGroups()).toEqual(['Busy']);
+    reopened.close();
+  });
+
   it('rejects stale or duplicate profile IDs without changing order', () => {
     const database = new ProfileDatabase(root, logger);
     database.upsertProfile(

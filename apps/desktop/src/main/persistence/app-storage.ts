@@ -6,6 +6,8 @@ import {
   AiConnectionInputSchema,
   AiConnectionRecordSchema,
   AiResponsesModelDefaultsSchema,
+  ProfileGroupNamesSchema,
+  ProfileGroupRequestSchema,
   ProfileOrderRequestSchema,
   type ProfileOrderRequest,
   type ProfileCredentials,
@@ -316,6 +318,24 @@ export class AppStorage {
     return this.requireDatabase()
       .listProfiles()
       .map((profile) => this.copyProfile(profile));
+  }
+
+  public profileGroupsSnapshot(): string[] {
+    return ProfileGroupNamesSchema.parse(this.requireDatabase().listProfileGroups());
+  }
+
+  public async createProfileGroup(name: string): Promise<string[]> {
+    const request = ProfileGroupRequestSchema.parse({ name });
+    const database = this.requireDatabase();
+    database.transaction(() => database.createProfileGroup(request.name));
+    return this.profileGroupsSnapshot();
+  }
+
+  public async deleteProfileGroup(name: string): Promise<string[]> {
+    const request = ProfileGroupRequestSchema.parse({ name });
+    const database = this.requireDatabase();
+    database.transaction(() => database.deleteProfileGroup(request.name));
+    return this.profileGroupsSnapshot();
   }
 
   public async saveProfile(profile: SessionProfile): Promise<SessionProfile[]> {

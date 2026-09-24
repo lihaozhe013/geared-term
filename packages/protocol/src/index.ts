@@ -115,10 +115,21 @@ export const SessionProfileRecordSchema = z
 
 export const ProfileIdRequestSchema = z.object({ id: IdSchema }).strict();
 
+export const ProfileGroupNameSchema = z.string().trim().min(1).max(160);
+export const ProfileGroupRequestSchema = z.object({ name: ProfileGroupNameSchema }).strict();
+export const ProfileGroupNamesSchema = z
+  .array(ProfileGroupNameSchema)
+  .max(1000)
+  .superRefine((names, context) => {
+    if (new Set(names).size !== names.length) {
+      context.addIssue({ code: 'custom', message: 'Group names must be unique' });
+    }
+  });
+
 export const ProfileOrderGroupSchema = z
   .object({
-    name: z.string().trim().min(1).max(160),
-    profileIds: z.array(IdSchema).min(1).max(1000)
+    name: ProfileGroupNameSchema,
+    profileIds: z.array(IdSchema).max(1000)
   })
   .strict();
 

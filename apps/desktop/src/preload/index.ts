@@ -21,6 +21,8 @@ import {
   EnvironmentRecordSchema,
   LocalTerminalRequestSchema,
   ProfileIdRequestSchema,
+  ProfileGroupNamesSchema,
+  ProfileGroupRequestSchema,
   ProfileOrderRequestSchema,
   SessionProfileRecordSchema,
   SessionProfileSaveRequestSchema,
@@ -314,6 +316,16 @@ const api = Object.freeze({
   },
   listProfiles: async () =>
     SessionProfileRecordSchema.array().parse(await ipcRenderer.invoke('profile:list')),
+  listProfileGroups: async () =>
+    ProfileGroupNamesSchema.parse(await ipcRenderer.invoke('profile-group:list')),
+  createProfileGroup: async (name: string) => {
+    const request = ProfileGroupRequestSchema.parse({ name });
+    return ProfileGroupNamesSchema.parse(await ipcRenderer.invoke('profile-group:create', request));
+  },
+  deleteProfileGroup: async (name: string) => {
+    const request = ProfileGroupRequestSchema.parse({ name });
+    return ProfileGroupNamesSchema.parse(await ipcRenderer.invoke('profile-group:delete', request));
+  },
   reorderProfiles: async (input: ProfileOrderRequest) => {
     const order = ProfileOrderRequestSchema.parse(input);
     return SessionProfileRecordSchema.array().parse(

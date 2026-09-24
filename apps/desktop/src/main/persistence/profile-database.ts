@@ -286,6 +286,7 @@ function createStatements(database: Database.Database) {
     allGroupOrders: database.prepare(
       'SELECT group_name, sort_order FROM session_profile_group_order ORDER BY sort_order, group_name'
     ),
+    countGroupOrders: database.prepare('SELECT COUNT(*) AS value FROM session_profile_group_order'),
     updateGroupSortOrder: database.prepare(
       'UPDATE session_profile_group_order SET sort_order = ? WHERE group_name = ?'
     ),
@@ -522,7 +523,6 @@ export class ProfileDatabase {
     });
     if (currentRow && currentGroup !== groupName) {
       this.compactProfileOrder(currentGroup);
-      this.removeEmptyGroupOrder(currentGroup);
     }
   }
 
@@ -537,13 +537,41 @@ export class ProfileDatabase {
     );
   }
 
+  public listProfileGroups(): string[] {
+    return (this.statements.allGroupOrders.all() as Array<{ group_name: string }>).map(
+      ({ group_name }) => group_name
+    );
+  }
+
+  public createProfileGroup(name: string): void {
+    const groupName = normalizeGroupName(name);
+    if (!groupName || groupName.length > 160) throw new Error('Profile group name is required');
+    if (this.statements.groupOrder.get(groupName)) {
+      throw new Error('A group with this name already exists');
+    }
+    const count = this.statements.countGroupOrders.get() as { value: number };
+    if (count.value >= 1000) throw new Error('At most 1000 groups can be saved');
+    const maximum = this.statements.maxGroupSortOrder.get() as { value: number };
+    this.statements.insertGroupOrder.run(groupName, maximum.value + 1);
+  }
+
+  public deleteProfileGroup(name: string): void {
+    const groupName = normalizeGroupName(name);
+    if (!groupName) throw new Error('Profile group name is required');
+    if (!this.statements.groupOrder.get(groupName)) throw new Error('Profile group does not exist');
+    if (this.statements.hasProfilesInGroup.get(groupName)) {
+      throw new Error('Only empty profile groups can be deleted');
+    }
+    this.statements.deleteGroupOrder.run(groupName);
+    this.compactGroupOrder();
+  }
+
   public deleteProfile(id: string): void {
     const currentRow = this.statements.getProfile.get(id) as ProfileRow | undefined;
     this.statements.deleteProfile.run(id);
     if (currentRow) {
       const groupName = normalizeGroupName(currentRow.group_name);
       this.compactProfileOrder(groupName);
-      this.removeEmptyGroupOrder(groupName);
     }
   }
 
@@ -562,11 +590,7 @@ export class ProfileDatabase {
       throw new Error('Profile order must include every saved profile exactly once');
     }
 
-    const currentGroups = new Set(
-      currentProfiles
-        .map((profile) => normalizeGroupName(profile.group))
-        .filter((groupName): groupName is string => groupName !== null)
-    );
+    const currentGroups = new Set(this.listProfileGroups());
     const requestedGroups = new Set<string>();
     for (const group of order.groups) {
       const name = normalizeGroupName(group.name);
@@ -574,6 +598,12 @@ export class ProfileDatabase {
         throw new Error('Profile order contains an unknown or duplicate group');
       }
       requestedGroups.add(name);
+    }
+    if (
+      requestedGroups.size !== currentGroups.size ||
+      this.listProfileGroups().some((name) => !requestedGroups.has(name))
+    ) {
+      throw new Error('Profile order must include every saved group exactly once');
     }
 
     this.statements.clearGroupOrders.run();
@@ -686,6 +716,8 @@ export class ProfileDatabase {
 
   private ensureGroupOrder(groupName: string | null): void {
     if (!groupName || this.statements.groupOrder.get(groupName)) return;
+    const count = this.statements.countGroupOrders.get() as { value: number };
+    if (count.value >= 1000) throw new Error('At most 1000 groups can be saved');
     const result = this.statements.maxGroupSortOrder.get() as { value: number };
     this.statements.insertGroupOrder.run(groupName, result.value + 1);
   }
@@ -701,9 +733,7 @@ export class ProfileDatabase {
     });
   }
 
-  private removeEmptyGroupOrder(groupName: string | null): void {
-    if (!groupName || this.statements.hasProfilesInGroup.get(groupName)) return;
-    this.statements.deleteGroupOrder.run(groupName);
+  private compactGroupOrder(): void {
     const groups = this.statements.allGroupOrders.all() as Array<{
       group_name: string;
       sort_order: number;

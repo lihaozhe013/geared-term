@@ -746,6 +746,18 @@ body.panel-resizing {
   width: min(760px, 100%);
 }
 
+.group-editor {
+  width: min(480px, 100%);
+}
+
+.group-name-label {
+  display: grid;
+  gap: 5px;
+  color: var(--gt-text-muted, #9aa8bd);
+  font-size: var(--gt-fs-sm);
+  font-weight: 600;
+}
+
 .profile-editor-body {
   display: grid;
   gap: 14px;
@@ -1011,6 +1023,17 @@ body.panel-resizing {
   flex: 1;
 }
 
+.sidebar-create-control {
+  position: relative;
+}
+
+.sidebar-context-menu.sidebar-create-menu {
+  position: absolute;
+  z-index: 61;
+  top: calc(100% + 4px);
+  right: 0;
+}
+
 .sidebar-body {
   display: grid;
   flex: 1;
@@ -1213,6 +1236,12 @@ button:disabled {
 .profile-tree-heading .group-drag-handle {
   width: 22px;
   height: 24px;
+}
+
+.profile-tree-heading .group-actions-button {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
 }
 
 .profile-tree-group {

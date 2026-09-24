@@ -143,6 +143,9 @@ declare global {
         onEvent: (event: unknown) => void
       ) => { cancel: () => void };
       listProfiles: () => Promise<SessionProfileRecord[]>;
+      listProfileGroups: () => Promise<string[]>;
+      createProfileGroup: (name: string) => Promise<string[]>;
+      deleteProfileGroup: (name: string) => Promise<string[]>;
       reorderProfiles: (input: ProfileOrderRequest) => Promise<SessionProfileRecord[]>;
       saveProfile: (input: SessionProfileRecord) => Promise<SessionProfileRecord[]>;
       saveProfileWithCredentials: (

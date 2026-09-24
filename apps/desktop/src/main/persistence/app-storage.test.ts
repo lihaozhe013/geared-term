@@ -273,7 +273,10 @@ describe('application storage', () => {
     await storage.saveProfile(profile('b1', 'Beta'));
     await storage.reorderProfiles({
       ungroupedIds: ['u1'],
-      groups: [{ name: 'Beta', profileIds: ['a1', 'b1'] }]
+      groups: [
+        { name: 'Beta', profileIds: ['a1', 'b1'] },
+        { name: 'Alpha', profileIds: [] }
+      ]
     });
 
     const reloaded = new AppStorage(directory, testLogger());
@@ -283,5 +286,29 @@ describe('application storage', () => {
       ['a1', 'Beta'],
       ['b1', 'Beta']
     ]);
+  });
+
+  it('creates, retains, and deletes empty profile groups through storage', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'geared-term-profile-groups-'));
+    const storage = new AppStorage(directory, testLogger());
+    await storage.load();
+
+    expect(await storage.createProfileGroup('  Spare  ')).toEqual(['Spare']);
+    await expect(storage.createProfileGroup('Spare')).rejects.toThrow('already exists');
+    await storage.saveProfile({
+      id: 'p1',
+      kind: 'local',
+      name: 'one',
+      group: 'Spare',
+      term: 'xterm-256color'
+    });
+    await expect(storage.deleteProfileGroup('Spare')).rejects.toThrow('Only empty profile groups');
+    await storage.deleteProfile('p1');
+    expect(storage.profileGroupsSnapshot()).toEqual(['Spare']);
+
+    const reloaded = new AppStorage(directory, testLogger());
+    await reloaded.load();
+    expect(reloaded.profileGroupsSnapshot()).toEqual(['Spare']);
+    expect(await reloaded.deleteProfileGroup('Spare')).toEqual([]);
   });
 });

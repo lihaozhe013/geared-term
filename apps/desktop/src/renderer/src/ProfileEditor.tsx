@@ -6,6 +6,7 @@ import type { SessionProfileRecord, SettingsRecord } from '@geared-term/protocol
 
 type ProfileEditorProps = {
   profile?: SessionProfileRecord;
+  initialKind: SessionProfileRecord['kind'];
   defaultTerm: SessionProfileRecord['term'];
   language: SettingsRecord['language'];
   onSaved: (profiles: SessionProfileRecord[]) => void;
@@ -35,11 +36,12 @@ type ProfileDraft = {
 function createDraft(
   profile: SessionProfileRecord | undefined,
   defaultTerm: ProfileDraft['term'],
-  defaultName: string
+  defaultName: string,
+  initialKind: ProfileDraft['kind']
 ): ProfileDraft {
   return {
     id: profile?.id ?? crypto.randomUUID(),
-    kind: profile?.kind ?? 'local',
+    kind: profile?.kind ?? initialKind,
     name: profile?.name ?? defaultName,
     group: profile?.group ?? '',
     term: profile?.term ?? defaultTerm,
@@ -63,6 +65,7 @@ function asError(reason: unknown, fallback: string): string {
 
 export function ProfileEditor({
   profile,
+  initialKind,
   defaultTerm,
   language,
   onSaved,
@@ -71,7 +74,7 @@ export function ProfileEditor({
 }: ProfileEditorProps): React.JSX.Element {
   const t = useCallback((key: MessageKey): string => translate(language, key), [language]);
   const [draft, setDraft] = useState<ProfileDraft>(() =>
-    createDraft(profile, defaultTerm, translate(language, 'profileDefaultName'))
+    createDraft(profile, defaultTerm, translate(language, 'profileDefaultName'), initialKind)
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

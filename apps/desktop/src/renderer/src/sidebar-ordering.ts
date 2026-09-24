@@ -8,10 +8,11 @@ export type SidebarProfileDropTarget =
   | { kind: 'ungrouped' };
 
 export function createSidebarOrder(
-  profiles: readonly Pick<SessionProfileRecord, 'id' | 'group'>[]
+  profiles: readonly Pick<SessionProfileRecord, 'id' | 'group'>[],
+  groupNames: readonly string[] = []
 ): SidebarOrder {
   const ungroupedIds: string[] = [];
-  const groups = new Map<string, string[]>();
+  const groups = new Map<string, string[]>(groupNames.map((name) => [name, []]));
 
   for (const profile of profiles) {
     const groupName = profile.group?.trim();
@@ -42,11 +43,10 @@ export function moveSidebarProfile(
   if (!sourceGroup && !isUngrouped) return order;
 
   const ungroupedIds = order.ungroupedIds.filter((id) => id !== profileId);
-  let groups = order.groups.map((group) => ({
+  const groups = order.groups.map((group) => ({
     name: group.name,
     profileIds: group.profileIds.filter((id) => id !== profileId)
   }));
-  groups = groups.filter((group) => group.profileIds.length > 0);
 
   let destinationGroupName: string | null;
   if (target.kind === 'ungrouped') {

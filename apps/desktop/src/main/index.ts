@@ -34,6 +34,8 @@ import {
   EmptyRequestSchema,
   AutoUnlockStatusSchema,
   ProfileIdRequestSchema,
+  ProfileGroupNamesSchema,
+  ProfileGroupRequestSchema,
   ProfileOrderRequestSchema,
   SETTINGS_CATEGORIES,
   SessionProfileRecordSchema,
@@ -542,6 +544,17 @@ function registerIpc(): void {
   ipcMain.handle('profile:list', () =>
     SessionProfileRecordSchema.array().parse(storage.profileSnapshot())
   );
+  ipcMain.handle('profile-group:list', () =>
+    ProfileGroupNamesSchema.parse(storage.profileGroupsSnapshot())
+  );
+  ipcMain.handle('profile-group:create', async (_event, input: unknown) => {
+    const request = ProfileGroupRequestSchema.parse(input);
+    return ProfileGroupNamesSchema.parse(await storage.createProfileGroup(request.name));
+  });
+  ipcMain.handle('profile-group:delete', async (_event, input: unknown) => {
+    const request = ProfileGroupRequestSchema.parse(input);
+    return ProfileGroupNamesSchema.parse(await storage.deleteProfileGroup(request.name));
+  });
   ipcMain.handle('profile:reorder', async (_event, input: unknown) => {
     const request = ProfileOrderRequestSchema.parse(input);
     return SessionProfileRecordSchema.array().parse(await storage.reorderProfiles(request));

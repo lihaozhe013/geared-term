@@ -181,7 +181,8 @@ row columns. The authoritative DDL is the version-1 schema in the source file.
 
 **Saved session ordering.** Migration 3 adds the session_profile_group_order table, per-profile
 ranks, and a separate rank for each named group. It backfills both from the former profile-list
-order so existing sidebars retain their visible arrangement.
+order so existing sidebars retain their visible arrangement. The group table is also the source of
+truth for empty groups, which remain ordered until explicitly deleted (ADR 0003, SES-014).
 
 **Mapping rules.**
 
@@ -195,7 +196,9 @@ the profile and its referenced secrets and sweeps unreferenced secrets; deleting
 password rotation re-encrypts every secret row and replaces vault metadata in one transaction
 (VLT-007).
 
-Profile reordering updates group membership and all affected ranks atomically.
+Profile reordering validates and updates every saved profile and group rank atomically. Group
+creation and deletion use validated IPC; deletion is rejected while any saved profile references the
+group. Empty groups reuse the existing table and require no migration.
 
 **Migrations.** Migrations are an ordered, forward-only list in code, each wrapped in one
 transaction. Before applying a migration the store creates a backup with `VACUUM INTO` next to the

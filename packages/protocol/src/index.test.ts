@@ -5,6 +5,8 @@ import {
   DEFAULT_TERMINAL_LIGATURE_SEQUENCES,
   LocalSessionRequestSchema,
   LocalWorkingDirectorySchema,
+  ProfileGroupNamesSchema,
+  ProfileGroupRequestSchema,
   ProfileOrderRequestSchema,
   normalizeLigatureSequences,
   normalizeTerminalLineEndings,
@@ -276,7 +278,24 @@ describe('ProfileOrderRequestSchema', () => {
     });
   });
 
-  it('rejects duplicate profiles, duplicate groups, and empty groups', () => {
+  it('validates and normalizes group requests and group snapshots', () => {
+    expect(ProfileGroupRequestSchema.parse({ name: ' Dev ' })).toEqual({ name: 'Dev' });
+    expect(ProfileGroupNamesSchema.parse(['Dev', 'Empty'])).toEqual(['Dev', 'Empty']);
+    expect(ProfileGroupRequestSchema.safeParse({ name: '   ' }).success).toBe(false);
+    expect(ProfileGroupRequestSchema.safeParse({ name: 'x'.repeat(161) }).success).toBe(false);
+    expect(ProfileGroupNamesSchema.safeParse(['Dev', 'Dev']).success).toBe(false);
+  });
+
+  it('accepts empty persisted groups', () => {
+    expect(
+      ProfileOrderRequestSchema.parse({
+        ungroupedIds: [],
+        groups: [{ name: 'Empty', profileIds: [] }]
+      })
+    ).toEqual({ ungroupedIds: [], groups: [{ name: 'Empty', profileIds: [] }] });
+  });
+
+  it('rejects duplicate profiles and duplicate groups', () => {
     expect(
       ProfileOrderRequestSchema.safeParse({
         ungroupedIds: ['p1'],
@@ -290,12 +309,6 @@ describe('ProfileOrderRequestSchema', () => {
           { name: 'Alpha', profileIds: ['p1'] },
           { name: 'Alpha', profileIds: ['p2'] }
         ]
-      }).success
-    ).toBe(false);
-    expect(
-      ProfileOrderRequestSchema.safeParse({
-        ungroupedIds: [],
-        groups: [{ name: 'Alpha', profileIds: [] }]
       }).success
     ).toBe(false);
   });

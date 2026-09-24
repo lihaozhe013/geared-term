@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   AppInfo,
   SessionProfileRecord,
@@ -10,9 +10,11 @@ import {
   ChevronDown,
   ChevronRight,
   GripVertical,
+  MoreHorizontal,
   PanelLeftClose,
   Plus,
-  RefreshCw
+  RefreshCw,
+  Trash2
 } from 'lucide-react';
 import { translate } from './i18n';
 import type { MessageKey } from './i18n';
@@ -24,9 +26,12 @@ type SidebarProps = {
   platform: AppInfo['platform'] | undefined;
   language: SettingsRecord['language'];
   profiles: SessionProfileRecord[];
+  groupNames: string[];
   wslDistributions: WslDistribution[];
   wslLoading: boolean;
-  onNewProfile: () => void;
+  onNewProfile: (kind: SessionProfileRecord['kind']) => void;
+  onCreateGroup: () => void;
+  onDeleteGroup: (name: string) => void;
   onOpenProfile: (profile: SessionProfileRecord) => void;
   onEditProfile: (profile: SessionProfileRecord) => void;
   onDeleteProfile: (profile: SessionProfileRecord) => void;
@@ -48,9 +53,12 @@ export function Sidebar({
   platform,
   language,
   profiles,
+  groupNames,
   wslDistributions,
   wslLoading,
   onNewProfile,
+  onCreateGroup,
+  onDeleteGroup,
   onOpenProfile,
   onEditProfile,
   onDeleteProfile,
@@ -62,6 +70,9 @@ export function Sidebar({
   const t = useCallback((key: MessageKey): string => translate(language, key), [language]);
   const [tab, setTab] = useState<SidebarTab>('sessions');
   const [collapsedGroups, setCollapsedGroups] = useState<ReadonlySet<string>>(new Set());
+  const [createMenuOpen, setCreateMenuOpen] = useState(false);
+  const [groupMenu, setGroupMenu] = useState<{ name: string; x: number; y: number } | null>(null);
+  const createMenuRef = useRef<HTMLDivElement>(null);
   const [profileMenu, setProfileMenu] = useState<{
     x: number;
     y: number;
@@ -71,6 +82,41 @@ export function Sidebar({
   const [dropTarget, setDropTarget] = useState<SidebarDropTarget | null>(null);
   const [reorderingProfiles, setReorderingProfiles] = useState(false);
   const isWindows = platform === 'win32';
+
+  useEffect(() => {
+    if (!createMenuOpen) return;
+    const closeOnOutsideClick = (event: MouseEvent): void => {
+      if (!createMenuRef.current?.contains(event.target as Node)) setCreateMenuOpen(false);
+    };
+    const closeOnKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') setCreateMenuOpen(false);
+    };
+    const close = (): void => setCreateMenuOpen(false);
+    window.addEventListener('click', closeOnOutsideClick);
+    window.addEventListener('keydown', closeOnKeyDown);
+    window.addEventListener('resize', close);
+    return () => {
+      window.removeEventListener('click', closeOnOutsideClick);
+      window.removeEventListener('keydown', closeOnKeyDown);
+      window.removeEventListener('resize', close);
+    };
+  }, [createMenuOpen]);
+
+  useEffect(() => {
+    if (!groupMenu) return;
+    const close = (): void => setGroupMenu(null);
+    const closeOnKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') close();
+    };
+    window.addEventListener('click', close);
+    window.addEventListener('keydown', closeOnKeyDown);
+    window.addEventListener('resize', close);
+    return () => {
+      window.removeEventListener('click', close);
+      window.removeEventListener('keydown', closeOnKeyDown);
+      window.removeEventListener('resize', close);
+    };
+  }, [groupMenu]);
 
   useEffect(() => {
     if (!profileMenu) return;
@@ -85,7 +131,7 @@ export function Sidebar({
     };
   }, [profileMenu]);
 
-  const sidebarOrder = createSidebarOrder(profiles);
+  const sidebarOrder = createSidebarOrder(profiles, groupNames);
   const profilesById = new Map(profiles.map((profile) => [profile.id, profile]));
 
   const clearDrag = (): void => {
@@ -281,15 +327,52 @@ export function Sidebar({
         ) : null}
         <span className="sidebar-spacer" />
         {tab === 'sessions' ? (
-          <button
-            type="button"
-            className="icon-button"
-            onClick={onNewProfile}
-            aria-label="New session profile"
-            title="New session profile"
-          >
-            <Plus size={14} aria-hidden="true" />
-          </button>
+          <div className="sidebar-create-control" ref={createMenuRef}>
+            <button
+              type="button"
+              className="icon-button"
+              onClick={() => setCreateMenuOpen((open) => !open)}
+              aria-label={t('newSessionProfile')}
+              title={t('newSessionProfile')}
+              aria-haspopup="menu"
+              aria-expanded={createMenuOpen}
+            >
+              <Plus size={14} aria-hidden="true" />
+            </button>
+            {createMenuOpen ? (
+              <div className="sidebar-context-menu sidebar-create-menu" role="menu">
+                {(
+                  [
+                    ['local', 'newLocalSession'],
+                    ['ssh', 'newSshSession'],
+                    ['wsl', 'newWslSession']
+                  ] as const
+                ).map(([kind, label]) => (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    key={kind}
+                    onClick={() => {
+                      setCreateMenuOpen(false);
+                      onNewProfile(kind);
+                    }}
+                  >
+                    {t(label)}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setCreateMenuOpen(false);
+                    onCreateGroup();
+                  }}
+                >
+                  {t('emptyGroupMenuItem')}
+                </button>
+              </div>
+            ) : null}
+          </div>
         ) : (
           <button
             type="button"
@@ -384,6 +467,23 @@ export function Sidebar({
                   >
                     <GripVertical size={14} aria-hidden="true" />
                   </button>
+                  {profileIds.length === 0 ? (
+                    <button
+                      type="button"
+                      className="icon-button group-actions-button"
+                      aria-label={t('groupActions') + ': ' + groupName}
+                      title={t('groupActions')}
+                      aria-haspopup="menu"
+                      aria-expanded={groupMenu?.name === groupName}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        const rect = event.currentTarget.getBoundingClientRect();
+                        setGroupMenu({ name: groupName, x: rect.right - 180, y: rect.bottom });
+                      }}
+                    >
+                      <MoreHorizontal size={14} aria-hidden="true" />
+                    </button>
+                  ) : null}
                 </div>
                 {!collapsed
                   ? profileIds.map((id) => {
@@ -394,7 +494,7 @@ export function Sidebar({
               </section>
             );
           })}
-          {profiles.length === 0 ? (
+          {profiles.length === 0 && sidebarOrder.groups.length === 0 ? (
             <div className="empty-state">
               <span className="empty-icon" aria-hidden="true">
                 +
@@ -454,6 +554,27 @@ export function Sidebar({
             }}
           >
             {t('delete')}
+          </button>
+        </div>
+      ) : null}
+      {groupMenu ? (
+        <div
+          className="sidebar-context-menu"
+          role="menu"
+          aria-label={t('groupActions') + ': ' + groupMenu.name}
+          style={{ left: groupMenu.x, top: groupMenu.y }}
+        >
+          <button
+            type="button"
+            role="menuitem"
+            className="danger"
+            onClick={() => {
+              onDeleteGroup(groupMenu.name);
+              setGroupMenu(null);
+            }}
+          >
+            <Trash2 size={14} aria-hidden="true" />
+            {t('deleteGroup')}
           </button>
         </div>
       ) : null}

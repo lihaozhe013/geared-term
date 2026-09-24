@@ -29,6 +29,7 @@ import type { MessageKey } from './i18n';
 import { AssistantPanel } from './AssistantPanel';
 import { EnvironmentPanel } from './EnvironmentPanel';
 import { ProfileEditor } from './ProfileEditor';
+import { CreateGroupDialog } from './CreateGroupDialog';
 import { QuickSshDialog } from './QuickSshDialog';
 import { Sidebar } from './Sidebar';
 import { SftpPanel } from './SftpPanel';
@@ -212,6 +213,7 @@ function environmentTarget(
 export function App(): React.JSX.Element {
   const [info, setInfo] = useState<AppInfo | null>(null);
   const [profiles, setProfiles] = useState<SessionProfileRecord[]>([]);
+  const [profileGroups, setProfileGroups] = useState<string[]>([]);
   const [settings, setSettings] = useState<SettingsRecord>(defaultSettings);
   const [alternateScreens, setAlternateScreens] = useState<Record<string, boolean>>({});
   const [userThemes, setUserThemes] = useState<UserTheme[]>([]);
@@ -223,6 +225,8 @@ export function App(): React.JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [showProfileEditor, setShowProfileEditor] = useState(false);
   const [editingProfile, setEditingProfile] = useState<SessionProfileRecord | undefined>();
+  const [newProfileKind, setNewProfileKind] = useState<SessionProfileRecord['kind']>('local');
+  const [showGroupDialog, setShowGroupDialog] = useState(false);
   const [showQuickSsh, setShowQuickSsh] = useState(false);
   const [pendingHistoryId, setPendingHistoryId] = useState<string | null>(null);
   const [pendingChatText, setPendingChatText] = useState<string | null>(null);
@@ -249,12 +253,14 @@ export function App(): React.JSX.Element {
     void Promise.all([
       window.geared.getAppInfo(),
       window.geared.listProfiles(),
+      window.geared.listProfileGroups(),
       window.geared.getUiState(),
       window.geared.getSettings()
     ])
-      .then(([appInfo, savedProfiles, savedUiState, savedSettings]) => {
+      .then(([appInfo, savedProfiles, savedGroups, savedUiState, savedSettings]) => {
         setInfo(appInfo);
         setProfiles(savedProfiles);
+        setProfileGroups(savedGroups);
         setUiState(savedUiState);
         setSettings(savedSettings);
       })
@@ -528,8 +534,9 @@ export function App(): React.JSX.Element {
 
   const activeTab = tabs.find((tab) => tab.id === activeTabId) ?? tabs[0];
 
-  const openNewProfile = useCallback((): void => {
+  const openNewProfile = useCallback((kind: SessionProfileRecord['kind']): void => {
     setEditingProfile(undefined);
+    setNewProfileKind(kind);
     setShowProfileEditor(true);
     setError(null);
   }, []);
@@ -544,7 +551,10 @@ export function App(): React.JSX.Element {
     (profile: SessionProfileRecord): void => {
       void window.geared
         .deleteProfile(profile.id)
-        .then(setProfiles)
+        .then(async (nextProfiles) => {
+          setProfiles(nextProfiles);
+          setProfileGroups(await window.geared.listProfileGroups());
+        })
         .catch((reason: unknown) =>
           setError(reason instanceof Error ? reason.message : t('errDeleteSession'))
         );
@@ -556,10 +566,41 @@ export function App(): React.JSX.Element {
     async (order: ProfileOrderRequest): Promise<void> => {
       try {
         setProfiles(await window.geared.reorderProfiles(order));
+        setProfileGroups(await window.geared.listProfileGroups());
         setError(null);
       } catch (reason) {
         setError(reason instanceof Error ? reason.message : t('errReorderProfiles'));
       }
+    },
+    [t]
+  );
+
+  const saveProfileGroups = useCallback(async (name: string): Promise<void> => {
+    setProfileGroups(await window.geared.createProfileGroup(name));
+    setError(null);
+  }, []);
+
+  const deleteProfileGroup = useCallback(
+    (name: string): void => {
+      void window.geared
+        .deleteProfileGroup(name)
+        .then(setProfileGroups)
+        .catch((reason: unknown) =>
+          setError(reason instanceof Error ? reason.message : t('errDeleteGroup'))
+        );
+    },
+    [t]
+  );
+
+  const handleProfilesSaved = useCallback(
+    (nextProfiles: SessionProfileRecord[]): void => {
+      setProfiles(nextProfiles);
+      void window.geared
+        .listProfileGroups()
+        .then(setProfileGroups)
+        .catch((reason: unknown) =>
+          setError(reason instanceof Error ? reason.message : t('errLoadGroups'))
+        );
     },
     [t]
   );
@@ -852,9 +893,15 @@ export function App(): React.JSX.Element {
             platform={info?.platform}
             language={settings.language}
             profiles={profiles}
+            groupNames={profileGroups}
             wslDistributions={wslDistributions}
             wslLoading={wslLoading}
             onNewProfile={openNewProfile}
+            onCreateGroup={() => {
+              setError(null);
+              setShowGroupDialog(true);
+            }}
+            onDeleteGroup={deleteProfileGroup}
             onOpenProfile={openProfile}
             onEditProfile={openEditProfile}
             onDeleteProfile={deleteProfileRecord}
@@ -1159,13 +1206,22 @@ export function App(): React.JSX.Element {
 
       {showProfileEditor ? (
         <ProfileEditor
-          key={editingProfile?.id ?? 'new-profile'}
+          key={editingProfile?.id ?? `new-profile-${newProfileKind}`}
           profile={editingProfile}
+          initialKind={newProfileKind}
           defaultTerm={settings.defaultTerm}
           language={settings.language}
-          onSaved={setProfiles}
+          onSaved={handleProfilesSaved}
           onError={setError}
           onClose={() => setShowProfileEditor(false)}
+        />
+      ) : null}
+
+      {showGroupDialog ? (
+        <CreateGroupDialog
+          language={settings.language}
+          onCreate={saveProfileGroups}
+          onClose={() => setShowGroupDialog(false)}
         />
       ) : null}
 

@@ -27,6 +27,16 @@ describe('createSidebarOrder', () => {
       ])
     ).toEqual({ ungroupedIds: [], groups: [{ name: 'Alpha', profileIds: ['a1', 'a2'] }] });
   });
+
+  it('keeps persisted groups that have no profiles', () => {
+    expect(createSidebarOrder([{ id: 'u1' }], ['Empty', 'Alpha'])).toEqual({
+      ungroupedIds: ['u1'],
+      groups: [
+        { name: 'Empty', profileIds: [] },
+        { name: 'Alpha', profileIds: [] }
+      ]
+    });
+  });
 });
 
 describe('moveSidebarProfile', () => {
@@ -51,10 +61,23 @@ describe('moveSidebarProfile', () => {
     ]);
   });
 
-  it('moves a session into an ungrouped list and removes an empty group', () => {
+  it('moves a session into an ungrouped list and keeps its now-empty group', () => {
     const next = moveSidebarProfile(order, 'b1', { kind: 'ungrouped' });
     expect(next.ungroupedIds).toEqual(['u1', 'b1']);
-    expect(next.groups).toEqual([{ name: 'Alpha', profileIds: ['a1', 'a2'] }]);
+    expect(next.groups).toEqual([
+      { name: 'Alpha', profileIds: ['a1', 'a2'] },
+      { name: 'Beta', profileIds: [] }
+    ]);
+  });
+
+  it('moves a session into and back out of an empty group without dropping it', () => {
+    const withEmptyGroup = createSidebarOrder(profiles, ['Alpha', 'Beta', 'Empty']);
+    const filled = moveSidebarProfile(withEmptyGroup, 'u1', { kind: 'group', name: 'Empty' });
+    expect(filled.groups[2]).toEqual({ name: 'Empty', profileIds: ['u1'] });
+
+    const emptied = moveSidebarProfile(filled, 'u1', { kind: 'ungrouped' });
+    expect(emptied.ungroupedIds).toEqual(['u1']);
+    expect(emptied.groups[2]).toEqual({ name: 'Empty', profileIds: [] });
   });
 
   it('appends to a collapsed group header target', () => {

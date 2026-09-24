@@ -15,11 +15,20 @@ test('reorders sessions and groups, moves sessions between sections, and restore
   const { page } = session;
   const createProfile = async (name: string, group?: string): Promise<void> => {
     await page.getByRole('button', { name: 'New session profile' }).click();
+    await page.getByRole('menuitem', { name: 'New local session' }).click();
     const editor = page.locator('.profile-editor');
     await editor.getByLabel('Name').fill(name);
     if (group) await editor.getByLabel('Group (optional)').fill(group);
     await editor.getByRole('button', { name: 'Save profile' }).click();
     await expect(editor).toHaveCount(0);
+  };
+  const createEmptyGroup = async (name: string): Promise<void> => {
+    await page.getByRole('button', { name: 'New session profile' }).click();
+    await page.getByRole('menuitem', { name: 'Empty group' }).click();
+    const dialog = page.locator('.group-editor');
+    await dialog.getByLabel('Group name').fill(name);
+    await dialog.getByRole('button', { name: 'Create group' }).click();
+    await expect(dialog).toHaveCount(0);
   };
 
   await createProfile('Ungrouped one');
@@ -27,6 +36,7 @@ test('reorders sessions and groups, moves sessions between sections, and restore
     await createProfile(name, 'Alpha');
   }
   for (const name of ['Beta one', 'Beta two']) await createProfile(name, 'Beta');
+  await createEmptyGroup('Empty');
 
   const group = (name: string) => page.locator(`.profile-tree-group[aria-label="${name}"]`);
   const groupHandle = (name: string) =>
@@ -39,6 +49,8 @@ test('reorders sessions and groups, moves sessions between sections, and restore
     group(name).locator('.profile-button span').allTextContents();
   const ungroupedNames = () =>
     page.locator('.sidebar-body > .profile-row .profile-button span').allTextContents();
+
+  await expect(group('Empty').locator('.profile-tree-header small')).toHaveText('0');
 
   const drag = async (
     source: Locator,
@@ -110,7 +122,7 @@ test('reorders sessions and groups, moves sessions between sections, and restore
     'before',
     'drop-before'
   );
-  await expect.poll(groupNames).toEqual(['Beta', 'Alpha']);
+  await expect.poll(groupNames).toEqual(['Beta', 'Alpha', 'Empty']);
 
   await drag(profileHandle('Alpha one'), row('Alpha two'), 'after', 'drop-after');
   await expect.poll(() => profileNames('Alpha')).toEqual(['Alpha two', 'Alpha one', 'Alpha three']);
@@ -139,9 +151,32 @@ test('reorders sessions and groups, moves sessions between sections, and restore
   );
   await expect.poll(ungroupedNames).toEqual(['Ungrouped one', 'Alpha two']);
 
+  await drag(
+    profileHandle('Alpha one'),
+    group('Empty').locator('.profile-tree-heading'),
+    'center',
+    'drop-append'
+  );
+  await expect.poll(() => profileNames('Empty')).toEqual(['Alpha one']);
+  await drag(
+    profileHandle('Alpha one'),
+    group('Alpha').locator('.profile-tree-heading'),
+    'center',
+    'drop-append'
+  );
+  await expect.poll(() => profileNames('Alpha')).toEqual(['Alpha one']);
+  await expect(group('Empty').locator('.profile-tree-header small')).toHaveText('0');
+
   await page.reload();
-  await expect.poll(groupNames).toEqual(['Beta', 'Alpha']);
+  await expect.poll(groupNames).toEqual(['Beta', 'Alpha', 'Empty']);
   await expect.poll(() => profileNames('Beta')).toEqual(['Beta one', 'Beta two', 'Alpha three']);
   await expect.poll(() => profileNames('Alpha')).toEqual(['Alpha one']);
   await expect.poll(ungroupedNames).toEqual(['Ungrouped one', 'Alpha two']);
+  await expect(group('Empty').locator('.profile-tree-header small')).toHaveText('0');
+
+  await group('Empty').getByRole('button', { name: 'Group actions: Empty' }).click();
+  await page.getByRole('menuitem', { name: 'Delete group' }).click();
+  await expect(group('Empty')).toHaveCount(0);
+  await page.reload();
+  await expect.poll(groupNames).toEqual(['Beta', 'Alpha']);
 });

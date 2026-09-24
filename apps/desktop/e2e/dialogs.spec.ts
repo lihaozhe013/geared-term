@@ -43,9 +43,10 @@ test('opens and cancels the temporary SSH dialog', async () => {
 test('opens the profile editor with credential fields but no vault management for SSH profiles', async () => {
   const { page } = session;
   await page.getByRole('button', { name: 'New session profile' }).click();
+  await page.getByRole('menuitem', { name: 'New SSH session' }).click();
   const dialog = page.locator('.profile-editor');
   await expect(dialog).toBeVisible();
-  await dialog.getByLabel('Kind').selectOption('ssh');
+  await expect(dialog.getByLabel('Kind')).toHaveValue('ssh');
   await expect(dialog.getByLabel('Host')).toBeVisible();
   await expect(dialog.getByLabel('Private key (optional)')).toBeVisible();
   await expect(dialog.locator('.vault-box')).toHaveCount(0);

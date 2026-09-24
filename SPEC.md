@@ -219,6 +219,10 @@ When terminal focus is active, the following behavior is required:
   reorder named group sections by dragging. Moving a session across groups MUST update its group.
   The ungrouped section MUST remain at the top, and all manual ordering MUST persist across
   restarts.
+- **SES-014**: Users MUST be able to create an empty named group from the sidebar's + menu. Empty
+  groups MUST remain visible and retain their order when their last session is moved or deleted.
+  Users MUST be able to delete an empty group; deleting a group containing sessions MUST be
+  rejected.
 
 ### 8.2 Temporary SSH connections
 
