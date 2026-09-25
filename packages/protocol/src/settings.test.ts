@@ -45,6 +45,18 @@ describe('SettingsRecordSchema keybindings', () => {
   });
 });
 
+describe('SettingsRecordSchema automatic updates', () => {
+  it('enables automatic checks for settings saved before the field existed', () => {
+    expect(SettingsRecordSchema.parse(baseSettings).autoCheckUpdates).toBe(true);
+    expect(
+      SettingsRecordSchema.parse({ ...baseSettings, autoCheckUpdates: false }).autoCheckUpdates
+    ).toBe(false);
+    expect(
+      SettingsRecordSchema.safeParse({ ...baseSettings, autoCheckUpdates: 'yes' }).success
+    ).toBe(false);
+  });
+});
+
 describe('SettingsRecordSchema terminal padding', () => {
   it('defaults to the shell inset for records saved before the field existed', () => {
     expect(SettingsRecordSchema.parse(baseSettings).terminalPadding).toBe(14);

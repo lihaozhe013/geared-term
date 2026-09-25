@@ -57,6 +57,68 @@ textarea {
   height: 100vh;
 }
 
+.update-notice-card {
+  position: fixed;
+  z-index: 15;
+  top: calc(40px * var(--gt-ui-scale, 1) + 12px);
+  right: 16px;
+  display: grid;
+  width: min(380px, calc(100vw - 32px));
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--gt-border-strong, #344157);
+  border-radius: var(--gt-radius-lg, 8px);
+  background: var(--gt-panel-alt, #161e2a);
+  color: var(--gt-text, #e4eaf3);
+  box-shadow: var(--gt-shadow-popover, 0 12px 32px rgba(0, 0, 0, 0.45));
+}
+
+.update-notice-heading,
+.update-notice-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.update-notice-heading strong {
+  flex: 1;
+  font-size: var(--gt-fs-md);
+}
+
+.update-notice-icon {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border-radius: var(--gt-radius-md, 6px);
+  background: var(--gt-hover, #1a2332);
+  color: var(--gt-accent, #5c8ea5);
+}
+
+.update-notice-close {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+}
+
+.update-notice-description,
+.update-notice-homebrew {
+  margin: 0;
+  color: var(--gt-text-muted, #9aa8bd);
+  font-size: var(--gt-fs-sm);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.update-notice-homebrew code {
+  color: var(--gt-text-dim, #d8e0ee);
+  overflow-wrap: anywhere;
+}
+
+.update-notice-actions {
+  justify-content: flex-end;
+}
+
 .titlebar {
   position: relative;
   display: flex;
@@ -2439,6 +2501,11 @@ button:disabled {
 
 .settings-check input {
   accent-color: var(--gt-accent, #5c8ea5);
+}
+
+.settings-update-preferences {
+  display: grid;
+  gap: 4px;
 }
 
 .stepper {

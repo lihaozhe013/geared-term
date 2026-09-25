@@ -554,18 +554,24 @@ export function AiAssistantSection({
 const homebrewUpgradeCommand = 'brew upgrade --cask geared-term';
 
 export function AboutSection({
+  settings,
   info,
   runtime,
   updateStatus,
+  onSave,
   onCheckUpdates,
+  onDownloadUpdate,
   onInstallUpdate,
   onOpenRelease,
   t
 }: {
+  settings: SettingsRecord;
   info: AppInfo | null;
   runtime: RuntimeInfo | null;
   updateStatus: UpdateStatus | null;
+  onSave: (patch: Partial<SettingsRecord>) => Promise<void>;
   onCheckUpdates: () => Promise<void>;
+  onDownloadUpdate: () => Promise<void>;
   onInstallUpdate: () => void;
   onOpenRelease: () => void;
   t: Translate;
@@ -577,7 +583,9 @@ export function AboutSection({
       case 'up-to-date':
         return t('upToDate');
       case 'available':
-        return `${t('updateAvailable')} (${updateStatus.latestSha?.slice(0, 7) ?? ''})`;
+        return updateStatus.error
+          ? t('updateDownloadFailed')
+          : `${t('updateAvailable')} (${updateStatus.latestSha?.slice(0, 7) ?? ''})`;
       case 'downloading':
         return t('downloadingUpdate');
       case 'downloaded':
@@ -612,6 +620,19 @@ export function AboutSection({
           ) : null}
         </div>
       </div>
+      <div className="settings-update-preferences">
+        <label className="settings-check">
+          <input
+            type="checkbox"
+            checked={settings.autoCheckUpdates}
+            onChange={(event) =>
+              void onSave({ autoCheckUpdates: event.target.checked }).catch(() => undefined)
+            }
+          />
+          <span>{t('autoCheckUpdates')}</span>
+        </label>
+        <p className="settings-hint">{t('autoCheckUpdatesHint')}</p>
+      </div>
       <div className="settings-actions-row">
         {info?.isPackaged ? (
           <>
@@ -626,6 +647,17 @@ export function AboutSection({
             {updateStatus?.state === 'downloaded' && updateStatus.canInstall ? (
               <button type="button" className="primary-button" onClick={onInstallUpdate}>
                 {t('restartToInstall')}
+              </button>
+            ) : null}
+            {updateStatus?.state === 'available' && updateStatus.canInstall ? (
+              <button
+                type="button"
+                className="primary-button"
+                onClick={() => {
+                  void onDownloadUpdate().catch(() => undefined);
+                }}
+              >
+                {t('downloadUpdate')}
               </button>
             ) : null}
             {updateStatus?.state !== 'downloaded' ? (

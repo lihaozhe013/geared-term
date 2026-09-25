@@ -70,6 +70,7 @@ export const defaultSettings: Settings = {
   defaultTerm: 'xterm-256color',
   splitCommandPresentation: true,
   allowRiskyRun: false,
+  autoCheckUpdates: true,
   keepRunningInBackground: false,
   terminalContextPrecedingLines: 100,
   remoteFileCommands: 'cat\nless\nvim',

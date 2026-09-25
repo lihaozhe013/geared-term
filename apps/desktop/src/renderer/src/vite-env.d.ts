@@ -57,6 +57,7 @@ import type {
   EnvironmentRecord,
   UiStateRecord,
   UpdateStatus,
+  UpdateNotice,
   WslDistribution,
   VaultPasswordRequest,
   VaultRotateRequest,
@@ -79,10 +80,14 @@ declare global {
       readonly platform: NodeJS.Platform;
       getAppInfo: () => Promise<AppInfo>;
       getUpdateStatus: () => Promise<UpdateStatus>;
+      getUpdateNotice: () => Promise<UpdateNotice | null>;
       checkForUpdates: () => Promise<UpdateStatus>;
+      startUpdateDownload: () => Promise<SftpOperationResult>;
       installDownloadedUpdate: () => Promise<SftpOperationResult>;
       openNightlyRelease: () => Promise<SftpOperationResult>;
       onUpdateStatus: (listener: (status: UpdateStatus) => void) => () => void;
+      dismissUpdateNotice: (commitSha: string) => Promise<SftpOperationResult>;
+      onUpdateNotice: (listener: (notice: UpdateNotice | null) => void) => () => void;
       createLocalTerminal: (
         input: LocalTerminalRequest,
         onMessage: (message: unknown) => void

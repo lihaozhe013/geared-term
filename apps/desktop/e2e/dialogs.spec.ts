@@ -29,6 +29,38 @@ test('opens the settings window with category navigation', async () => {
   await settingsWindow.close();
 });
 
+test('persists the automatic update check preference in About settings', async () => {
+  const { page, app } = session;
+  await page.getByRole('button', { name: 'Settings' }).click();
+  const settingsWindow = await app.waitForEvent('window');
+  await settingsWindow.waitForLoadState('domcontentloaded');
+  await settingsWindow.getByRole('button', { name: 'About' }).click();
+
+  const autoCheck = settingsWindow.getByRole('checkbox', {
+    name: 'Automatically check for updates'
+  });
+  await expect(autoCheck).toBeChecked();
+  await autoCheck.click();
+  await expect
+    .poll(() =>
+      settingsWindow.evaluate(() =>
+        window.geared.getSettings().then((settings) => settings.autoCheckUpdates)
+      )
+    )
+    .toBe(false);
+  await expect(autoCheck).not.toBeChecked();
+
+  await settingsWindow.close();
+  await page.getByRole('button', { name: 'Settings' }).click();
+  const reopenedSettings = await app.waitForEvent('window');
+  await reopenedSettings.waitForLoadState('domcontentloaded');
+  await reopenedSettings.getByRole('button', { name: 'About' }).click();
+  await expect(
+    reopenedSettings.getByRole('checkbox', { name: 'Automatically check for updates' })
+  ).not.toBeChecked();
+  await reopenedSettings.close();
+});
+
 test('opens and cancels the temporary SSH dialog', async () => {
   const { page } = session;
   await session.app.evaluate(({ Menu }) => {

@@ -10,6 +10,7 @@ const autoUpdaterMock = vi.hoisted(() => ({
   channel: 'beta',
   on: vi.fn(),
   checkForUpdates: vi.fn(),
+  downloadUpdate: vi.fn(),
   quitAndInstall: vi.fn()
 }));
 
@@ -38,9 +39,20 @@ function makeLogger(): Logger {
   } as unknown as Logger;
 }
 
+function emitUpdaterEvent(event: string, payload: unknown): void {
+  const calls = autoUpdaterMock.on.mock.calls as unknown as Array<
+    [string, (input: unknown) => void]
+  >;
+  for (const [registeredEvent, handler] of calls) {
+    if (registeredEvent === event) handler(payload);
+  }
+}
+
 beforeEach(() => {
+  autoUpdaterMock.autoDownload = false;
   autoUpdaterMock.on.mockClear();
   autoUpdaterMock.checkForUpdates.mockReset().mockResolvedValue(null);
+  autoUpdaterMock.downloadUpdate.mockReset().mockResolvedValue([]);
   autoUpdaterMock.quitAndInstall.mockClear();
   vi.stubGlobal(
     'fetch',
@@ -49,6 +61,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
 });
@@ -82,7 +95,6 @@ describe('nightly update metadata', () => {
     const fetcher = vi
       .fn<typeof fetch>()
       .mockResolvedValue(new Response('rate limited', { status: 403 }));
-
     await expect(fetchNightlyRelease(fetcher)).rejects.toThrow('GitHub returned HTTP 403');
   });
 
@@ -92,17 +104,17 @@ describe('nightly update metadata', () => {
       html_url: 'https://github.com/lihaozhe013/geared-term/releases/tag/nightly',
       assets: [{ name: 'geared-term-windows-x64-portable.exe' }]
     });
-
     expect(release.hasWindowsInstaller).toBe(false);
   });
 });
 
-describe('automatic update notifications', () => {
-  it('notifies once when an automatic check finds a different nightly commit', async () => {
+describe('automatic update checks', () => {
+  it('notifies for an automatic new-SHA result, but not for manual checks', async () => {
     const notify = vi.fn();
     const manager = new UpdateManager(makeLogger(), sha, true, vi.fn(), notify);
 
-    await manager.check('automatic');
+    await manager.check('manual');
+    expect(notify).not.toHaveBeenCalled();
     await manager.check('automatic');
 
     expect(notify).toHaveBeenCalledOnce();
@@ -113,18 +125,59 @@ describe('automatic update notifications', () => {
     });
   });
 
-  it('does not notify from a manual check, but allows a later automatic check', async () => {
+  it('suppresses an in-flight automatic notification after the setting is disabled', async () => {
+    let resolveFetch: ((response: Response) => void) | undefined;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveFetch = resolve;
+          })
+      )
+    );
     const notify = vi.fn();
     const manager = new UpdateManager(makeLogger(), sha, true, vi.fn(), notify);
 
-    await manager.check('manual');
-    expect(notify).not.toHaveBeenCalled();
+    const request = manager.check('automatic');
+    manager.setAutomaticChecksEnabled(false);
+    resolveFetch?.(nightlyResponse(newerSha));
+    await request;
 
-    await manager.check('automatic');
-    expect(notify).toHaveBeenCalledOnce();
+    expect(notify).not.toHaveBeenCalled();
   });
 
-  it('keeps an automatic notification when its check joins an in-flight manual check', async () => {
+  it('does not automatically check while disabled and still allows a manual check', async () => {
+    vi.useFakeTimers();
+    const fetcher = vi.fn().mockImplementation(async () => nightlyResponse(newerSha));
+    vi.stubGlobal('fetch', fetcher);
+    const manager = new UpdateManager(makeLogger(), sha, true, vi.fn(), undefined, false);
+
+    manager.start();
+    await vi.advanceTimersByTimeAsync(6000);
+    expect(fetcher).not.toHaveBeenCalled();
+    expect((await manager.check('manual')).state).toBe('available');
+    expect(fetcher).toHaveBeenCalledOnce();
+    manager.stop();
+  });
+
+  it('schedules the startup check after automatic checks are re-enabled', async () => {
+    vi.useFakeTimers();
+    const fetcher = vi.fn().mockImplementation(async () => nightlyResponse(newerSha));
+    vi.stubGlobal('fetch', fetcher);
+    const manager = new UpdateManager(makeLogger(), sha, true, vi.fn(), undefined, false);
+
+    manager.start();
+    await vi.advanceTimersByTimeAsync(6000);
+    expect(fetcher).not.toHaveBeenCalled();
+
+    manager.setAutomaticChecksEnabled(true);
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(fetcher).toHaveBeenCalledOnce();
+    manager.stop();
+  });
+
+  it('keeps one automatic request when it joins an in-flight manual check', async () => {
     let resolveFetch: ((response: Response) => void) | undefined;
     vi.stubGlobal(
       'fetch',
@@ -146,41 +199,20 @@ describe('automatic update notifications', () => {
     expect(notify).toHaveBeenCalledOnce();
   });
 
-  it('notifies with the manual-download status for portable builds', async () => {
+  it('notifies with manual-download status for portable builds', async () => {
     vi.stubEnv('PORTABLE_EXECUTABLE_FILE', 'GearedTerm.exe');
     const notify = vi.fn();
     const manager = new UpdateManager(makeLogger(), sha, true, vi.fn(), notify);
 
     const status = await manager.check('automatic');
-
     expect(status.state).toBe('available');
     expect(status.canInstall).toBe(false);
     expect(notify).toHaveBeenCalledOnce();
   });
 
-  it.skipIf(process.platform !== 'win32')(
-    'does not notify when the Windows updater check fails',
-    async () => {
-      const notify = vi.fn();
-      autoUpdaterMock.checkForUpdates.mockRejectedValueOnce(new Error('updater feed unavailable'));
-      const manager = new UpdateManager(makeLogger(), sha, true, vi.fn(), notify);
-
-      const status = await manager.check('automatic');
-
-      expect(status.state).toBe('error');
-      expect(notify).not.toHaveBeenCalled();
-    }
-  );
-
-  it('does not notify when the build is current, checking fails, or the app is unpackaged', async () => {
+  it('does not notify when current, on failure, or unpackaged', async () => {
     const notify = vi.fn();
-    const currentBuildManager = new UpdateManager(
-      makeLogger(),
-      sha,
-      true,
-      vi.fn(),
-      notify
-    );
+    const currentBuildManager = new UpdateManager(makeLogger(), sha, true, vi.fn(), notify);
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(nightlyResponse(sha)));
     await currentBuildManager.check('automatic');
     expect(notify).not.toHaveBeenCalled();
@@ -193,5 +225,34 @@ describe('automatic update notifications', () => {
     const unpackagedManager = new UpdateManager(makeLogger(), sha, false, vi.fn(), notify);
     await unpackagedManager.check('automatic');
     expect(notify).not.toHaveBeenCalled();
+  });
+});
+
+describe('explicit Windows update downloads', () => {
+  it('only downloads after an explicit request and publishes progress and readiness', async () => {
+    autoUpdaterMock.checkForUpdates.mockResolvedValue({ isUpdateAvailable: true });
+    const manager = new UpdateManager(makeLogger(), sha, true, vi.fn(), undefined, true, true);
+
+    const available = await manager.check('manual');
+    expect(available).toMatchObject({ state: 'available', canInstall: true });
+    expect(autoUpdaterMock.autoDownload).toBe(false);
+    expect(autoUpdaterMock.downloadUpdate).not.toHaveBeenCalled();
+
+    manager.startDownload();
+    expect(autoUpdaterMock.downloadUpdate).toHaveBeenCalledOnce();
+    expect(manager.getStatus()).toMatchObject({ state: 'downloading', progress: 0 });
+
+    emitUpdaterEvent('download-progress', { percent: 37 });
+    expect(manager.getStatus()).toMatchObject({ state: 'downloading', progress: 37 });
+    emitUpdaterEvent('update-downloaded', { version: '0.1.0-beta.1' });
+    expect(manager.getStatus()).toMatchObject({ state: 'downloaded', progress: 100 });
+
+    manager.installDownloadedUpdate();
+    expect(autoUpdaterMock.quitAndInstall).toHaveBeenCalledWith(true, true);
+  });
+
+  it('rejects downloads unless a Windows installer update is ready', () => {
+    const manager = new UpdateManager(makeLogger(), sha, true, vi.fn(), undefined, true, true);
+    expect(() => manager.startDownload()).toThrow('No downloadable Windows update is available');
   });
 });

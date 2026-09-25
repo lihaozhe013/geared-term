@@ -85,6 +85,8 @@ import {
   TerminalLigatureRequestSchema,
   TerminalLigatureSequencesSchema,
   UiStateRecordSchema,
+  UpdateNoticeDismissRequestSchema,
+  UpdateNoticeSchema,
   UpdateStatusSchema,
   VaultPasswordRequestSchema,
   VaultRotateRequestSchema,
@@ -463,6 +465,31 @@ function registerIpc(): void {
     if (!updateManager) throw new Error('Update service is unavailable');
     return UpdateStatusSchema.parse(await updateManager.check('manual'));
   });
+  ipcMain.handle('updates:get-notice', (event, input: unknown) => {
+    EmptyRequestSchema.parse(input ?? {});
+    if (BrowserWindow.fromWebContents(event.sender) !== mainWindow) {
+      throw new Error('Only the main window can read the update notice');
+    }
+    if (!updateNotification) throw new Error('Update notification is unavailable');
+    return UpdateNoticeSchema.nullable().parse(updateNotification.getNotice());
+  });
+  ipcMain.handle('updates:dismiss-notice', async (event, input: unknown) => {
+    if (BrowserWindow.fromWebContents(event.sender) !== mainWindow) {
+      throw new Error('Only the main window can dismiss the update notice');
+    }
+    if (!updateNotification) throw new Error('Update notification is unavailable');
+    const request = UpdateNoticeDismissRequestSchema.parse(input);
+    await updateNotification.dismiss(request);
+    return SftpOperationResultSchema.parse({ accepted: true });
+  });
+  ipcMain.handle('updates:download', (event) => {
+    if (!settingsWindow.ownsWebContents(event.sender)) {
+      throw new Error('Only Settings can start an update download');
+    }
+    if (!updateManager) throw new Error('Update service is unavailable');
+    updateManager.startDownload();
+    return SftpOperationResultSchema.parse({ accepted: true });
+  });
   ipcMain.handle('updates:install', () => {
     if (!updateManager) throw new Error('Update service is unavailable');
     updateManager.installDownloadedUpdate();
@@ -590,6 +617,8 @@ function registerIpc(): void {
   ipcMain.handle('settings:save', async (_event, input: unknown) => {
     const settings = SettingsRecordSchema.parse(input);
     const saved = SettingsRecordSchema.parse(await storage.saveSettings(settings));
+    updateManager?.setAutomaticChecksEnabled(saved.autoCheckUpdates);
+    updateNotification?.setEnabled(saved.autoCheckUpdates);
     await rebuildApplicationMenu();
     trayController?.sync(saved.keepRunningInBackground, resolveMenuLocale(saved.language));
     sendToRenderer('settings:changed', saved);
@@ -1302,7 +1331,8 @@ if (hasSingleInstanceLock) {
       },
       (release) => {
         updateNotification?.notify(release);
-      }
+      },
+      storage.settingsSnapshot().autoCheckUpdates
     );
     registerIpc();
     settingsWindow = new SettingsWindowManager(logger, isDevelopment, () => {
@@ -1312,12 +1342,13 @@ if (hasSingleInstanceLock) {
       void rebuildApplicationMenu();
     });
     updateNotification = new UpdateNotificationController(
-      logger,
       () => mainWindow,
-      () => resolveMenuLocale(storage.settingsSnapshot().language),
-      () => settingsWindow.open('about'),
-      (parent, options) => dialog.showMessageBox(parent, options),
-      () => installChannel
+      storage.updateNotices,
+      (notice) => {
+        if (!mainWindow || mainWindow.isDestroyed()) return;
+        mainWindow.webContents.send('updates:notice', notice);
+      },
+      storage.settingsSnapshot().autoCheckUpdates
     );
     historyWindow = new HistoryWindowManager(logger, isDevelopment);
     await rebuildApplicationMenu();

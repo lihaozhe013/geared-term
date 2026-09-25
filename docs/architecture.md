@@ -263,21 +263,25 @@ notarization is applied, and the hook steps aside when electron-builder signs wi
 - `update-release.ts` fetches the `nightly` release metadata from the GitHub API and extracts the
   full commit SHA from the release body.
 - `update-manager.ts` compares that SHA with the running build. A packaged build checks once at
-  startup and then every 24 hours, plus manually from Settings → About; development builds never
+  startup and then at most every 24 hours when automatic checks are enabled; users can disable
+  automatic checks in Settings → About without disabling manual checks. Development builds never
   check.
 - Status is published to renderers as the validated `UpdateStatus` union
   (`idle | checking | up-to-date | available | downloading | downloaded | error`).
 - `install-channel.ts` probes how the running build was delivered — the Windows NSIS installer, a
   Homebrew cask (the `Caskroom/geared-term` directory under the active Homebrew prefix), or a manual
   download — and the result is published in `AppInfo`.
-- `update-notification.ts` receives one automatic new-SHA notification per process run and shows a
-  localized native prompt. It opens Settings → About on request and queues the prompt until the main
-  window is shown if the app is hidden or minimized in the tray.
-- Automatic download and in-app install are Windows NSIS-installer builds only (electron-updater
-  with a generic publish feed pointing at the release download URL and the `beta` channel,
-  `beta.yml`). Portable Windows builds and macOS/Linux builds detect an update and offer the release
-  page link for manual download instead; a Homebrew-managed macOS install is additionally shown the
-  `brew upgrade --cask geared-term` command, which the app never executes.
+- `update-notification.ts` publishes a localized non-modal notice for automatic new-SHA results. The
+  main renderer can query or subscribe to the pending notice after a reload; hidden windows defer
+  presentation. `update-notice.json` stores the last dismissed or viewed full commit SHA so the same
+  nightly is not announced again after restart.
+- The notice card lives in the main renderer, uses the active theme, and opens Settings → About or
+  dismisses the notice without taking focus from the terminal. Homebrew-managed macOS installs also
+  see the `brew upgrade --cask geared-term` command in the card; the app never executes it.
+- Windows NSIS-installer builds use `electron-updater` with the generic `beta.yml` feed, but checks
+  only report availability. An explicit Download update action in Settings → About starts the
+  download. Portable Windows builds and macOS/Linux builds offer the release page for manual
+  downloads instead.
 - The macOS DMG is also published through the project's Homebrew tap
   (`lihaozhe013/homebrew-geared-term`). The release job renders `Casks/geared-term.rb` with
   `scripts/render-homebrew-cask.mjs`, pinning the nightly version and the artifact SHA-256, and

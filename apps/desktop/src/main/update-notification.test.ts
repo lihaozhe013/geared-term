@@ -1,14 +1,29 @@
-import type { BrowserWindow, MessageBoxOptions } from 'electron';
+import type { BrowserWindow } from 'electron';
 import { describe, expect, it, vi } from 'vitest';
-import type { Logger } from './logging';
+import type { UpdateNoticeStore } from './persistence/update-notice-store';
 import { UpdateNotificationController } from './update-notification';
 import type { NightlyRelease } from './update-release';
 
-const release: NightlyRelease = {
-  commitSha: 'abcdef0123456789abcdef0123456789abcdef01',
-  htmlUrl: 'https://github.com/lihaozhe013/geared-term/releases/tag/nightly',
-  hasWindowsInstaller: true
-};
+const commitSha = 'abcdef0123456789abcdef0123456789abcdef01';
+const nextSha = '1234567890abcdef1234567890abcdef12345678';
+
+function release(sha: string): NightlyRelease {
+  return {
+    commitSha: sha,
+    htmlUrl: 'https://github.com/lihaozhe013/geared-term/releases/tag/nightly',
+    hasWindowsInstaller: true
+  };
+}
+
+function makeStore(dismissed?: string): UpdateNoticeStore {
+  let dismissedCommitSha = dismissed;
+  return {
+    dismissedCommitSha: () => dismissedCommitSha,
+    dismiss: vi.fn(async (sha: string) => {
+      dismissedCommitSha = sha;
+    })
+  } as unknown as UpdateNoticeStore;
+}
 
 function makeWindow(visible: () => boolean): BrowserWindow {
   return {
@@ -18,118 +33,77 @@ function makeWindow(visible: () => boolean): BrowserWindow {
   } as unknown as BrowserWindow;
 }
 
-function makeLogger(): Logger {
-  return {
-    debug: vi.fn(),
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn()
-  } as unknown as Logger;
-}
-
 describe('UpdateNotificationController', () => {
-  it('shows a localized prompt and opens About when selected', async () => {
+  it('keeps a visible notice until the user dismisses or opens About', async () => {
     const window = makeWindow(() => true);
-    const openAboutSettings = vi.fn();
-    const showMessageBox = vi
-      .fn<(parent: BrowserWindow, options: MessageBoxOptions) => Promise<{ response: number }>>()
-      .mockResolvedValue({ response: 0 });
-    const controller = new UpdateNotificationController(
-      makeLogger(),
-      () => window,
-      () => 'zh-CN',
-      openAboutSettings,
-      showMessageBox
-    );
+    const store = makeStore();
+    const publish = vi.fn();
+    const controller = new UpdateNotificationController(() => window, store, publish);
 
-    controller.notify(release);
-    await vi.waitFor(() => expect(openAboutSettings).toHaveBeenCalledOnce());
+    controller.notify(release(commitSha));
+    expect(controller.getNotice()).toEqual({ commitSha });
+    expect(publish).toHaveBeenLastCalledWith({ commitSha });
 
-    expect(showMessageBox).toHaveBeenCalledWith(
-      window,
-      expect.objectContaining({
-        title: '\u53d1\u73b0\u65b0\u7248\u672c',
-        buttons: ['\u524d\u5f80\u8bbe\u7f6e', '\u7a0d\u540e'],
-        message: expect.stringContaining('abcdef0')
-      })
-    );
+    await controller.dismiss({ commitSha });
+    expect(store.dismiss).toHaveBeenCalledWith(commitSha);
+    expect(controller.getNotice()).toBeNull();
+    expect(publish).toHaveBeenLastCalledWith(null);
   });
 
-  it('defers while the main window is hidden and does not reopen after Later', async () => {
+  it('defers notices while hidden and replays them when the main window is shown', () => {
     let visible = false;
     const window = makeWindow(() => visible);
-    const openAboutSettings = vi.fn();
-    const showMessageBox = vi
-      .fn<(parent: BrowserWindow, options: MessageBoxOptions) => Promise<{ response: number }>>()
-      .mockResolvedValue({ response: 1 });
-    const controller = new UpdateNotificationController(
-      makeLogger(),
-      () => window,
-      () => 'en-US',
-      openAboutSettings,
-      showMessageBox
-    );
+    const publish = vi.fn();
+    const controller = new UpdateNotificationController(() => window, makeStore(), publish);
 
-    controller.notify(release);
-    expect(showMessageBox).not.toHaveBeenCalled();
+    controller.notify(release(commitSha));
+    expect(publish).not.toHaveBeenCalled();
+    expect(controller.getNotice()).toBeNull();
 
     visible = true;
     controller.onMainWindowPresented();
-    await vi.waitFor(() => expect(showMessageBox).toHaveBeenCalledOnce());
-    controller.onMainWindowPresented();
-    controller.notify(release);
-
-    expect(showMessageBox).toHaveBeenCalledOnce();
-    expect(showMessageBox).toHaveBeenCalledWith(
-      window,
-      expect.objectContaining({
-        title: 'Update available',
-        buttons: ['Open Settings', 'Later']
-      })
-    );
-    expect(openAboutSettings).not.toHaveBeenCalled();
+    expect(controller.getNotice()).toEqual({ commitSha });
+    expect(publish).toHaveBeenLastCalledWith({ commitSha });
   });
 
-  it('points Homebrew-managed installs at the cask upgrade command', async () => {
+  it('suppresses the dismissed SHA and permits a newer nightly commit', async () => {
     const window = makeWindow(() => true);
-    const showMessageBox = vi
-      .fn<(parent: BrowserWindow, options: MessageBoxOptions) => Promise<{ response: number }>>()
-      .mockResolvedValue({ response: 1 });
-    const homebrewController = new UpdateNotificationController(
-      makeLogger(),
-      () => window,
-      () => 'en-US',
-      vi.fn(),
-      showMessageBox,
-      () => 'homebrew-cask'
+    const store = makeStore();
+    const controller = new UpdateNotificationController(() => window, store, vi.fn());
+
+    controller.notify(release(commitSha));
+    await controller.dismiss({ commitSha });
+    controller.notify(release(commitSha));
+    expect(controller.getNotice()).toBeNull();
+
+    controller.notify(release(nextSha));
+    expect(controller.getNotice()).toEqual({ commitSha: nextSha });
+  });
+
+  it('clears a pending notice while automatic checks are disabled', () => {
+    const window = makeWindow(() => true);
+    const publish = vi.fn();
+    const controller = new UpdateNotificationController(() => window, makeStore(), publish);
+
+    controller.notify(release(commitSha));
+    controller.setEnabled(false);
+    expect(controller.getNotice()).toBeNull();
+    expect(publish).toHaveBeenLastCalledWith(null);
+
+    controller.setEnabled(true);
+    expect(controller.getNotice()).toBeNull();
+  });
+
+  it('rejects stale or malformed dismiss requests', async () => {
+    const controller = new UpdateNotificationController(
+      () => makeWindow(() => true),
+      makeStore(),
+      vi.fn()
     );
 
-    homebrewController.notify(release);
-    await vi.waitFor(() => expect(showMessageBox).toHaveBeenCalledOnce());
-
-    expect(showMessageBox).toHaveBeenCalledWith(
-      window,
-      expect.objectContaining({
-        message: expect.stringContaining('brew upgrade --cask geared-term')
-      })
+    await expect(controller.dismiss({ commitSha })).rejects.toThrow(
+      'The update notice is no longer active'
     );
-
-    showMessageBox.mockClear();
-    const manualController = new UpdateNotificationController(
-      makeLogger(),
-      () => window,
-      () => 'zh-CN',
-      vi.fn(),
-      showMessageBox
-    );
-    manualController.notify(release);
-    await vi.waitFor(() => expect(showMessageBox).toHaveBeenCalledOnce());
-
-    expect(showMessageBox).toHaveBeenCalledWith(
-      window,
-      expect.objectContaining({
-        message: expect.not.stringContaining('brew upgrade')
-      })
-    );
+    await expect(controller.dismiss({ commitSha: 'invalid' })).rejects.toThrow();
   });
 });

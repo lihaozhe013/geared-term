@@ -69,6 +69,7 @@ test('exposes exactly the documented preload surface', async () => {
       'disableAutoUnlock',
       'discoverAiModels',
       'discoverWsl',
+      'dismissUpdateNotice',
       'downloadPathsSftp',
       'downloadSftp',
       'enableAutoUnlock',
@@ -86,6 +87,7 @@ test('exposes exactly the documented preload surface', async () => {
       'getTerminalLigatureSequences',
       'getUiState',
       'getUpdateStatus',
+      'getUpdateNotice',
       'getVaultStatus',
       'initializeVault',
       'installDownloadedUpdate',
@@ -111,6 +113,7 @@ test('exposes exactly the documented preload surface', async () => {
       'onSftpEditorSaved',
       'onTerminalSnapshotAddToAssistant',
       'onUpdateStatus',
+      'onUpdateNotice',
       'onSftpTransferEvent',
       'onVaultChanged',
       'onWindowMaximizeChanged',
@@ -139,6 +142,7 @@ test('exposes exactly the documented preload surface', async () => {
       'saveProfileWithCredentials',
       'saveSettings',
       'saveUiState',
+      'startUpdateDownload',
       'streamAi',
       'revealLocalPath',
       'sftpDelete',
@@ -175,6 +179,32 @@ test('reports application information from the main process', async () => {
   expect(info.platform).toBe(process.platform);
   expect(info.isPackaged).toBe(false);
   expect(info.version).toMatch(/^\d+\.\d+\.\d+/);
+});
+
+test('renders update notices inside the workspace without opening a modal', async () => {
+  const { page, app } = session;
+  const focusedBefore = await page.evaluate(() => {
+    const active = document.activeElement;
+    return `${active?.tagName}:${active?.id}:${active?.getAttribute('aria-label')}`;
+  });
+  await app.evaluate(({ BrowserWindow }) => {
+    BrowserWindow.getAllWindows()[0]?.webContents.send('updates:notice', {
+      commitSha: 'abcdef0123456789abcdef0123456789abcdef01'
+    });
+  });
+
+  const notice = page.locator('.update-notice-card');
+  await expect(notice).toBeVisible();
+  await expect(notice).toContainText('abcdef0');
+  await expect(notice.getByRole('button', { name: 'View update' })).toBeVisible();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  expect(await notice.getAttribute('aria-live')).toBe('polite');
+  expect(
+    await page.evaluate(() => {
+      const active = document.activeElement;
+      return `${active?.tagName}:${active?.id}:${active?.getAttribute('aria-label')}`;
+    })
+  ).toBe(focusedBefore);
 });
 
 test('opens Files as a single local pane and searches its current directory', async () => {

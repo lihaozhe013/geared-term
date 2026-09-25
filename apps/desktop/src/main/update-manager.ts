@@ -7,6 +7,7 @@ const { autoUpdater } = electronUpdater;
 const repository = 'lihaozhe013/geared-term';
 const releaseUrl = `https://github.com/${repository}/releases/tag/nightly`;
 const checkIntervalMs = 24 * 60 * 60 * 1000;
+const startupCheckDelayMs = 5000;
 
 type StatusPublisher = (status: UpdateStatus) => void;
 type NewVersionPublisher = (release: NightlyRelease) => void;
@@ -17,31 +18,36 @@ export class UpdateManager {
   private checkPromise: Promise<UpdateStatus> | undefined;
   private checkTimer: NodeJS.Timeout | undefined;
   private automaticCheckRequested = false;
-  private updatePrompted = false;
-  private readonly canInstall =
-    process.platform === 'win32' &&
-    !process.env.PORTABLE_EXECUTABLE_FILE &&
-    !process.env.PORTABLE_EXECUTABLE_DIR;
+  private automaticChecksEnabled: boolean;
+  private started = false;
+  private lastAutomaticCheckAt: number | undefined;
+  private downloadInFlight = false;
+  private readonly canInstall: boolean;
 
   public constructor(
     private readonly logger: Logger,
     private readonly currentSha: string,
     private readonly isPackaged: boolean,
     private readonly publishStatus: StatusPublisher,
-    private readonly publishNewVersion?: NewVersionPublisher
+    private readonly publishNewVersion?: NewVersionPublisher,
+    automaticChecksEnabled = true,
+    canInstall = process.platform === 'win32' &&
+      !process.env.PORTABLE_EXECUTABLE_FILE &&
+      !process.env.PORTABLE_EXECUTABLE_DIR
   ) {
+    this.automaticChecksEnabled = automaticChecksEnabled;
+    this.canInstall = canInstall;
     this.status = UpdateStatusSchema.parse({ state: 'idle', currentSha });
     if (this.isPackaged && this.canInstall) {
-      autoUpdater.autoDownload = true;
+      autoUpdater.autoDownload = false;
       autoUpdater.autoInstallOnAppQuit = false;
       autoUpdater.allowPrerelease = true;
       autoUpdater.channel = 'beta';
       autoUpdater.on('update-available', (info) => {
         this.logger.info('system', 'Nightly update available', { version: info.version });
         this.publish({
-          state: 'downloading',
+          state: 'available',
           latestVersion: info.version,
-          progress: 0,
           canInstall: true
         });
       });
@@ -57,6 +63,7 @@ export class UpdateManager {
         });
       });
       autoUpdater.on('update-downloaded', (info) => {
+        this.downloadInFlight = false;
         this.logger.info('system', 'Nightly update downloaded', { version: info.version });
         this.publish({
           state: 'downloaded',
@@ -66,22 +73,41 @@ export class UpdateManager {
         });
       });
       autoUpdater.on('error', (error) => {
+        this.downloadInFlight = false;
         this.logger.warn('system', 'Nightly update installation failed', {
           error: error.message
         });
-        this.publish({ state: 'available', canInstall: false, error: error.message.slice(0, 512) });
+        this.publish({
+          state: 'available',
+          canInstall: Boolean(this.pendingRelease?.hasWindowsInstaller),
+          error: error.message.slice(0, 512)
+        });
       });
     }
   }
 
   public start(): void {
-    if (!this.isPackaged) return;
-    this.checkTimer = setTimeout(() => {
-      void this.check('automatic');
-      this.checkTimer = setInterval(() => void this.check('automatic'), checkIntervalMs);
-      this.checkTimer.unref();
-    }, 5000);
-    this.checkTimer.unref();
+    if (!this.isPackaged || this.started) return;
+    this.started = true;
+    this.scheduleAutomaticCheck(startupCheckDelayMs);
+  }
+
+  public setAutomaticChecksEnabled(enabled: boolean): void {
+    if (this.automaticChecksEnabled === enabled) return;
+    this.automaticChecksEnabled = enabled;
+    if (!enabled) {
+      this.automaticCheckRequested = false;
+      this.clearCheckTimer();
+      return;
+    }
+    if (!this.started) return;
+    const elapsed =
+      this.lastAutomaticCheckAt === undefined
+        ? checkIntervalMs
+        : Date.now() - this.lastAutomaticCheckAt;
+    this.scheduleAutomaticCheck(
+      elapsed >= checkIntervalMs ? startupCheckDelayMs : checkIntervalMs - elapsed
+    );
   }
 
   public getStatus(): UpdateStatus {
@@ -90,6 +116,9 @@ export class UpdateManager {
 
   public check(mode: 'automatic' | 'manual' = 'manual'): Promise<UpdateStatus> {
     if (!this.isPackaged) return Promise.resolve(this.status);
+    if (mode === 'automatic' && !this.automaticChecksEnabled) {
+      return Promise.resolve(this.status);
+    }
     if (mode === 'automatic') this.automaticCheckRequested = true;
     if (this.checkPromise) return this.checkPromise;
     this.publish({ state: 'checking', canInstall: this.canInstall });
@@ -100,6 +129,39 @@ export class UpdateManager {
     return this.checkPromise;
   }
 
+  public startDownload(): void {
+    if (
+      !this.canInstall ||
+      this.status.state !== 'available' ||
+      !this.status.canInstall ||
+      !this.pendingRelease?.hasWindowsInstaller
+    ) {
+      throw new Error('No downloadable Windows update is available');
+    }
+    if (this.downloadInFlight) return;
+    this.downloadInFlight = true;
+    this.publish({
+      state: 'downloading',
+      latestVersion: this.status.latestVersion,
+      progress: 0,
+      canInstall: true
+    });
+    void autoUpdater.downloadUpdate().catch((error: unknown) => {
+      this.downloadInFlight = false;
+      this.logger.warn('system', 'Nightly update download failed', {
+        error: error instanceof Error ? error.message : String(error)
+      });
+      if (this.status.state !== 'downloaded') {
+        this.publish({
+          state: 'available',
+          latestVersion: this.status.latestVersion,
+          canInstall: true,
+          error: error instanceof Error ? error.message.slice(0, 512) : String(error).slice(0, 512)
+        });
+      }
+    });
+  }
+
   public installDownloadedUpdate(): void {
     if (!this.canInstall || this.status.state !== 'downloaded') {
       throw new Error('No downloaded Windows update is ready to install');
@@ -108,7 +170,8 @@ export class UpdateManager {
   }
 
   public stop(): void {
-    if (this.checkTimer) clearTimeout(this.checkTimer);
+    this.started = false;
+    this.clearCheckTimer();
   }
 
   private async performCheck(mode: 'automatic' | 'manual'): Promise<UpdateStatus> {
@@ -121,29 +184,29 @@ export class UpdateManager {
       if (release.commitSha === this.currentSha.toLowerCase()) {
         return this.publish({ state: 'up-to-date', canInstall: false });
       }
-      if (this.canInstall) {
-        if (!release.hasWindowsInstaller) {
-          this.notifyNewVersion(release);
-          return this.publish({ state: 'available', canInstall: false });
-        }
+      if (this.canInstall && release.hasWindowsInstaller) {
         const result = await autoUpdater.checkForUpdates();
-        this.notifyNewVersion(release);
-        if (!result) return this.publish({ state: 'available', canInstall: false });
         if (this.status.state === 'checking') {
-          this.publish({ state: 'available', canInstall: true });
+          this.publish({
+            state: 'available',
+            canInstall: Boolean(result?.isUpdateAvailable)
+          });
         }
+        this.notifyNewVersion(release);
         return this.status;
       }
+      const status = this.publish({ state: 'available', canInstall: false });
       this.notifyNewVersion(release);
-      return this.publish({ state: 'available', canInstall: false });
+      return status;
     } catch (error) {
       return this.fail(error instanceof Error ? error.message : String(error), mode);
     }
   }
 
   private notifyNewVersion(release: NightlyRelease): void {
-    if (!this.automaticCheckRequested || this.updatePrompted || !this.publishNewVersion) return;
-    this.updatePrompted = true;
+    if (!this.automaticCheckRequested || !this.automaticChecksEnabled || !this.publishNewVersion) {
+      return;
+    }
     try {
       this.publishNewVersion(release);
     } catch (error) {
@@ -156,6 +219,24 @@ export class UpdateManager {
   private fail(message: string, mode: 'automatic' | 'manual'): UpdateStatus {
     this.logger.warn('system', 'Nightly update check failed', { error: message, mode });
     return this.publish({ state: 'error', error: message.slice(0, 512), canInstall: false });
+  }
+
+  private scheduleAutomaticCheck(delay: number): void {
+    this.clearCheckTimer();
+    if (!this.started || !this.isPackaged || !this.automaticChecksEnabled) return;
+    this.checkTimer = setTimeout(() => {
+      this.checkTimer = undefined;
+      if (!this.started || !this.automaticChecksEnabled) return;
+      this.lastAutomaticCheckAt = Date.now();
+      void this.check('automatic').finally(() => this.scheduleAutomaticCheck(checkIntervalMs));
+    }, delay);
+    this.checkTimer.unref();
+  }
+
+  private clearCheckTimer(): void {
+    if (!this.checkTimer) return;
+    clearTimeout(this.checkTimer);
+    this.checkTimer = undefined;
   }
 
   private publish(

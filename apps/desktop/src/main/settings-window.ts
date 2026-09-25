@@ -85,4 +85,8 @@ export class SettingsWindowManager {
     });
     this.window = window;
   }
+
+  ownsWebContents(webContents: Electron.WebContents): boolean {
+    return this.window?.webContents === webContents;
+  }
 }

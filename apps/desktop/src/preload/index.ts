@@ -78,6 +78,8 @@ import {
   TerminalClientMessageSchema,
   TerminalPortMessageSchema,
   UiStateRecordSchema,
+  UpdateNoticeDismissRequestSchema,
+  UpdateNoticeSchema,
   UpdateStatusSchema,
   WslDistributionSchema,
   type LocalTerminalRequest,
@@ -119,6 +121,7 @@ import {
   type SshProfileTerminalRequest,
   type SshTerminalRequest,
   type UiStateRecord,
+  type UpdateNotice,
   type UpdateStatus,
   type VaultPasswordRequest,
   type WslDistribution
@@ -129,7 +132,11 @@ const api = Object.freeze({
   getAppInfo: async () => AppInfoSchema.parse(await ipcRenderer.invoke('app:get-info', {})),
   getUpdateStatus: async () =>
     UpdateStatusSchema.parse(await ipcRenderer.invoke('updates:get-status')),
+  getUpdateNotice: async () =>
+    UpdateNoticeSchema.nullable().parse(await ipcRenderer.invoke('updates:get-notice', {})),
   checkForUpdates: async () => UpdateStatusSchema.parse(await ipcRenderer.invoke('updates:check')),
+  startUpdateDownload: async () =>
+    SftpOperationResultSchema.parse(await ipcRenderer.invoke('updates:download')),
   installDownloadedUpdate: async () =>
     SftpOperationResultSchema.parse(await ipcRenderer.invoke('updates:install')),
   openNightlyRelease: async () =>
@@ -141,6 +148,20 @@ const api = Object.freeze({
     };
     ipcRenderer.on('updates:status', handler);
     return () => ipcRenderer.removeListener('updates:status', handler);
+  },
+  dismissUpdateNotice: async (commitSha: string) => {
+    const request = UpdateNoticeDismissRequestSchema.parse({ commitSha });
+    return SftpOperationResultSchema.parse(
+      await ipcRenderer.invoke('updates:dismiss-notice', request)
+    );
+  },
+  onUpdateNotice: (listener: (notice: UpdateNotice | null) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, payload: unknown): void => {
+      const result = UpdateNoticeSchema.nullable().safeParse(payload);
+      if (result.success) listener(result.data);
+    };
+    ipcRenderer.on('updates:notice', handler);
+    return () => ipcRenderer.removeListener('updates:notice', handler);
   },
   createLocalTerminal: (input: LocalTerminalRequest, onMessage: (message: unknown) => void) => {
     const request = LocalTerminalRequestSchema.parse(input);

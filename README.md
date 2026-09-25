@@ -85,7 +85,8 @@ A few things to know about nightlies:
 - Nightly builds carry no Developer ID signature and no notarization. macOS bundles receive an
   ad-hoc signature so the bundle stays internally valid, but Gatekeeper still warns on first launch.
 - The Windows installer build checks the nightly channel automatically after startup and once per
-  day, downloads updates, and offers in-app installation. Portable, macOS, and Linux builds detect
+  day when automatic checks are enabled in Settings → About. It downloads an update only after you
+  choose Download update, then offers in-app installation. Portable, macOS, and Linux builds detect
   new nightlies and link you to the release page for manual download; macOS installs from the
   Homebrew tap below also show the `brew upgrade` command in Settings → About and in the update
   prompt.

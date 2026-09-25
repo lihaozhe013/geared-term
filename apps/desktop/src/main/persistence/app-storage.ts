@@ -24,6 +24,7 @@ import { AutoUnlockStore, type SafeStorageAdapter } from '../vault/auto-unlock';
 import { normalizeEndpoint } from '../ai/endpoint';
 import { ProfileDatabase, newSecretId } from './profile-database';
 import { VersionedJsonStore } from './json-store';
+import { UpdateNoticeStore } from './update-notice-store';
 import {
   defaultProfile,
   defaultSettings,
@@ -46,6 +47,7 @@ export class AppStorage {
   public readonly settings: VersionedJsonStore<Settings>;
   public readonly uiState: VersionedJsonStore<UiState>;
   public readonly vaultState: VersionedJsonStore<VaultState>;
+  public readonly updateNotices: UpdateNoticeStore;
   public vault: Vault;
   private readonly rootDirectory: string;
   private readonly logger: Logger;
@@ -71,6 +73,7 @@ export class AppStorage {
       UiStateSchema,
       defaultUiState
     );
+    this.updateNotices = new UpdateNoticeStore(rootDirectory);
     const defaultVaultState: VaultState = {
       schemaVersion: 1,
       metadata: createVaultMetadata(),
@@ -89,7 +92,8 @@ export class AppStorage {
     const [settings, uiState, vaultState] = await Promise.all([
       this.settings.load(),
       this.uiState.load(),
-      this.vaultState.load()
+      this.vaultState.load(),
+      this.updateNotices.load()
     ]);
     this.vaultStateSnapshot = vaultState.value;
     this.settingsValue = settings.value;

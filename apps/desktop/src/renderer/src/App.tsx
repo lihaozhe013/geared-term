@@ -51,6 +51,8 @@ import {
 import { LocalFilesPanel } from './LocalFilesPanel';
 import { VaultGate } from './VaultGate';
 import { WindowTitleBar } from './WindowTitleBar';
+import { UpdateNoticeCard } from './UpdateNoticeCard';
+import { useUpdateNotice } from './useUpdateNotice';
 
 type TerminalRequest = LocalTerminalRequest | SshTerminalRequest | SshProfileTerminalRequest;
 type TabStatus = 'starting' | 'awaiting-user' | 'running' | 'exited' | 'failed' | 'closed';
@@ -77,6 +79,7 @@ const defaultSettings: SettingsRecord = {
   defaultTerm: 'xterm-256color',
   splitCommandPresentation: true,
   allowRiskyRun: false,
+  autoCheckUpdates: true,
   keepRunningInBackground: false,
   terminalContextPrecedingLines: 100,
   remoteFileCommands: 'cat\nless\nvim',
@@ -231,6 +234,7 @@ export function App(): React.JSX.Element {
   const [pendingHistoryId, setPendingHistoryId] = useState<string | null>(null);
   const [pendingChatText, setPendingChatText] = useState<string | null>(null);
   const [vaultStatus, setVaultStatus] = useState<VaultStatus | null>(null);
+  const { notice: updateNotice, dismiss: dismissUpdateNotice } = useUpdateNotice();
   const sftpControls = useRef(new Map<string, SftpTerminalControl>());
   const snapshotControls = useRef(new Map<string, TerminalSnapshotControl>());
 
@@ -870,6 +874,19 @@ export function App(): React.JSX.Element {
         onOpenSettings={() => void window.geared.openSettings()}
         keybindings={settings.keybindings}
       />
+
+      {settings.autoCheckUpdates && updateNotice ? (
+        <UpdateNoticeCard
+          notice={updateNotice}
+          installChannel={info?.installChannel ?? 'manual'}
+          language={settings.language}
+          onDismiss={() => dismissUpdateNotice(updateNotice.commitSha)}
+          onView={async () => {
+            await dismissUpdateNotice(updateNotice.commitSha);
+            await window.geared.openSettings('about');
+          }}
+        />
+      ) : null}
 
       <section
         className={`workspace ${uiState.sidebarCollapsed ? 'sidebar-collapsed' : ''}`}

@@ -718,12 +718,13 @@ reported in Settings without blocking startup.
   structured error instead of guessing.
 - **UPD-003**: Packaged builds MUST check for updates automatically once shortly after startup and
   then at most once per day, and MUST support a manual check from Settings → About. Development
-  builds MUST NOT check for updates.
-- **UPD-004**: Automatic download and in-app installation MUST be limited to the Windows NSIS
-  installer build and MUST run only from an explicit user action. Portable Windows, macOS, and Linux
-  builds MUST present the release page link for manual download instead. A macOS build installed
-  through the Homebrew tap MUST additionally present the package manager upgrade command in Settings
-  → About and in the automatic update prompt, and MUST NOT execute it.
+  builds MUST NOT check for updates. Automatic checks MUST be enabled by default and MUST be
+  disableable from Settings → About without disabling manual checks.
+- **UPD-004**: Update downloads and in-app installation MUST be limited to the Windows NSIS
+  installer build and MUST start only after an explicit user action. Portable Windows, macOS, and
+  Linux builds MUST present the release page link for manual download instead. A macOS build
+  installed through the Homebrew tap MUST additionally present the package manager upgrade command
+  in Settings → About and in the automatic update prompt, and MUST NOT execute it.
 - **UPD-005**: The updater MUST target only Geared Term's own release feed, and update traffic MUST
   NOT include user content, credentials, or identifiers beyond an ordinary release metadata request.
   Update failures MUST be bounded and redacted and MUST NOT interrupt terminal, SFTP, or AI
@@ -731,11 +732,15 @@ reported in Settings without blocking startup.
 - **UPD-006**: The UI MUST render the validated update state machine (`idle`, `checking`,
   `up-to-date`, `available`, `downloading`, `downloaded`, `error`), including download progress and
   the install affordance when an update is ready.
-- **UPD-007**: Packaged builds MUST show a localized native prompt when an automatic check finds a
-  nightly commit SHA different from the running build. The prompt MUST be shown at most once per
-  process run, offer actions to open Settings → About or dismiss it, and wait until the main window
-  is visible when the app is hidden or minimized. Manual checks MUST continue to report through
-  Settings → About without opening a separate prompt; dismissals MUST NOT persist across restarts.
+- **UPD-007**: Packaged builds MUST show a localized, non-modal in-app notice card when an enabled
+  automatic check finds a nightly commit SHA different from the running build. The card MUST offer
+  actions to open Settings → About or dismiss it, MUST NOT take focus from the workspace, and MUST
+  remain available until one of those actions is taken. A dismissed or viewed full commit SHA MUST
+  not be shown again across restarts; a different SHA MAY be shown. Notices MUST wait until the main
+  window is visible when the app is hidden or minimized and MUST be recoverable after a renderer
+  reload. Manual checks MUST report through Settings → About without opening a notice. A Homebrew
+  managed macOS install MUST show its upgrade command in Settings → About and in the notice card;
+  the app MUST NOT execute it.
 - **UPD-008**: Packaged macOS bundles MUST carry a code signature that verifies, at minimum an
   ad-hoc signature covering the whole bundle including its helpers. Builds MUST NOT advertise
   Developer ID signing or notarization they do not perform, and the release pipeline MUST fail when

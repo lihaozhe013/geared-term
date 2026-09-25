@@ -58,6 +58,14 @@ export const UpdateStatusSchema = z
   })
   .strict();
 
+export const UpdateNoticeSchema = z
+  .object({ commitSha: z.string().regex(/^[a-f0-9]{40}$/i) })
+  .strict();
+
+export const UpdateNoticeDismissRequestSchema = z
+  .object({ commitSha: z.string().regex(/^[a-f0-9]{40}$/i) })
+  .strict();
+
 export const EmptyRequestSchema = z.object({}).strict();
 
 export const VaultPasswordRequestSchema = z
@@ -235,6 +243,7 @@ export const SettingsRecordSchema = z
     allowRiskyRun: z.boolean().default(false),
     /** False keeps the historical quit-on-close behavior for missing settings. */
     keepRunningInBackground: z.boolean().default(false),
+    autoCheckUpdates: z.boolean().default(true),
     terminalContextPrecedingLines: z.number().int().min(0).max(2000),
     remoteFileCommands: z.string().max(4096).default('cat\nless\nvim'),
     uiFontFamily: z.string().max(256).default(''),
@@ -1272,6 +1281,8 @@ export type SessionProfileSaveRequest = z.infer<typeof SessionProfileSaveRequest
 export type ProfileOrderRequest = z.infer<typeof ProfileOrderRequestSchema>;
 export type UiStateRecord = z.infer<typeof UiStateRecordSchema>;
 export type SettingsRecord = z.infer<typeof SettingsRecordSchema>;
+export type UpdateNotice = z.infer<typeof UpdateNoticeSchema>;
+export type UpdateNoticeDismissRequest = z.infer<typeof UpdateNoticeDismissRequestSchema>;
 export type TerminalLigatureRequest = z.infer<typeof TerminalLigatureRequestSchema>;
 export type WslDistribution = z.infer<typeof WslDistributionSchema>;
 export type AiConnectionRecord = z.infer<typeof AiConnectionRecordSchema>;

@@ -258,10 +258,15 @@ export function SettingsWindow(): React.JSX.Element {
             {category === 'security' ? <SecurityVaultSection t={t} /> : null}
             {category === 'about' ? (
               <AboutSection
+                settings={settings}
                 info={info}
                 runtime={runtime}
                 updateStatus={updateStatus}
+                onSave={save}
                 onCheckUpdates={async () => setUpdateStatus(await window.geared.checkForUpdates())}
+                onDownloadUpdate={async () => {
+                  await window.geared.startUpdateDownload();
+                }}
                 onInstallUpdate={() => void window.geared.installDownloadedUpdate()}
                 onOpenRelease={() => void window.geared.openNightlyRelease()}
                 t={t}
