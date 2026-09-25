@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
@@ -155,9 +155,109 @@ async function runPowerShellPromptSmoke(page, timeoutMs = 20000) {
     timeout: timeoutMs
   });
   const promptDelayMs = await page.evaluate((startTime) => performance.now() - startTime, startedAt);
+  const promptRow = await page.evaluate(() => {
+    const rows = [
+      ...document.querySelectorAll('.terminal-wrapper:not([hidden]) .xterm-rows > div')
+    ];
+    for (let index = rows.length - 1; index >= 0; index -= 1) {
+      if (rows[index]?.textContent?.trim()) return index;
+    }
+    return -1;
+  });
+  expect(promptRow).toBeGreaterThanOrEqual(0);
+  const marker = `GEARED_PACKAGED_CURSOR_${randomUUID().replaceAll('-', '')}`;
+  await page.locator('.terminal-wrapper:not([hidden]) .terminal-host').click();
+  await page.keyboard.type(`echo ${marker}`);
+  await expect
+    .poll(
+      () =>
+        page.evaluate((value) => {
+          const rows = [
+            ...document.querySelectorAll('.terminal-wrapper:not([hidden]) .xterm-rows > div')
+          ];
+          return rows.findIndex((row) => row.textContent?.includes(value));
+        }, marker),
+      { timeout: timeoutMs }
+    )
+    .toBe(promptRow);
+  await page.keyboard.press('Enter');
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          (value) =>
+            [
+              ...document.querySelectorAll('.terminal-wrapper:not([hidden]) .xterm-rows > div')
+            ].filter((row) => row.textContent?.includes(value)).length,
+          marker
+        ),
+      { timeout: timeoutMs }
+    )
+    .toBeGreaterThanOrEqual(2);
   await page.locator('.terminal-tab.active .tab-close').click();
   await expect(page.locator('.terminal-empty')).toBeVisible({ timeout: timeoutMs });
   return { promptDelayMs };
+}
+
+async function runWslInputAlignmentSmoke(page, distribution, timeoutMs = 30000) {
+  const profileName = `WSL cursor check ${distribution}`;
+  await page.getByRole('button', { name: /New session profile|新建会话配置/u }).click();
+  await page.getByRole('menuitem', { name: /New WSL session|新建 WSL 会话/u }).click();
+  const editor = page.getByRole('dialog', { name: 'Session profile editor' });
+  await editor.getByLabel(/Name|名称/u).fill(profileName);
+  await editor.getByLabel(/Distribution|发行版/u).fill(distribution);
+  await editor.getByRole('button', { name: /Save profile|保存配置/u }).click();
+  await expect(editor).toHaveCount(0, { timeout: timeoutMs });
+  await page.locator('.profile-button').filter({ hasText: profileName }).click();
+  await expect(page.locator('.terminal-surface')).toHaveAttribute('data-active-status', 'running', {
+    timeout: timeoutMs
+  });
+
+  const rows = page.locator('.terminal-wrapper:not([hidden]) .xterm-rows > div');
+  const promptText = async () =>
+    (await rows.allTextContents()).reverse().find((value) => value.trim().length > 0) ?? '';
+  await expect.poll(promptText, { timeout: timeoutMs }).toMatch(/[$#%>❯]|➜/u);
+  const promptRow = await page.evaluate(() => {
+    const visibleRows = [
+      ...document.querySelectorAll('.terminal-wrapper:not([hidden]) .xterm-rows > div')
+    ];
+    for (let index = visibleRows.length - 1; index >= 0; index -= 1) {
+      if (visibleRows[index]?.textContent?.trim()) return index;
+    }
+    return -1;
+  });
+  expect(promptRow).toBeGreaterThanOrEqual(0);
+
+  const marker = `GEARED_PACKAGED_WSL_CURSOR_${randomUUID().replaceAll('-', '')}`;
+  await page.locator('.terminal-wrapper:not([hidden]) .terminal-host').click();
+  await page.keyboard.type(`echo ${marker}`);
+  await expect
+    .poll(
+      () =>
+        page.evaluate((value) => {
+          const visibleRows = [
+            ...document.querySelectorAll('.terminal-wrapper:not([hidden]) .xterm-rows > div')
+          ];
+          return visibleRows.findIndex((row) => row.textContent?.includes(value));
+        }, marker),
+      { timeout: timeoutMs }
+    )
+    .toBe(promptRow);
+  await page.keyboard.press('Enter');
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          (value) =>
+            [...document.querySelectorAll('.terminal-wrapper:not([hidden]) .xterm-rows > div')]
+              .filter((row) => row.textContent?.includes(value)).length,
+          marker
+        ),
+      { timeout: timeoutMs }
+    )
+    .toBeGreaterThanOrEqual(2);
+  await page.locator('.terminal-tab.active .tab-close').click();
+  await expect(page.locator('.terminal-empty')).toBeVisible({ timeout: timeoutMs });
 }
 
 function availablePowerShell() {
@@ -168,6 +268,19 @@ function availablePowerShell() {
 function requirePowerShell(command) {
   const result = spawnSync('where.exe', [command], { encoding: 'utf8', windowsHide: true });
   return result.status === 0 ? command : undefined;
+}
+
+function availableWslDistribution() {
+  const result = spawnSync('wsl.exe', ['--list', '--quiet'], {
+    encoding: 'utf16le',
+    windowsHide: true
+  });
+  if (result.status !== 0 || result.error) return undefined;
+  return result.stdout
+    .replace(/\0/gu, '')
+    .split(/\r?\n/u)
+    .map((value) => value.trim())
+    .find(Boolean);
 }
 
 const executablePath = packagedExecutable();
@@ -246,7 +359,13 @@ try {
       }
     }
 
-    console.log('WSL interactive terminal verification remains a manual packaged-app check.');
+    const wslDistribution = availableWslDistribution();
+    if (wslDistribution) {
+      await runWslInputAlignmentSmoke(page, wslDistribution);
+      console.log(`Packaged WSL input alignment verified: ${wslDistribution}.`);
+    } else {
+      console.log('WSL input alignment smoke skipped because no WSL distribution is installed.');
+    }
 
     const terminalLogPath = join(userDataDirectory, 'user-data', 'logs', 'debug-terminal.log');
     const terminalLog = await readFile(terminalLogPath, 'utf8');

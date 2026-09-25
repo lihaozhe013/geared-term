@@ -27,6 +27,17 @@ function activeTerminalHost(page: AppSession['page']) {
   return page.locator('.terminal-wrapper:not([hidden]) .terminal-host');
 }
 
+function terminalRows(page: AppSession['page']) {
+  return page.locator('.terminal-wrapper:not([hidden]) .xterm-rows > div');
+}
+
+function lastNonEmptyRowIndex(rows: string[]): number {
+  for (let index = rows.length - 1; index >= 0; index -= 1) {
+    if (rows[index]?.trim()) return index;
+  }
+  return -1;
+}
+
 // Scope to the terminal tab bar: the sidebar switcher also exposes tabs.
 function terminalTabs(page: AppSession['page']) {
   return page.getByRole('tablist', { name: 'Terminal tabs' }).getByRole('tab');
@@ -34,6 +45,33 @@ function terminalTabs(page: AppSession['page']) {
 
 async function newLocalTabViaMenu(session: AppSession): Promise<void> {
   await openLocalTab(session.app);
+}
+
+async function expectCommandOnPromptRow(page: AppSession['page'], marker: string): Promise<void> {
+  const rows = terminalRows(page);
+  await expect
+    .poll(async () => {
+      const contents = await rows.allTextContents();
+      return (
+        [...contents]
+          .reverse()
+          .find((row) => row.trim().length > 0)
+          ?.trim() ?? ''
+      );
+    })
+    .toMatch(/>$/u);
+  const promptRow = lastNonEmptyRowIndex(await rows.allTextContents());
+
+  await activeTerminalHost(page).click();
+  await page.keyboard.type(`echo ${marker}`);
+  await expect
+    .poll(async () => (await rows.allTextContents()).findIndex((row) => row.includes(marker)))
+    .toBe(promptRow);
+
+  await page.keyboard.press('Enter');
+  await expect
+    .poll(async () => (await rows.allTextContents()).filter((row) => row.includes(marker)).length)
+    .toBeGreaterThanOrEqual(2);
 }
 
 test('runs a local shell and echoes typed commands', async () => {
@@ -44,6 +82,37 @@ test('runs a local shell and echoes typed commands', async () => {
   await page.keyboard.type('echo geared-e2e-marker');
   await page.keyboard.press('Enter');
   await expect(activeTerminal(page)).toContainText('geared-e2e-marker', { timeout: 15_000 });
+});
+
+test('keeps Windows cmd input aligned with its prompt after resize and tab switching', async () => {
+  const { page, app } = session;
+  test.skip((await page.evaluate(() => window.geared.platform)) !== 'win32');
+
+  await page.getByRole('button', { name: /New session profile|新建会话配置/u }).click();
+  await page.getByRole('menuitem', { name: /New local session|新建本地会话/u }).click();
+  const editor = page.getByRole('dialog', { name: 'Session profile editor' });
+  await editor.getByLabel(/Name|名称/u).fill('Cursor alignment cmd');
+  await editor.getByLabel(/Shell executable|Shell 可执行文件/u).fill('cmd.exe');
+  await editor.getByLabel(/Arguments|参数/u).fill('/d');
+  await editor.getByRole('button', { name: /Save profile|保存配置/u }).click();
+  await expect(editor).toHaveCount(0);
+  await page.locator('.profile-button').filter({ hasText: 'Cursor alignment cmd' }).click();
+  await waitForRunning(page);
+
+  await expectCommandOnPromptRow(page, 'geared-before-resize');
+
+  const host = activeTerminalHost(page);
+  const initialWidth = await host.evaluate((element) => element.clientWidth);
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getFocusedWindow()?.setSize(1320, 900));
+  await expect.poll(() => host.evaluate((element) => element.clientWidth)).not.toBe(initialWidth);
+  await expectCommandOnPromptRow(page, 'geared-after-resize');
+
+  await newLocalTabViaMenu(session);
+  await waitForRunning(page);
+  const cmdTab = terminalTabs(page).nth(0);
+  await cmdTab.click();
+  await expect(cmdTab).toHaveAttribute('aria-selected', 'true');
+  await expectCommandOnPromptRow(page, 'geared-after-tab-switch');
 });
 
 test('closes the tab automatically when the shell exits', async () => {

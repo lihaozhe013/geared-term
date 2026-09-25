@@ -25,7 +25,9 @@ Windows Terminal `v1.24.10921.0` release as NuGet package version `1.24.26040200
    `apps/desktop/resources/conpty/win32-x64/README.md` and `manifest.json`.
 2. Set `useConptyDll: true` for every local Windows x64 session. PowerShell, cmd, and WSL therefore
    use the same pinned backend. Keep other operating systems and Windows ARM64 on their current
-   backend.
+   backend. The renderer must leave the xterm buffer empty until the PTY emits output: the bundled
+   runtime does not emit the same clear-and-home sequence as system ConPTY, and its absolute cursor
+   positioning would otherwise be offset by any renderer-written startup line.
 3. Before Windows x64 development startup and in Electron `afterPack`, verify both binary digests
    and stage the pair under `conpty/` beside every x64 `conpty.node` load location. Missing or
    modified files fail staging or packaging.
@@ -53,16 +55,18 @@ Windows Terminal `v1.24.10921.0` release as NuGet package version `1.24.26040200
 
 Unit coverage checks Windows x64 backend selection, natural-exit cleanup, and write/resize errors
 during shutdown. Windows x64 packaged smoke verifies hashes beside every loadable native binding,
-starts cmd, and measures the PowerShell prompt through the packaged app's xterm UI. The latest run
-verified the hashes and cmd; PowerShell prompt times were 5.387, 0.444, and 0.468 seconds. The
-median (0.468 seconds) and maximum (5.387 seconds) passed the 3-second median and 8-second maximum
+starts cmd, verifies that typed input stays on the PowerShell prompt row, and measures the prompt
+through the packaged app's xterm UI. The latest run
+verified the hashes, cmd, and interactive archlinux WSL input alignment; PowerShell prompt times
+were 2.577, 0.439, and 0.466 seconds. The median (0.466 seconds) and maximum (2.577 seconds)
+passed the 3-second median and 8-second maximum
 limits. The first PowerShell launch includes a cold-start delay; subsequent launches were under
 500 ms. The node-pty issue reporting roughly 3.5 seconds with a raw PTY listener does not account
 for terminal-generated responses, which the packaged UI smoke now supplies through xterm:
 https://github.com/microsoft/node-pty/issues/894.
 
-The WSL command worked when launched directly through `wsl.exe`, but the packaged interactive WSL
-session has not been verified. Run that check in the packaged UI before release.
+The packaged interactive WSL check opens the first installed distribution, waits for its prompt,
+and confirms that the first typed command stays on the prompt row.
 
 The manual OpenCode acceptance remains outstanding: on the affected Windows machine, run `opencode`,
 enter `/exit`, and confirm the PowerShell prompt returns with the terminal tab open. Confirm no

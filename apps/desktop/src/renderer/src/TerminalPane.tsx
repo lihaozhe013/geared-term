@@ -329,15 +329,6 @@ export function TerminalPane({
       if (client && activeRef.current) client.resize(terminal.cols, terminal.rows);
     };
 
-    terminal.writeln(
-      isSshRequest(request)
-        ? isSavedSshRequest(request)
-          ? translate(settings.language, 'termConnectingSaved')
-          : translate(settings.language, 'termConnecting')
-              .replace('{user}', request.username)
-              .replace('{host}', request.host)
-        : translate(settings.language, 'termStarting')
-    );
     const onMessage = (rawMessage: unknown): void => {
       const result = TerminalPortMessageSchema.safeParse(rawMessage);
       if (!result.success) return;
