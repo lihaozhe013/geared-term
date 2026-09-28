@@ -135,7 +135,6 @@ export function AppearanceSection({
 
   const apply = async (): Promise<void> => {
     await onSave({
-      theme: draft.theme,
       uiFontFamily: draft.uiFontFamily,
       uiFontSize: draft.uiFontSize,
       terminalFontFamily: draft.terminalFontFamily.trim() || 'Cascadia Code',
@@ -158,7 +157,11 @@ export function AppearanceSection({
         <select
           className="settings-select"
           value={draft.theme}
-          onChange={(event) => update('theme', event.target.value)}
+          onChange={(event) => {
+            const theme = event.target.value;
+            update('theme', theme);
+            void onSave({ theme }).catch(() => undefined);
+          }}
         >
           {themeGroups.map((group) => (
             <optgroup key={group.id} label={group.label}>
