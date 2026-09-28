@@ -57,7 +57,7 @@ describe('themes', () => {
   });
 
   it('keeps the shared grouped catalog in sync with all builtin palettes', () => {
-    expect(BUILTIN_THEME_NAMES).toHaveLength(32);
+    expect(BUILTIN_THEME_NAMES).toHaveLength(34);
     expect(new Set(BUILTIN_THEME_NAMES).size).toBe(BUILTIN_THEME_NAMES.length);
     expect(builtinThemeNames).toEqual(BUILTIN_THEME_NAMES);
     expect(BUILTIN_THEME_GROUPS.flatMap((group) => group.themes)).toEqual(BUILTIN_THEME_NAMES);
@@ -101,7 +101,7 @@ describe('themes', () => {
     );
     expect(groups.find((group) => group.id === 'catppuccin')?.themes).toContain('Catppuccin Mocha');
     expect(groups.find((group) => group.id === 'custom')?.themes).toEqual(['Ocean Blue']);
-    expect(groups.flatMap((group) => group.themes)).toHaveLength(33);
+    expect(groups.flatMap((group) => group.themes)).toHaveLength(35);
   });
 
   it('derives a full coordinated palette from a minimal theme', () => {

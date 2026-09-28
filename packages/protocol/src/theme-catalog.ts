@@ -24,7 +24,8 @@ export const BUILTIN_THEME_GROUPS = [
   { id: 'github', label: 'GitHub', themes: ['GitHub Dark Default', 'GitHub Light Default'] },
   { id: 'atom-one', label: 'Atom One', themes: ['Atom One Dark', 'Atom One Light'] },
   { id: 'everforest', label: 'Everforest', themes: ['Everforest Dark', 'Everforest Light'] },
-  { id: 'night-owl', label: 'Night Owl', themes: ['Night Owl', 'Light Owl'] }
+  { id: 'night-owl', label: 'Night Owl', themes: ['Night Owl', 'Light Owl'] },
+  { id: 'claude', label: 'Claude', themes: ['Claude Dark', 'Claude Light'] }
 ] as const;
 
 export const BUILTIN_THEME_NAMES = BUILTIN_THEME_GROUPS.flatMap((group) => group.themes);

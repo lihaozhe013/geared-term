@@ -1,7 +1,7 @@
 # Built-in Theme Sources
 
-Geared Term bundles 32 built-in themes. The original Geared and Catppuccin palettes are unchanged.
-The 25 added palettes below are adapted from the pinned upstream revisions listed here. Theme colors
+Geared Term bundles 34 built-in themes. The original Geared and Catppuccin palettes are unchanged.
+The 27 added palettes below are adapted from the pinned upstream revisions listed here. Theme colors
 are represented as palette data in `popular-theme-seeds.ts`; no upstream theme files are loaded at
 runtime. UI colors, terminal ANSI colors, cursor, selection, and search colors are coordinated from
 each upstream palette. Where an upstream project provides terminal colors, those are preferred.
@@ -22,6 +22,7 @@ Otherwise, the terminal colors are mapped from the upstream semantic palette.
 | Atom One Light                                    | [atom/one-light-syntax](https://github.com/atom/one-light-syntax/tree/d84579027410c576086dfca14d934c4bd74b0438/), `index.less`                                                                                 | `d84579027410c576086dfca14d934c4bd74b0438` | MIT; GitHub Inc.                         |
 | Everforest Dark, Everforest Light                 | [sainnhe/everforest-vscode](https://github.com/sainnhe/everforest-vscode/tree/b17f8affe9096f18d209caf2fc26322490e55857/), `themes/everforest-dark.json`, `themes/everforest-light.json`                        | `b17f8affe9096f18d209caf2fc26322490e55857` | MIT; sainnhe                             |
 | Night Owl, Light Owl                              | [sdras/night-owl-vscode-theme](https://github.com/sdras/night-owl-vscode-theme/tree/cc291eba7976b20d7c66bde6883c27b902196b07/), `themes/Night Owl-color-theme.json`, `themes/Night Owl-Light-color-theme.json` | `cc291eba7976b20d7c66bde6883c27b902196b07` | MIT; Sarah Drasner                       |
+| Claude Dark, Claude Light                         | [mbadolato/iTerm2-Color-Schemes](https://github.com/mbadolato/iTerm2-Color-Schemes/tree/99d9701ba3cf4a06d24eea6ca4f25a64656b446b/schemes), `Claude Dark.itermcolors`, `Claude Light.itermcolors`; original [zanehu-ai/ghostty-claude-theme](https://github.com/zanehu-ai/ghostty-claude-theme/tree/ca572e2532bc34e41ce91051867b2f15cb164596), `Claude` | `99d9701ba3cf4a06d24eea6ca4f25a64656b446b`; original `ca572e2532bc34e41ce91051867b2f15cb164596` | MIT; techfitmaster and Mark Badolato |
 
 The ANSI mappings for palettes without an upstream terminal scheme use the semantic palette colors
 and, where applicable,
@@ -31,9 +32,10 @@ terminal-palette reference. Its license is included in the bundled notice.
 
 [iTerm2-Color-Schemes](https://github.com/mbadolato/iTerm2-Color-Schemes) is useful for discovering
 and comparing terminal ports, but its top-level license says individual themes retain their own
-authors' copyright and licenses. It is not treated as a blanket license for bundled themes. Monokai
-Pro is not included because its [official license](https://monokai.pro/license) prohibits
-redistribution.
+authors' copyright and licenses. The Claude pair is included with attribution to its original
+MIT-licensed source and the collection; this does not treat the collection license as a blanket
+license for other bundled themes. Monokai Pro is not included because its
+[official license](https://monokai.pro/license) prohibits redistribution.
 
 The full MIT notice and theme-specific attribution list ship as `THIRD_PARTY_THEME_NOTICES.txt` in
 the renderer assets.

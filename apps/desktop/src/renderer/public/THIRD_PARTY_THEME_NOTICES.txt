@@ -53,11 +53,23 @@ Night Owl, Light Owl
 Source: https://github.com/sdras/night-owl-vscode-theme/tree/cc291eba7976b20d7c66bde6883c27b902196b07
 Copyright (c) 2018 Sarah Drasner
 
+Claude Dark, Claude Light
+Source: https://github.com/mbadolato/iTerm2-Color-Schemes/tree/99d9701ba3cf4a06d24eea6ca4f25a64656b446b/schemes
+Original theme: https://github.com/zanehu-ai/ghostty-claude-theme/tree/ca572e2532bc34e41ce91051867b2f15cb164596
+Copyright (c) 2026 techfitmaster (original Claude theme)
+Copyright (c) 2011 to Present Mark Badolato (iTerm2-Color-Schemes collection)
+
+The themes are unofficial community adaptations. Claude and Anthropic are trademarks of Anthropic, PBC.
+Geared Term is not affiliated with, endorsed by, or sponsored by Anthropic.
+
 Tinted Theming terminal-palette reference
 Source: https://github.com/tinted-theming/schemes/tree/50f6e3b93a8f62db9d839f8b79a709c1bbdaac53
 Copyright (c) 2022 Tinted Theming
 
 MIT License
+
+Copyright (c) 2026 techfitmaster
+Copyright (c) 2011 to Present Mark Badolato
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

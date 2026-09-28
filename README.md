@@ -48,9 +48,9 @@ work happens in a single window instead of scattered tools.
 
 - xterm.js rendering with WebGL, Unicode/CJK/emoji, ligature detection, and search
 - Terminal font zoom, custom font fallback chains, and configurable line height
-- 32 built-in themes across Geared, Catppuccin, Dracula, Tokyo Night, Gruvbox, Nord, Solarized, Rosé
-  Pine, Ayu, Kanagawa, GitHub, Atom One, Everforest, and Night Owl, plus user themes loaded from
-  JSON files
+- 34 built-in themes across Geared, Catppuccin, Dracula, Tokyo Night, Gruvbox, Nord, Solarized, Rosé
+  Pine, Ayu, Kanagawa, GitHub, Atom One, Everforest, Night Owl, and Claude, plus user themes loaded
+  from JSON files
 - Rebindable keyboard shortcuts with conflict reporting
 - English and Simplified Chinese interfaces, and background-to-tray mode on Windows/Linux
 
