@@ -153,6 +153,7 @@ export function TabBar({
             ) : (
               <button
                 type="button"
+                className="tab-activate"
                 role="tab"
                 aria-selected={active}
                 onClick={() => onActivate(tab.id)}
@@ -163,7 +164,10 @@ export function TabBar({
             <button
               type="button"
               className="tab-close"
-              onClick={() => onClose(tab.id)}
+              onClick={(event) => {
+                event.stopPropagation();
+                onClose(tab.id);
+              }}
               aria-label={`Close ${tab.label}`}
               title={tabs.length > 1 ? undefined : 'Closing the last tab empties the workspace'}
             >

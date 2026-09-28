@@ -153,7 +153,17 @@ test('opens, switches, and closes terminal tabs in isolation', async () => {
   await page.keyboard.press('Enter');
   await expect(activeTerminal(page)).toContainText('second-tab-marker', { timeout: 15_000 });
 
-  await tabs.nth(0).click();
+  const firstTab = tabs.nth(0);
+  const firstTabBounds = await firstTab.boundingBox();
+  const firstTabShellBounds = await page.locator('.terminal-tab').nth(0).boundingBox();
+  if (!firstTabBounds) throw new Error('First terminal tab is not visible');
+  expect(firstTabShellBounds).not.toBeNull();
+  expect(firstTabBounds.x).toBe(firstTabShellBounds?.x);
+  expect(firstTabBounds.width).toBe(firstTabShellBounds?.width);
+  expect(firstTabBounds.height).toBe(firstTabShellBounds?.height);
+  await firstTab.click({
+    position: { x: firstTabBounds.width - 2, y: firstTabBounds.height / 2 }
+  });
   await expect(tabs.nth(0)).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('.terminal-surface')).toHaveAttribute('data-active-status', 'running');
   await expect(activeTerminal(page)).not.toContainText('second-tab-marker');
