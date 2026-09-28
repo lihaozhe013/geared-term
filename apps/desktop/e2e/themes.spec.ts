@@ -32,7 +32,7 @@ test('groups built-in themes in settings and both menus, then persists the selec
   await settingsWindow.waitForLoadState('domcontentloaded');
   await settingsWindow.getByRole('button', { name: 'Appearance' }).click();
   const themePicker = settingsWindow.locator('.settings-select').first();
-  await expect(themePicker.locator('option')).toHaveCount(32);
+  await expect(themePicker.locator('option')).toHaveCount(34);
   await expect(themePicker.locator('optgroup[label="Tokyo Night"] option')).toHaveCount(3);
   await themePicker.selectOption('Tokyo Night Light');
   await settingsWindow.close();
