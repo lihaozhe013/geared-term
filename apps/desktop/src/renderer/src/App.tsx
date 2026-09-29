@@ -7,6 +7,7 @@ import type {
   ProfileOrderRequest,
   SessionProfileRecord,
   SshProfileTerminalRequest,
+  SshFailureCode,
   SshTerminalRequest,
   SettingsRecord,
   TerminalPortMessage,
@@ -40,6 +41,7 @@ import {
 } from './TerminalPane';
 import { TabBar } from './terminal/tab-bar';
 import { tabShortcutsFor } from './terminal/tab-context-menu';
+import { applyTerminalTabState } from './terminal/tab-state';
 import { filePanelMode } from './terminal/file-panel';
 import { formatChatInsert } from './terminal/extract';
 import {
@@ -62,6 +64,7 @@ type TerminalTab = {
   name: string;
   request: TerminalRequest;
   status: TabStatus;
+  failureCode?: SshFailureCode;
   manualTitle?: boolean;
   dynamicTitle?: string;
   sourceProfileId?: string;
@@ -822,14 +825,17 @@ export function App(): React.JSX.Element {
 
   const handleState = useCallback(
     (tabId: string, message: TerminalPortMessage & { kind: 'state' }): void => {
+      const isSshTab = tabs.some(
+        (tab) => tab.id === tabId && ('host' in tab.request || 'profileId' in tab.request)
+      );
       setTabs((current) =>
         current.map((tab) =>
-          tab.id === tabId ? { ...tab, status: message.state as TabStatus } : tab
+          tab.id === tabId ? applyTerminalTabState(tab, message, isSshTab) : tab
         )
       );
-      if (message.state === 'exited') closeTab(tabId);
+      if (message.state === 'exited' && !isSshTab) closeTab(tabId);
     },
-    [closeTab]
+    [closeTab, tabs]
   );
 
   const handleHostKeyPrompt = useCallback(
@@ -938,7 +944,8 @@ export function App(): React.JSX.Element {
             tabs={tabs.map((tab) => ({
               id: tab.id,
               label: tabDisplayLabel(tab, profiles),
-              tooltip: tab.dynamicTitle?.trim() || undefined
+              tooltip: tab.dynamicTitle?.trim() || undefined,
+              failureLabel: tab.failureCode ? t('sshFailureTab') : undefined
             }))}
             activeTabId={activeTabId}
             labels={{
@@ -971,6 +978,8 @@ export function App(): React.JSX.Element {
                 settings={settings}
                 palette={palette}
                 active={tab.id === activeTab?.id}
+                failureCode={tab.failureCode}
+                onCloseTab={() => closeTab(tab.id)}
                 onState={(message) => handleState(tab.id, message)}
                 onHostKeyPrompt={handleHostKeyPrompt}
                 onAlternateScreen={(value) =>

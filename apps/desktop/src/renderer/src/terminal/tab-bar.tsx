@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { CircleAlert } from 'lucide-react';
 import { ContextMenu } from '../sftp/context-menu';
 import { buildTabContextMenu, type TabMenuLabels, type TabMenuShortcuts } from './tab-context-menu';
 
@@ -6,6 +7,7 @@ export type TabEntry = {
   id: string;
   label: string;
   tooltip?: string;
+  failureLabel?: string;
 };
 
 type TabBarProps = {
@@ -104,7 +106,7 @@ export function TabBar({
         return (
           <div
             key={tab.id}
-            title={tab.tooltip}
+            title={[tab.tooltip, tab.failureLabel].filter(Boolean).join('\n') || undefined}
             className={`terminal-tab ${active ? 'active' : ''}${isDragSource ? ' dragging' : ''}${dropSide}`}
             draggable={!renaming || renaming.id !== tab.id}
             onDragStart={(event) => {
@@ -156,9 +158,13 @@ export function TabBar({
                 className="tab-activate"
                 role="tab"
                 aria-selected={active}
+                aria-label={tab.failureLabel ? `${tab.label}, ${tab.failureLabel}` : undefined}
                 onClick={() => onActivate(tab.id)}
               >
                 <span>{tab.label}</span>
+                {tab.failureLabel ? (
+                  <CircleAlert className="terminal-tab-failure" size={14} aria-hidden="true" />
+                ) : null}
               </button>
             )}
             <button

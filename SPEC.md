@@ -399,6 +399,10 @@ not currently implemented is stated as such instead of being treated as complete
   or passphrase work without leaving a usable privileged handle.
 - **SSH-010**: There is no automatic reconnect in the initial release. A disconnect ends the session
   with an explicit terminal state.
+- **SSH-011**: The client MUST probe connected SSH sessions every 10 seconds and end a session after
+  two unanswered keepalive probes. Unexpected loss MUST produce a localized failure notice in the
+  affected tab while preserving its final terminal output. Reported remote exit and user-requested
+  closure MUST NOT be presented as connection failures.
 
 ## 14. SFTP and local file panel
 

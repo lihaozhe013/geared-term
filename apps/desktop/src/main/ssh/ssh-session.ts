@@ -4,6 +4,7 @@ import type { Client as ClientType } from 'ssh2';
 import {
   SshTerminalRequestSchema,
   TerminalClientMessageSchema,
+  type SshFailureCode,
   type SftpListResult,
   type SshTerminalRequest
 } from '@geared-term/protocol';
@@ -33,6 +34,8 @@ type SshSession = {
   rejectSftp: (error: Error) => void;
   sequence: number;
   closed: boolean;
+  running: boolean;
+  remoteExited: boolean;
   pendingHostKey?: PendingHostKey;
   follow: CdFollowState | null;
   size: { cols: number; rows: number };
@@ -81,6 +84,8 @@ export class SshSessionManager {
       rejectSftp,
       sequence: 0,
       closed: false,
+      running: false,
+      remoteExited: false,
       follow: null,
       size: { cols: request.cols, rows: request.rows }
     };
@@ -104,7 +109,7 @@ export class SshSessionManager {
         { term: request.term, cols: session.size.cols, rows: session.size.rows },
         (error, channel) => {
           if (error) {
-            this.fail(session, `PTY request failed: ${error.message}`);
+            this.fail(session, error.message, 'shell-request-failed');
             return;
           }
           session.channel = channel;
@@ -114,12 +119,21 @@ export class SshSessionManager {
           channel.stderr.on('data', (chunk: Buffer | string) =>
             this.sendOutput(session, chunk.toString())
           );
-          channel.on('exit', (code) =>
-            this.sendState(session, 'exited', `exitCode=${code ?? 'unknown'}`)
-          );
-          channel.on('close', () => {
-            if (!session.closed) this.close(session, 'remote-channel-closed');
+          channel.on('exit', (code) => {
+            session.remoteExited = true;
+            this.sendState(session, 'exited', `exitCode=${code ?? 'unknown'}`);
           });
+          channel.on('close', () => {
+            if (session.closed) return;
+            if (session.remoteExited) this.close(session, 'remote-channel-closed');
+            else
+              this.fail(
+                session,
+                'Remote shell channel closed without an exit status',
+                'remote-channel-closed'
+              );
+          });
+          session.running = true;
           this.sendState(session, 'running');
           this.hooks.onReady?.({
             sessionId: session.id,
@@ -128,9 +142,27 @@ export class SshSessionManager {
         }
       );
     });
-    client.on('error', (error) => this.fail(session, error.message));
+    client.on('error', (error) => {
+      const level = (error as Error & { level?: string }).level;
+      const failureCode: SshFailureCode =
+        level === 'client-authentication'
+          ? 'authentication-failed'
+          : level === 'client-timeout' && /keepalive/iu.test(error.message)
+            ? 'keepalive-timeout'
+            : session.running
+              ? 'connection-lost'
+              : 'connection-failed';
+      this.fail(session, error.message, failureCode);
+    });
     client.on('close', () => {
-      if (!session.closed) this.close(session, 'ssh-connection-closed');
+      if (session.closed) return;
+      if (session.remoteExited) this.close(session, 'ssh-connection-closed');
+      else
+        this.fail(
+          session,
+          'SSH connection closed unexpectedly',
+          session.running ? 'connection-lost' : 'connection-failed'
+        );
     });
 
     const config: ConnectConfig = {
@@ -141,11 +173,26 @@ export class SshSessionManager {
       privateKey: request.privateKey,
       passphrase: request.passphrase,
       readyTimeout: 15_000,
+      keepaliveInterval: 10_000,
+      keepaliveCountMax: 2,
       hostVerifier: (key: Buffer, verify: VerifyCallback) => {
-        void this.verifyHost(session, key, verify);
+        void this.verifyHost(session, key, verify).catch((error: unknown) => {
+          const detail = error instanceof Error ? error.message : String(error);
+          this.fail(session, detail, 'host-key-failed');
+          verify(false);
+        });
       }
     };
-    client.connect(config);
+    try {
+      client.connect(config);
+    } catch (error) {
+      this.fail(
+        session,
+        error instanceof Error ? error.message : String(error),
+        'connection-failed'
+      );
+      return;
+    }
     this.logger.info('ssh', 'SSH connection started', {
       sessionId: session.id,
       host: request.host,
@@ -287,8 +334,8 @@ export class SshSessionManager {
     const timer = setTimeout(() => {
       if (session.pendingHostKey?.verify === verify) {
         session.pendingHostKey = undefined;
+        this.fail(session, 'Host-key approval timed out', 'host-key-failed');
         verify(false);
-        this.sendState(session, 'failed', 'Host-key approval timed out');
       }
     }, 60_000);
     session.pendingHostKey = {
@@ -318,7 +365,7 @@ export class SshSessionManager {
   private onClientMessage(session: SshSession, rawMessage: unknown): void {
     const result = TerminalClientMessageSchema.safeParse(rawMessage);
     if (!result.success) {
-      this.fail(session, 'Invalid SSH terminal message');
+      this.fail(session, 'Invalid SSH terminal message', 'unexpected');
       return;
     }
     const message = result.data;
@@ -350,8 +397,8 @@ export class SshSessionManager {
     session.pendingHostKey = undefined;
     clearTimeout(pending.timer);
     if (!approved) {
+      this.fail(session, 'Host key was rejected', 'host-key-failed');
       pending.verify(false);
-      this.fail(session, 'Host key was rejected');
       return;
     }
     try {
@@ -380,11 +427,12 @@ export class SshSessionManager {
       }
       pending.verify(true);
     } catch (error) {
-      pending.verify(false);
       this.fail(
         session,
-        error instanceof Error ? error.message : 'Unable to persist host key approval'
+        error instanceof Error ? error.message : 'Unable to persist host key approval',
+        'host-key-failed'
       );
+      pending.verify(false);
     }
   }
 
@@ -402,7 +450,8 @@ export class SshSessionManager {
   private sendState(
     session: SshSession,
     state: 'starting' | 'awaiting-user' | 'running' | 'exited' | 'closing' | 'closed' | 'failed',
-    detail?: string
+    detail?: string,
+    errorCode?: SshFailureCode
   ): void {
     if (session.closed && state !== 'closed') return;
     session.sequence += 1;
@@ -411,13 +460,19 @@ export class SshSessionManager {
       sessionId: session.id,
       sequence: session.sequence,
       state,
-      detail
+      detail,
+      errorCode
     });
   }
 
-  private fail(session: SshSession, detail: string): void {
+  private fail(session: SshSession, detail: string, errorCode: SshFailureCode): void {
     if (session.closed) return;
-    this.sendState(session, 'failed', detail);
+    this.logger.error('ssh', 'SSH session failed', {
+      sessionId: session.id,
+      errorCode,
+      error: detail
+    });
+    this.sendState(session, 'failed', undefined, errorCode);
     this.close(session, 'failure');
   }
 

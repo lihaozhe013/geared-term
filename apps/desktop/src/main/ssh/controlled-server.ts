@@ -286,9 +286,22 @@ function attachSftpSubsystem(
   });
 }
 
-type ServerChannelLike = { write: (chunk: string | Buffer) => void };
+type ServerChannelLike = {
+  write: (chunk: string | Buffer) => void;
+  exit: (status: number) => void;
+  close: () => void;
+};
 
 function handleShellCommand(command: string, channel: ServerChannelLike): void {
+  if (command === 'exit') {
+    channel.exit(0);
+    channel.close();
+    return;
+  }
+  if (command === 'close-shell') {
+    channel.close();
+    return;
+  }
   const flood = /^flood (\d+)x(\d+)$/u.exec(command);
   if (!flood) return;
   const count = Math.min(Number(flood[1]), 2000);

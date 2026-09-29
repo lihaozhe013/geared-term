@@ -12,6 +12,7 @@ import {
 import {
   TerminalPortMessageSchema,
   type LocalTerminalRequest,
+  type SshFailureCode,
   type SshProfileTerminalRequest,
   type SshTerminalRequest,
   type SettingsRecord,
@@ -41,6 +42,7 @@ import {
 } from './terminal/line-tracker';
 import { logInputDiagnostic } from './terminal/input-diagnostics';
 import { isBareSpaceKeydown } from './terminal/space-guard';
+import { SshFailureNotice } from './SshFailureNotice';
 
 type TerminalRequest = LocalTerminalRequest | SshTerminalRequest | SshProfileTerminalRequest;
 type TerminalClient =
@@ -76,6 +78,8 @@ type TerminalPaneProps = {
   registerSnapshotControl?: (control: TerminalSnapshotControl | null) => void;
   onAddToChat?: (text: string) => void;
   onError?: (message: string) => void;
+  failureCode?: SshFailureCode;
+  onCloseTab?: () => void;
 };
 
 function isSshRequest(request: TerminalRequest): request is SshTerminalRequest {
@@ -108,7 +112,9 @@ export function TerminalPane({
   registerSftpControl,
   registerSnapshotControl,
   onAddToChat,
-  onError
+  onError,
+  failureCode,
+  onCloseTab
 }: TerminalPaneProps): React.JSX.Element {
   const hostRef = useRef<HTMLDivElement>(null);
   const fitRef = useRef<FitAddon | null>(null);
@@ -341,7 +347,9 @@ export function TerminalPane({
       } else if (message.kind === 'state') {
         onStateRef.current(message);
         if (message.state === 'failed') {
-          terminal.writeln(`\r\n[terminal error] ${message.detail ?? 'unknown error'}`);
+          if (!isSshRequest(request)) {
+            terminal.writeln(`\r\n[terminal error] ${message.detail ?? 'unknown error'}`);
+          }
         } else if (message.state === 'exited') {
           terminal.writeln(`\r\n[process exited] ${message.detail ?? ''}`);
         } else if (message.state === 'running') {
@@ -572,10 +580,7 @@ export function TerminalPane({
           clear: translate(settings.language, 'terminalClear'),
           addSelectionToChat: translate(settings.language, 'terminalAddSelectionToChat'),
           addScreenToChat: translate(settings.language, 'terminalAddScreenToChat'),
-          openScreenSnapshotEditor: translate(
-            settings.language,
-            'terminalOpenScreenSnapshotEditor'
-          )
+          openScreenSnapshotEditor: translate(settings.language, 'terminalOpenScreenSnapshotEditor')
         },
         shortcuts: terminalShortcutsFor(keybindings, platform),
         actions: {
@@ -685,6 +690,13 @@ export function TerminalPane({
             ×
           </button>
         </div>
+      ) : null}
+      {failureCode ? (
+        <SshFailureNotice
+          code={failureCode}
+          language={settings.language}
+          onClose={() => onCloseTab?.()}
+        />
       ) : null}
       <div
         ref={hostRef}

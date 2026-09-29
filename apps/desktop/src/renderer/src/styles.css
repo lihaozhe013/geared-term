@@ -1576,6 +1576,12 @@ button:disabled {
   font-size: var(--gt-fs-sm);
 }
 
+.terminal-tab-failure {
+  flex: 0 0 auto;
+  margin-left: 6px;
+  color: var(--gt-danger, #f4a5a5);
+}
+
 .tab-close {
   position: absolute;
   z-index: 2;
@@ -1682,6 +1688,43 @@ button:disabled {
 .terminal-wrapper > .terminal-host {
   height: 100%;
   min-height: 360px;
+}
+
+.ssh-failure-notice {
+  position: absolute;
+  z-index: 4;
+  top: 12px;
+  right: 12px;
+  left: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--gt-danger, #f4a5a5);
+  border-radius: var(--gt-radius-lg, 8px);
+  color: var(--gt-text, #e4eaf3);
+  background: color-mix(in srgb, var(--gt-panel, #111822) 94%, transparent);
+  box-shadow: var(--gt-shadow-popover);
+}
+
+.ssh-failure-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.ssh-failure-copy strong {
+  display: block;
+  color: var(--gt-danger, #f4a5a5);
+}
+
+.ssh-failure-copy p {
+  margin: 4px 0 0;
+  color: var(--gt-text-dim, #d8e0ee);
+}
+
+.ssh-failure-icon {
+  flex: 0 0 auto;
+  color: var(--gt-danger, #f4a5a5);
 }
 
 .terminal-surface > .terminal-wrapper[hidden] {

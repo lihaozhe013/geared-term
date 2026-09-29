@@ -40,12 +40,22 @@ describe('sidebar translations', () => {
   });
 
   it('keeps the WSL distribution hint localized around its dynamic name', () => {
-    expect(translate('zh-CN', 'openWslDistributionHint').replace('{name}', 'Ubuntu'))
-      .toBe('双击以在新终端中打开“Ubuntu”');
+    expect(translate('zh-CN', 'openWslDistributionHint').replace('{name}', 'Ubuntu')).toBe(
+      '双击以在新终端中打开“Ubuntu”'
+    );
   });
 
   it('keeps English labels available', () => {
     expect(translate('en-US', 'newLocalSession')).toBe('New local session');
     expect(translate('en-US', 'errGroupNameExists')).toBe('A group with this name already exists');
+  });
+});
+
+describe('SSH failure translations', () => {
+  it('localizes connection loss and keepalive timeout in both supported locales', () => {
+    expect(translate('en-US', 'sshErrorConnectionLost')).toBe('The SSH connection was lost.');
+    expect(translate('en-US', 'sshErrorKeepaliveTimeout')).toContain('30 seconds');
+    expect(translate('zh-CN', 'sshErrorConnectionLost')).toBe('SSH 连接已中断。');
+    expect(translate('zh-CN', 'sshErrorKeepaliveTimeout')).toContain('30 秒');
   });
 });

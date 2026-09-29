@@ -65,6 +65,20 @@ describe('protocol schemas', () => {
     expect(result.success).toBe(false);
   });
 
+  it('validates SSH failure codes on terminal state messages', () => {
+    const state = {
+      kind: 'state',
+      sessionId: 'ssh-1',
+      sequence: 2,
+      state: 'failed',
+      errorCode: 'keepalive-timeout'
+    };
+    expect(TerminalPortMessageSchema.safeParse(state).success).toBe(true);
+    expect(
+      TerminalPortMessageSchema.safeParse({ ...state, errorCode: 'password-included' }).success
+    ).toBe(false);
+  });
+
   it('bounds discovered model results and requires truncation metadata', () => {
     const models = Array.from({ length: 4096 }, (_, index) => `model-${index}`);
     expect(AiDiscoveredModelsSchema.parse({ models, truncated: true }).models).toHaveLength(4096);

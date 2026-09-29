@@ -9,6 +9,7 @@ import {
   session,
   shell
 } from 'electron';
+import type { MessagePortMain } from 'electron';
 import { mkdir as fsMkdir } from 'node:fs/promises';
 import { basename, join, posix } from 'node:path';
 import {
@@ -81,6 +82,7 @@ import {
   SftpOperationResultSchema,
   SftpUploadRequestSchema,
   SshProfileTerminalRequestSchema,
+  SshTerminalRequestSchema,
   TerminalCommandActionSchema,
   TerminalLigatureRequestSchema,
   TerminalLigatureSequencesSchema,
@@ -143,6 +145,17 @@ const isDevelopment = !app.isPackaged;
 // The delivery channel never changes during a run, so probe it once for the About panel and the
 // update prompt.
 const installChannel = detectInstallChannel(currentInstallChannelProbe());
+
+function reportSshCreationFailure(port: MessagePortMain, sessionId: string): void {
+  port.postMessage({
+    kind: 'state',
+    sessionId,
+    sequence: 1,
+    state: 'failed',
+    errorCode: 'connection-failed'
+  });
+  port.close();
+}
 // Depth of in-flight key-capture sessions (shortcut recording in the settings
 // window). While positive, the application menu is detached so its registered
 // accelerators cannot swallow the keys being recorded.
@@ -974,12 +987,15 @@ function registerIpc(): void {
       return;
     }
     try {
-      sshSessions.create(input, port);
+      const request = SshTerminalRequestSchema.parse(input);
+      sshSessions.create(request, port);
     } catch (error) {
       logger.error('ssh', 'SSH terminal creation failed', {
         error: error instanceof Error ? error.message : String(error)
       });
-      port.close();
+      const request = SshTerminalRequestSchema.safeParse(input);
+      if (request.success) reportSshCreationFailure(port, request.data.sessionId);
+      else port.close();
     }
   });
 
@@ -999,7 +1015,9 @@ function registerIpc(): void {
       logger.error('ssh', 'Saved SSH terminal creation failed', {
         error: error instanceof Error ? error.message : String(error)
       });
-      port.close();
+      const request = SshProfileTerminalRequestSchema.safeParse(input);
+      if (request.success) reportSshCreationFailure(port, request.data.sessionId);
+      else port.close();
     }
   });
 

@@ -97,7 +97,8 @@ The port protocol includes:
 - `output { sessionId, sequence, chunk }`;
 - `input { sessionId, chunk }`;
 - `resize { sessionId, cols, rows, revision }`;
-- `state { sessionId, sequence, state, detail? }`;
+- `state { sessionId, sequence, state, detail?, errorCode? }`; `errorCode` is a validated SSH
+  failure code and never contains raw transport details;
 - `ack { sessionId, sequence, bytes }` for flow control;
 - `close { sessionId, reason }`.
 
@@ -119,13 +120,19 @@ All backends share this state model:
 
 ```text
 created -> starting -> awaiting-user? -> running -> closing -> closed
-                      \-> failed ----------------------^
+                      \-> failed -> closing -> closed
 running -> exited -> closed
 ```
 
 `awaiting-user` covers host-key and private-key-passphrase prompts. Every transition is idempotent,
 sequenced, and testable. Remote SFTP capability is attached only after an SSH session is ready;
 local file browsing is available only for ordinary local shell sessions.
+
+SSH connections send a keepalive every 10 seconds and end after two unanswered probes (about 30
+seconds after the last response). An unexpected transport or shell-channel close emits a typed
+failure before cleanup; the renderer retains the final terminal view, marks the tab, and displays a
+localized notice. A reported remote exit remains an exit state. Raw transport details stay in the
+SSH log and are not sent to the renderer.
 
 ## 5. Runtime validation
 

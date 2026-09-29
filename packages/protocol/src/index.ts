@@ -574,6 +574,17 @@ export const AiStreamEventSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('error'), message: z.string().min(1).max(1024) })
 ]);
 
+export const SshFailureCodeSchema = z.enum([
+  'connection-failed',
+  'connection-lost',
+  'keepalive-timeout',
+  'remote-channel-closed',
+  'authentication-failed',
+  'host-key-failed',
+  'shell-request-failed',
+  'unexpected'
+]);
+
 export const TerminalPortMessageSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('output'),
@@ -595,7 +606,8 @@ export const TerminalPortMessageSchema = z.discriminatedUnion('kind', [
       'closed',
       'failed'
     ]),
-    detail: z.string().max(512).optional()
+    detail: z.string().max(512).optional(),
+    errorCode: SshFailureCodeSchema.optional()
   }),
   z.object({
     kind: z.literal('ack'),
@@ -1091,6 +1103,7 @@ export type UpdateStatus = z.infer<typeof UpdateStatusSchema>;
 export type ErrorCode = z.infer<typeof ErrorCodeSchema>;
 export type StructuredError = z.infer<typeof StructuredErrorSchema>;
 export type TerminalPortMessage = z.infer<typeof TerminalPortMessageSchema>;
+export type SshFailureCode = z.infer<typeof SshFailureCodeSchema>;
 export type LocalTerminalRequest = z.infer<typeof LocalTerminalRequestSchema>;
 export type TerminalClientMessage = z.infer<typeof TerminalClientMessageSchema>;
 export type SshTerminalRequest = z.infer<typeof SshTerminalRequestSchema>;

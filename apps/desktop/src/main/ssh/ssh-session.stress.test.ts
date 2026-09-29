@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createServer, connect, type Socket } from 'node:net';
 import { MessageChannel, type MessagePort } from 'node:worker_threads';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { MessagePortMain } from 'electron';
@@ -115,7 +116,54 @@ async function waitForState(
   return message as StateMessage;
 }
 
-async function openSession(target: SshSessionManager = manager): Promise<SessionHandle> {
+async function startSilentProxy(targetPort: number): Promise<{
+  port: number;
+  dropResponses: () => void;
+  close: () => Promise<void>;
+}> {
+  let droppingResponses = false;
+  const sockets = new Set<Socket>();
+  const proxy = createServer((client) => {
+    const upstream = connect(targetPort, '127.0.0.1');
+    sockets.add(client);
+    sockets.add(upstream);
+    client.pipe(upstream);
+    upstream.on('data', (chunk: Buffer) => {
+      if (!droppingResponses) client.write(chunk);
+    });
+    const discard = (): void => {
+      sockets.delete(client);
+      sockets.delete(upstream);
+      client.destroy();
+      upstream.destroy();
+    };
+    client.on('close', discard);
+    upstream.on('close', discard);
+    client.on('error', discard);
+    upstream.on('error', discard);
+  });
+  await new Promise<void>((resolve, reject) => {
+    proxy.once('error', reject);
+    proxy.listen(0, '127.0.0.1', resolve);
+  });
+  const address = proxy.address();
+  if (!address || typeof address === 'string') throw new Error('SSH test proxy did not bind');
+  return {
+    port: address.port,
+    dropResponses: () => {
+      droppingResponses = true;
+    },
+    close: async () => {
+      for (const socket of sockets) socket.destroy();
+      await new Promise<void>((resolve) => proxy.close(() => resolve()));
+    }
+  };
+}
+
+async function openSession(
+  target: SshSessionManager = manager,
+  targetPort = server.port
+): Promise<SessionHandle> {
   const id = `stress-${++sessionCounter}`;
   const { port1, port2 } = new MessageChannel();
   const messages: TerminalPortMessage[] = [];
@@ -137,7 +185,7 @@ async function openSession(target: SshSessionManager = manager): Promise<Session
     {
       sessionId: id,
       host: '127.0.0.1',
-      port: server.port,
+      port: targetPort,
       username: 'tester',
       password: 'geared-secret',
       cols: 80,
@@ -363,10 +411,61 @@ describe('SSH session stress and fault tolerance', () => {
     async () => {
       const session = await openSession();
       server.dropConnections('abrupt');
+      const failed = await waitForState(session.messages, 'failed');
+      expect(failed.errorCode).toBe('connection-lost');
+      expect(failed.detail).toBeUndefined();
       const closed = await waitForState(session.messages, 'closed');
-      expect(closed.detail).toBe('ssh-connection-closed');
+      expect(closed.detail).toBe('failure');
     }
   );
+
+  it(
+    'ends a silent half-open SSH session after keepalive responses stop',
+    { timeout: 45_000 },
+    async () => {
+      const proxy = await startSilentProxy(server.port);
+      try {
+        const session = await openSession(manager, proxy.port);
+        proxy.dropResponses();
+        const startedAt = Date.now();
+        const failed = await waitForState(session.messages, 'failed', 36_000);
+        expect(Date.now() - startedAt).toBeLessThan(36_000);
+        expect(failed.errorCode).toBe('keepalive-timeout');
+        expect(failed.detail).toBeUndefined();
+        await waitForState(session.messages, 'closed');
+      } finally {
+        await proxy.close();
+      }
+    }
+  );
+
+  it('treats a remote shell close without an exit status as a failure', async () => {
+    const session = await openSession();
+    session.send({ kind: 'input', data: 'close-shell\r' });
+    const failed = await waitForState(session.messages, 'failed');
+    expect(failed.errorCode).toBe('remote-channel-closed');
+    await waitForState(session.messages, 'closed');
+  });
+
+  it('retains normal SSH shell exit status without reporting a failure', async () => {
+    const session = await openSession();
+    session.send({ kind: 'input', data: 'exit\r' });
+    const exited = await waitForState(session.messages, 'exited');
+    expect(exited.detail).toBe('exitCode=0');
+    await waitForState(session.messages, 'closed');
+    expect(
+      session.messages.some((message) => message.kind === 'state' && message.state === 'failed')
+    ).toBe(false);
+  });
+
+  it('does not report an error when the user closes an SSH session', async () => {
+    const session = await openSession();
+    session.send({ kind: 'close' });
+    await waitForState(session.messages, 'closed');
+    expect(
+      session.messages.some((message) => message.kind === 'state' && message.state === 'failed')
+    ).toBe(false);
+  });
 
   it(
     'fails the session when the renderer sends a protocol violation',
@@ -375,7 +474,8 @@ describe('SSH session stress and fault tolerance', () => {
       const session = await openSession();
       session.send({ kind: 'not-a-real-message' });
       const failed = await waitForState(session.messages, 'failed');
-      expect(failed.detail).toContain('Invalid SSH terminal message');
+      expect(failed.errorCode).toBe('unexpected');
+      expect(failed.detail).toBeUndefined();
       await waitForMessage(
         session.messages,
         (message) => message.kind === 'state' && message.state === 'closed'
@@ -386,7 +486,8 @@ describe('SSH session stress and fault tolerance', () => {
   it('fails the session when the host key is rejected', { timeout: 20_000 }, async () => {
     const session = await openRejectedSession();
     const failed = await waitForState(session.messages, 'failed');
-    expect(failed.detail).toMatch(/host (key was rejected|denied)/iu);
+    expect(failed.errorCode).toBe('host-key-failed');
+    expect(failed.detail).toBeUndefined();
     await waitForMessage(
       session.messages,
       (message) => message.kind === 'state' && message.state === 'closed'
