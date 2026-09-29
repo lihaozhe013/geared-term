@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Check, ChevronRight } from 'lucide-react';
 import { groupThemeNames, type SettingsRecord } from '@geared-term/protocol';
 import {
@@ -180,6 +181,15 @@ function submenu(id: string, label: string, items: MenuItem[]): MenuItem {
   return { kind: 'submenu', id, label, items };
 }
 
+type SubmenuPosition = { left: number; top: number; flipped: boolean; maxHeight: number };
+
+function isDescendantMenuTarget(target: EventTarget | null, path: string): boolean {
+  if (!(target instanceof Element)) return false;
+  const targetPath = target.closest<HTMLElement>('[data-desktop-menu-path]')?.dataset
+    .desktopMenuPath;
+  return Boolean(targetPath && (targetPath === path || targetPath.startsWith(`${path}/`)));
+}
+
 function createMenus(
   language: SettingsRecord['language'],
   theme: string,
@@ -291,23 +301,87 @@ function createMenus(
 
 function MenuEntry({
   item,
-  onAction
+  onAction,
+  parentPath
 }: {
   item: MenuItem;
   onAction: (action: string) => void;
+  parentPath: string;
 }): React.JSX.Element {
   const [submenuOpen, setSubmenuOpen] = useState(false);
-  const [submenuFlipped, setSubmenuFlipped] = useState(false);
+  const [submenuPosition, setSubmenuPosition] = useState<SubmenuPosition | null>(null);
+  const path = `${parentPath}/${item.id}`;
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const nestedPopoverRef = useRef<HTMLDivElement>(null);
+  const closeTimerRef = useRef<number | null>(null);
 
-  useEffect(() => {
-    if (!submenuOpen || !nestedPopoverRef.current) return;
-    const frame = requestAnimationFrame(() => {
-      const bounds = nestedPopoverRef.current?.getBoundingClientRect();
-      setSubmenuFlipped(Boolean(bounds && bounds.right > window.innerWidth));
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [submenuOpen]);
+  useEffect(
+    () => () => {
+      if (closeTimerRef.current !== null) window.clearTimeout(closeTimerRef.current);
+    },
+    []
+  );
+
+  useLayoutEffect(() => {
+    if (!submenuOpen) {
+      setSubmenuPosition(null);
+      return;
+    }
+
+    const updatePosition = (): void => {
+      const trigger = triggerRef.current?.getBoundingClientRect();
+      const popover = nestedPopoverRef.current?.getBoundingClientRect();
+      if (!trigger || !popover) return;
+
+      const padding = 8;
+      const maxHeight = Math.max(0, window.innerHeight - padding * 2);
+      const height = Math.min(popover.height, maxHeight);
+      const width = Math.min(popover.width, Math.max(0, window.innerWidth - padding * 2));
+      const rightSpace = window.innerWidth - padding - trigger.right;
+      const leftSpace = trigger.left - padding;
+      const flipped = width > rightSpace && leftSpace > rightSpace;
+      const preferredLeft = flipped ? trigger.left - width : trigger.right;
+      const left = Math.max(padding, Math.min(preferredLeft, window.innerWidth - padding - width));
+      const top = Math.max(
+        padding,
+        Math.min(trigger.top - 6, window.innerHeight - padding - height)
+      );
+
+      setSubmenuPosition((current) =>
+        current?.left === left &&
+        current.top === top &&
+        current.flipped === flipped &&
+        current.maxHeight === maxHeight
+          ? current
+          : { left, top, flipped, maxHeight }
+      );
+    };
+
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [item.kind === 'submenu' ? item.items.length : 0, submenuOpen]);
+
+  const openSubmenu = (): void => {
+    if (closeTimerRef.current !== null) {
+      window.clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+    setSubmenuOpen(true);
+  };
+
+  const closeSubmenuSoon = (relatedTarget: EventTarget | null): void => {
+    if (isDescendantMenuTarget(relatedTarget, path)) return;
+    if (closeTimerRef.current !== null) window.clearTimeout(closeTimerRef.current);
+    closeTimerRef.current = window.setTimeout(() => {
+      closeTimerRef.current = null;
+      setSubmenuOpen(false);
+    }, 140);
+  };
 
   if (item.kind === 'separator') {
     return <div className="desktop-menu-separator" role="separator" />;
@@ -317,32 +391,46 @@ function MenuEntry({
     return (
       <div
         className="desktop-menu-submenu"
-        onMouseEnter={() => setSubmenuOpen(true)}
-        onMouseLeave={() => setSubmenuOpen(false)}
+        onMouseEnter={openSubmenu}
+        onMouseLeave={(event) => closeSubmenuSoon(event.relatedTarget)}
       >
         <button
+          ref={triggerRef}
           type="button"
           className="desktop-menu-entry"
           role="menuitem"
           aria-haspopup="menu"
           aria-expanded={submenuOpen}
-          onClick={() => setSubmenuOpen((current) => !current)}
+          onClick={openSubmenu}
         >
           <span className="desktop-menu-entry-check" />
           <span className="desktop-menu-entry-label">{item.label}</span>
           <ChevronRight size={14} aria-hidden="true" />
         </button>
-        {submenuOpen ? (
-          <div
-            ref={nestedPopoverRef}
-            className={`desktop-menu-popover desktop-menu-popover-nested${submenuFlipped ? ' desktop-menu-popover-flipped' : ''}`}
-            role="menu"
-          >
-            {item.items.map((child) => (
-              <MenuEntry key={child.id} item={child} onAction={onAction} />
-            ))}
-          </div>
-        ) : null}
+        {submenuOpen
+          ? createPortal(
+              <div
+                ref={nestedPopoverRef}
+                data-desktop-menu-flyout="true"
+                data-desktop-menu-path={path}
+                className={`desktop-menu-popover desktop-menu-popover-nested${submenuPosition?.flipped ? ' desktop-menu-popover-flipped' : ''}`}
+                role="menu"
+                style={{
+                  left: submenuPosition?.left ?? 0,
+                  top: submenuPosition?.top ?? 0,
+                  maxHeight: submenuPosition?.maxHeight ?? 'calc(100vh - 16px)',
+                  visibility: submenuPosition ? 'visible' : 'hidden'
+                }}
+                onMouseEnter={openSubmenu}
+                onMouseLeave={(event) => closeSubmenuSoon(event.relatedTarget)}
+              >
+                {item.items.map((child) => (
+                  <MenuEntry key={child.id} item={child} onAction={onAction} parentPath={path} />
+                ))}
+              </div>,
+              document.body
+            )
+          : null}
       </div>
     );
   }
@@ -382,7 +470,15 @@ export function DesktopMenuBar({
 
   useEffect(() => {
     const onPointerDown = (event: PointerEvent): void => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpenMenu(null);
+      const target = event.target;
+      if (
+        target instanceof Node &&
+        (rootRef.current?.contains(target) ||
+          (target instanceof Element && target.closest('[data-desktop-menu-flyout]')))
+      ) {
+        return;
+      }
+      setOpenMenu(null);
     };
     const onKeyDown = (event: KeyboardEvent): void => {
       if (event.key === 'Escape') setOpenMenu(null);
@@ -422,9 +518,9 @@ export function DesktopMenuBar({
               {menu.label}
             </button>
             {isOpen ? (
-              <div className="desktop-menu-popover" role="menu">
+              <div className="desktop-menu-popover" data-desktop-menu-path={menu.id} role="menu">
                 {menu.items.map((item) => (
-                  <MenuEntry key={item.id} item={item} onAction={runAction} />
+                  <MenuEntry key={item.id} item={item} onAction={runAction} parentPath={menu.id} />
                 ))}
               </div>
             ) : null}

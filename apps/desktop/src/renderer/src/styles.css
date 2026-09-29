@@ -263,15 +263,15 @@ textarea {
 }
 
 .desktop-menu-popover-nested {
-  top: -6px;
-  left: calc(100% + 4px);
+  position: fixed;
+  z-index: 70;
+  top: 0;
+  left: 0;
+  min-width: min(218px, calc(100vw - 16px));
+  max-width: calc(100vw - 16px);
   max-height: calc(100vh - 16px);
+  overflow-x: hidden;
   overflow-y: auto;
-}
-
-.desktop-menu-popover-flipped {
-  right: calc(100% + 4px);
-  left: auto;
 }
 
 .desktop-menu-entry {
