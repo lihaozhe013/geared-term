@@ -26,7 +26,9 @@ function packagedExecutable() {
   if (process.platform === 'win32') {
     return join(releaseDirectory, 'win-unpacked', 'geared-term.exe');
   }
-  return join(releaseDirectory, 'linux-unpacked', 'geared-term');
+  const unpackedDirectory =
+    process.arch === 'x64' ? 'linux-unpacked' : `linux-${process.arch}-unpacked`;
+  return join(releaseDirectory, unpackedDirectory, 'geared-term');
 }
 
 function packagedAsar() {

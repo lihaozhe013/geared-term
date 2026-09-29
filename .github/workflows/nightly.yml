@@ -245,7 +245,12 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
-          images=("apps/desktop/out/releases/geared-term-linux-${TARGET_ARCH}-"*.AppImage)
+          if [[ "${TARGET_ARCH}" == x64 ]]; then
+            appimage_arch=x86_64
+          else
+            appimage_arch=arm64
+          fi
+          images=("apps/desktop/out/releases/geared-term-linux-${appimage_arch}-"*.AppImage)
           if (( ${#images[@]} != 1 )) || [[ ! -s "${images[0]}" ]]; then
             echo "Expected exactly one non-empty Linux ${TARGET_ARCH} AppImage, found ${#images[@]}."
             exit 1
@@ -306,7 +311,7 @@ jobs:
           windows_installers=(staging/*-setup.exe)
           windows_portables=(staging/*-portable.exe)
           macos_images=(staging/geared-term-mac-arm64-*.dmg)
-          linux_x64_appimages=(staging/geared-term-linux-x64-*.AppImage)
+          linux_x64_appimages=(staging/geared-term-linux-x86_64-*.AppImage)
           linux_arm64_appimages=(staging/geared-term-linux-arm64-*.AppImage)
           linux_x64_archives=(staging/geared-term-linux-x64-*.tar.gz)
           linux_arm64_archives=(staging/geared-term-linux-arm64-*.tar.gz)
