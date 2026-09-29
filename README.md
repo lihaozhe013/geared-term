@@ -1,9 +1,52 @@
+<div align="center">
+
+<img src="assets/geared-term-mark.png" width="128" alt="Geared Term logo" />
+
 # Geared Term
+
+**A conversation-first AI terminal — no agent, no server footprint.**
+
+Local shells · WSL · SSH · SFTP · Encrypted vault · API-based AI assistant
+
+</div>
 
 Geared Term is a cross-platform desktop terminal built with Electron, TypeScript, React, and
 xterm.js. It brings local shells, WSL distributions, SSH connections, file transfer, environment
 context, and an API-based AI assistant into one workspace, so day-to-day development and operations
 work happens in a single window instead of scattered tools.
+
+## Design philosophy
+
+Geared Term starts from one premise: **AI plus security**. The way to get both is to keep the AI
+close to your terminal — but never in control of it.
+
+### Conversation, not autonomy
+
+Geared Term is not an agent. The AI never drives your terminal and never executes anything on its
+own; it talks with you. What makes the conversation genuinely useful is context: your selection or
+a snapshot of the viewport can be attached to a prompt as a clearly delimited observation, so the
+AI sees what you see without any background plumbing.
+
+### Interaction upgrade
+
+Answers containing shell commands arrive as reviewable command cards. Copy a command, insert it
+into the terminal with one click — insertion never submits — or run it, which always requires an
+explicit click. Every command the AI proposes passes under your eyes before anything touches your
+shell. The terminal stays yours; the AI just makes it faster to drive.
+
+### Your data, your rules
+
+You decide what leaves the machine. Terminal context is attached only when you choose to attach
+it, and you control what goes in — including keeping sensitive information out of what the AI
+receives.
+
+### Zero footprint on your servers
+
+There is no server-side component: no service to install, no daemon to babysit, not even a small
+agent. Geared Term is a client speaking ordinary SSH; to your servers it looks like any other SSH
+session, and removing the app leaves nothing behind to clean up.
+
+Simple and secure — by design, and by omission.
 
 ## Features
 
