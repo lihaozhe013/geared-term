@@ -225,7 +225,20 @@ function createMenus(
         action('cut', t.cut, 'cut', { shortcut: 'Ctrl+X' }),
         action('copy', t.copy, 'copy', { shortcut: 'Ctrl+C' }),
         action('paste', t.paste, 'paste', { shortcut: 'Ctrl+V' }),
-        action('select-all', t.selectAll, 'select-all', { shortcut: 'Ctrl+A' })
+        action('select-all', t.selectAll, 'select-all', { shortcut: 'Ctrl+A' }),
+        separator('edit-divider-2'),
+        submenu('terminal-snapshots', t.terminalSnapshots, [
+          action(
+            'terminal-snapshot-to-assistant',
+            t.addScreenSnapshotToAssistant,
+            'terminal-add-screen-to-chat'
+          ),
+          action(
+            'terminal-snapshot-to-draft',
+            t.openScreenSnapshotDraft,
+            'terminal-open-screen-snapshot'
+          )
+        ])
       ]
     },
     {
@@ -240,18 +253,6 @@ function createMenus(
         action('zoom-out', t.zoomOut, 'zoom-out', { shortcut: hint('terminal.zoomOut') }),
         separator('view-divider-2'),
         action('fullscreen', t.fullScreen, 'toggle-fullscreen'),
-        submenu('terminal-snapshots', t.terminalSnapshots, [
-          action(
-            'terminal-snapshot-to-assistant',
-            t.addScreenSnapshotToAssistant,
-            'terminal-add-screen-to-chat'
-          ),
-          action(
-            'terminal-snapshot-to-draft',
-            t.openScreenSnapshotDraft,
-            'terminal-open-screen-snapshot'
-          )
-        ]),
         submenu('panels', t.panels, [
           action('sftp', t.sftp, 'toggle-sftp'),
           action('assistant', t.assistant, 'toggle-assistant'),

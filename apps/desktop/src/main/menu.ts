@@ -312,7 +312,21 @@ export function buildApplicationMenu(state: MenuState, commands: MenuCommands): 
         { role: 'cut', label: t.cut, ...editRoleAccelerator },
         { role: 'copy', label: t.copy, ...editRoleAccelerator },
         { role: 'paste', label: t.paste, ...editRoleAccelerator },
-        { role: 'selectAll', label: t.selectAll, ...editRoleAccelerator }
+        { role: 'selectAll', label: t.selectAll, ...editRoleAccelerator },
+        { type: 'separator' },
+        {
+          label: t.terminalSnapshots,
+          submenu: [
+            {
+              label: t.addScreenSnapshotToAssistant,
+              click: () => commands.onCommand('terminal-add-screen-to-chat')
+            },
+            {
+              label: t.openScreenSnapshotDraft,
+              click: () => commands.onCommand('terminal-open-screen-snapshot')
+            }
+          ]
+        }
       ]
     },
     {
@@ -340,19 +354,6 @@ export function buildApplicationMenu(state: MenuState, commands: MenuCommands): 
         },
         { type: 'separator' },
         { role: 'togglefullscreen', label: t.toggleFullscreen },
-        {
-          label: t.terminalSnapshots,
-          submenu: [
-            {
-              label: t.addScreenSnapshotToAssistant,
-              click: () => commands.onCommand('terminal-add-screen-to-chat')
-            },
-            {
-              label: t.openScreenSnapshotDraft,
-              click: () => commands.onCommand('terminal-open-screen-snapshot')
-            }
-          ]
-        },
         {
           label: t.panels,
           submenu: [
