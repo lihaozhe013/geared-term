@@ -302,15 +302,21 @@ function createMenus(
 function MenuEntry({
   item,
   onAction,
-  parentPath
+  parentPath,
+  openSubmenuPaths,
+  onOpenSubmenu,
+  onCloseSubmenu
 }: {
   item: MenuItem;
   onAction: (action: string) => void;
   parentPath: string;
+  openSubmenuPaths: ReadonlySet<string>;
+  onOpenSubmenu: (path: string, parentPath: string) => void;
+  onCloseSubmenu: (path: string) => void;
 }): React.JSX.Element {
-  const [submenuOpen, setSubmenuOpen] = useState(false);
   const [submenuPosition, setSubmenuPosition] = useState<SubmenuPosition | null>(null);
   const path = `${parentPath}/${item.id}`;
+  const submenuOpen = openSubmenuPaths.has(path);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const nestedPopoverRef = useRef<HTMLDivElement>(null);
   const closeTimerRef = useRef<number | null>(null);
@@ -371,7 +377,7 @@ function MenuEntry({
       window.clearTimeout(closeTimerRef.current);
       closeTimerRef.current = null;
     }
-    setSubmenuOpen(true);
+    onOpenSubmenu(path, parentPath);
   };
 
   const closeSubmenuSoon = (relatedTarget: EventTarget | null): void => {
@@ -379,7 +385,7 @@ function MenuEntry({
     if (closeTimerRef.current !== null) window.clearTimeout(closeTimerRef.current);
     closeTimerRef.current = window.setTimeout(() => {
       closeTimerRef.current = null;
-      setSubmenuOpen(false);
+      onCloseSubmenu(path);
     }, 140);
   };
 
@@ -425,7 +431,15 @@ function MenuEntry({
                 onMouseLeave={(event) => closeSubmenuSoon(event.relatedTarget)}
               >
                 {item.items.map((child) => (
-                  <MenuEntry key={child.id} item={child} onAction={onAction} parentPath={path} />
+                  <MenuEntry
+                    key={child.id}
+                    item={child}
+                    onAction={onAction}
+                    parentPath={path}
+                    openSubmenuPaths={openSubmenuPaths}
+                    onOpenSubmenu={onOpenSubmenu}
+                    onCloseSubmenu={onCloseSubmenu}
+                  />
                 ))}
               </div>,
               document.body
@@ -461,12 +475,33 @@ export function DesktopMenuBar({
   keybindings
 }: DesktopMenuBarProps): React.JSX.Element {
   const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const [openSubmenuPaths, setOpenSubmenuPaths] = useState<ReadonlySet<string>>(() => new Set());
   const rootRef = useRef<HTMLDivElement>(null);
   const bindings = useMemo(
     () => resolveKeybindings(keybindings, normalizePlatform(window.geared.platform)),
     [keybindings]
   );
   const menus = createMenus(language, theme, themeNames, isDevelopment, bindings);
+
+  const openSubmenuPath = (path: string, parentPath: string): void => {
+    setOpenSubmenuPaths((current) => {
+      if (current.has(path)) return current;
+      const next = new Set(
+        [...current].filter((openPath) => !openPath.startsWith(`${parentPath}/`))
+      );
+      next.add(path);
+      return next;
+    });
+  };
+
+  const closeSubmenuPath = (path: string): void => {
+    setOpenSubmenuPaths((current) => {
+      const next = new Set(
+        [...current].filter((openPath) => openPath !== path && !openPath.startsWith(`${path}/`))
+      );
+      return next.size === current.size ? current : next;
+    });
+  };
 
   useEffect(() => {
     const onPointerDown = (event: PointerEvent): void => {
@@ -479,9 +514,13 @@ export function DesktopMenuBar({
         return;
       }
       setOpenMenu(null);
+      setOpenSubmenuPaths(new Set());
     };
     const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') setOpenMenu(null);
+      if (event.key === 'Escape') {
+        setOpenMenu(null);
+        setOpenSubmenuPaths(new Set());
+      }
     };
     document.addEventListener('pointerdown', onPointerDown);
     document.addEventListener('keydown', onKeyDown);
@@ -493,6 +532,7 @@ export function DesktopMenuBar({
 
   const runAction = (actionName: string): void => {
     setOpenMenu(null);
+    setOpenSubmenuPaths(new Set());
     void window.geared.executeMenuAction(actionName).catch((error: unknown) => {
       console.error('Unable to execute application menu action', error);
     });
@@ -510,9 +550,15 @@ export function DesktopMenuBar({
               role="menuitem"
               aria-haspopup="menu"
               aria-expanded={isOpen}
-              onClick={() => setOpenMenu(isOpen ? null : menu.id)}
+              onClick={() => {
+                setOpenMenu(isOpen ? null : menu.id);
+                setOpenSubmenuPaths(new Set());
+              }}
               onMouseEnter={() => {
-                if (openMenu) setOpenMenu(menu.id);
+                if (openMenu && openMenu !== menu.id) {
+                  setOpenMenu(menu.id);
+                  setOpenSubmenuPaths(new Set());
+                }
               }}
             >
               {menu.label}
@@ -520,7 +566,15 @@ export function DesktopMenuBar({
             {isOpen ? (
               <div className="desktop-menu-popover" data-desktop-menu-path={menu.id} role="menu">
                 {menu.items.map((item) => (
-                  <MenuEntry key={item.id} item={item} onAction={runAction} parentPath={menu.id} />
+                  <MenuEntry
+                    key={item.id}
+                    item={item}
+                    onAction={runAction}
+                    parentPath={menu.id}
+                    openSubmenuPaths={openSubmenuPaths}
+                    onOpenSubmenu={openSubmenuPath}
+                    onCloseSubmenu={closeSubmenuPath}
+                  />
                 ))}
               </div>
             ) : null}
