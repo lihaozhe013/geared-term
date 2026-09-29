@@ -60,13 +60,14 @@ work happens in a single window instead of scattered tools.
 | -------------- | ----------------------------------- |
 | Windows x86-64 | NSIS installer and portable archive |
 | macOS arm64    | `.dmg` and Homebrew cask            |
-| Linux x86-64   | AppImage                            |
+| Linux x86-64   | AppImage and `.tar.gz`              |
+| Linux arm64    | AppImage and `.tar.gz`              |
 
 ## Nightly downloads
 
-Geared Term publishes automated nightly builds for all three supported platforms. Every nightly run
-replaces the rolling `nightly` prerelease on GitHub with fresh artifacts built from the latest
-published commit.
+Geared Term publishes automated nightly builds for all supported platforms and architectures. Every
+nightly run replaces the rolling `nightly` prerelease on GitHub with fresh artifacts built from the
+latest published commit.
 
 Grab the latest build from the
 [nightly release page](https://github.com/lihaozhe013/geared-term/releases/tag/nightly), or
@@ -76,6 +77,9 @@ directly:
 - [Windows portable](https://github.com/lihaozhe013/geared-term/releases/download/nightly/geared-term-windows-x64-portable.exe)
 - [macOS (arm64) DMG](https://github.com/lihaozhe013/geared-term/releases/download/nightly/geared-term-macos-arm64.dmg)
 - [Linux (x86-64) AppImage](https://github.com/lihaozhe013/geared-term/releases/download/nightly/geared-term-linux-x64.AppImage)
+- [Linux (x86-64) tar.gz](https://github.com/lihaozhe013/geared-term/releases/download/nightly/geared-term-linux-x64.tar.gz)
+- [Linux (arm64) AppImage](https://github.com/lihaozhe013/geared-term/releases/download/nightly/geared-term-linux-arm64.AppImage)
+- [Linux (arm64) tar.gz](https://github.com/lihaozhe013/geared-term/releases/download/nightly/geared-term-linux-arm64.tar.gz)
 
 The release also ships `SHA256SUMS.txt` covering every artifact, so you can verify what you
 downloaded.

@@ -19,7 +19,8 @@
     "package": "pnpm --filter @geared-term/desktop package",
     "package:win": "pnpm --filter @geared-term/desktop package:win",
     "package:mac": "pnpm --filter @geared-term/desktop package:mac",
-    "package:linux": "pnpm --filter @geared-term/desktop package:linux"
+    "package:linux": "pnpm --filter @geared-term/desktop package:linux",
+    "package:linux:arm64": "pnpm --filter @geared-term/desktop package:linux:arm64"
   },
   "devDependencies": {
     "@types/node": "26.6.2",

@@ -30,10 +30,12 @@
     "build:mac:x64": "pnpm run build && electron-builder --config electron-builder.yml --mac --x64 --publish never",
     "build:linux": "pnpm run build && electron-builder --config electron-builder.yml --linux --publish never",
     "build:linux:x64": "pnpm run build && electron-builder --config electron-builder.yml --linux --x64 --publish never",
+    "build:linux:arm64": "pnpm run build && electron-builder --config electron-builder.yml --linux --arm64 --publish never",
     "package": "pnpm run build && electron-builder --config electron-builder.yml --publish never",
     "package:win": "pnpm run build:win:x64",
     "package:mac": "pnpm run build:mac:arm64",
-    "package:linux": "pnpm run build:linux:x64"
+    "package:linux": "pnpm run build:linux:x64",
+    "package:linux:arm64": "pnpm run build:linux:arm64"
   },
   "dependencies": {
     "@codemirror/commands": "^6.11.1",

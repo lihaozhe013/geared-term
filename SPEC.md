@@ -94,7 +94,8 @@ The initial release MUST build and smoke-test these artifacts:
 | -------------- | ---------------------------------------------------- | ------------------------- |
 | Windows x86-64 | Installer; portable archive SHOULD also be available | Local ConPTY, WSL, SSH    |
 | macOS arm64    | `.app` and DMG                                       | Local PTY, SSH            |
-| Linux x86-64   | AppImage                                             | Local PTY, SSH            |
+| Linux x86-64   | AppImage and `.tar.gz`                               | Local PTY, SSH            |
+| Linux arm64    | AppImage and `.tar.gz`                               | Local PTY, SSH            |
 
 The application architecture SHOULD remain portable to additional architectures, but an architecture
 is not supported until its packaged application passes the same smoke tests.

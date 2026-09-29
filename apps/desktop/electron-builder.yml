@@ -52,6 +52,7 @@ linux:
   category: Development
   target:
     - AppImage
+    - tar.gz
 dmg:
   artifactName: geared-term-mac-${arch}-${version}.${ext}
 publish:

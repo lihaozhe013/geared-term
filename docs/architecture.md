@@ -259,6 +259,9 @@ Geared Term ships nightly artifacts to a rolling GitHub `nightly` prerelease
 (`.github/workflows/nightly.yml`); each build embeds its commit SHA. macOS bundles are ad-hoc signed
 by `scripts/after-pack.cjs` so the packaged bundle verifies; no Developer ID signature or
 notarization is applied, and the hook steps aside when electron-builder signs with a real identity.
+Linux packages build on native x64 and arm64 runners, producing both AppImage and `.tar.gz`
+artifacts for each architecture. The release job checks all four files and includes them in
+`SHA256SUMS.txt`.
 
 - `update-release.ts` fetches the `nightly` release metadata from the GitHub API and extracts the
   full commit SHA from the release body.

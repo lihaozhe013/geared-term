@@ -64,7 +64,7 @@ jobs:
       - name: Electron E2E acceptance
         run: |
           xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24' \
-            bash -c 'openbox --sm-disable >/tmp/geared-term-openbox.log 2>&1 & sleep 1; pnpm test:e2e'
+            bash -c 'openbox --sm-disable >/tmp/geared-term-openbox.log 2>&1 & sleep 1; pnpm --filter @geared-term/desktop run test:e2e'
 
   packages:
     name: Package ${{ matrix.name }}
@@ -83,9 +83,15 @@ jobs:
             platform: macos
             arch: arm64
           - name: linux-x64
-            os: ubuntu-latest
+            os: ubuntu-24.04
             platform: linux
             arch: x64
+            package_script: package:linux
+          - name: linux-arm64
+            os: ubuntu-24.04-arm
+            platform: linux
+            arch: arm64
+            package_script: package:linux:arm64
 
     steps:
       - name: Check out source
@@ -159,9 +165,9 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
-      - name: Build Linux AppImage
+      - name: Build Linux packages
         if: matrix.platform == 'linux'
-        run: pnpm run package:linux
+        run: pnpm run ${{ matrix.package_script }}
 
       - name: Prepare unpacked package for startup smoke test (Windows)
         if: matrix.platform == 'windows'
@@ -181,7 +187,7 @@ jobs:
         if: matrix.platform == 'linux'
         run:
           pnpm --filter @geared-term/desktop exec electron-builder --config electron-builder.yml
-          --linux --x64 --dir --publish never
+          --linux --${{ matrix.arch }} --dir --publish never
 
       - name: Verify packaged startup (Windows/macOS)
         if: matrix.platform != 'linux'
@@ -231,15 +237,27 @@ jobs:
               ;;
           esac
 
-      - name: Verify Linux AppImage
+      - name: Verify Linux packages
         if: matrix.platform == 'linux'
         shell: bash
+        env:
+          TARGET_ARCH: ${{ matrix.arch }}
         run: |
           set -euo pipefail
           shopt -s nullglob
-          images=(apps/desktop/out/releases/*.AppImage)
+          images=("apps/desktop/out/releases/geared-term-linux-${TARGET_ARCH}-"*.AppImage)
           if (( ${#images[@]} != 1 )) || [[ ! -s "${images[0]}" ]]; then
-            echo "Expected exactly one non-empty Linux AppImage, found ${#images[@]}."
+            echo "Expected exactly one non-empty Linux ${TARGET_ARCH} AppImage, found ${#images[@]}."
+            exit 1
+          fi
+          archives=("apps/desktop/out/releases/geared-term-linux-${TARGET_ARCH}-"*.tar.gz)
+          if (( ${#archives[@]} != 1 )) || [[ ! -s "${archives[0]}" ]]; then
+            echo "Expected exactly one non-empty Linux ${TARGET_ARCH} tar.gz archive, found ${#archives[@]}."
+            exit 1
+          fi
+          archive_contents="$(tar -tzf "${archives[0]}")"
+          if ! grep -Eq '(^|/)geared-term$' <<<"${archive_contents}"; then
+            echo "The Linux ${TARGET_ARCH} tar.gz archive does not contain the application executable."
             exit 1
           fi
 
@@ -254,6 +272,7 @@ jobs:
             apps/desktop/out/releases/*-setup.exe
             apps/desktop/out/releases/*-portable.exe
             apps/desktop/out/releases/*.AppImage
+            apps/desktop/out/releases/*.tar.gz
             apps/desktop/out/releases/beta.yml
 
   release:
@@ -287,9 +306,12 @@ jobs:
           windows_installers=(staging/*-setup.exe)
           windows_portables=(staging/*-portable.exe)
           macos_images=(staging/geared-term-mac-arm64-*.dmg)
-          linux_images=(staging/*.AppImage)
-          if (( ${#windows_installers[@]} != 1 )) || (( ${#windows_portables[@]} != 1 )) || (( ${#macos_images[@]} != 1 )) || (( ${#linux_images[@]} != 1 )); then
-            echo "Expected exactly one package per platform, got ${#windows_installers[@]} Windows installers, ${#windows_portables[@]} Windows portables, ${#macos_images[@]} macOS and ${#linux_images[@]} Linux images."
+          linux_x64_appimages=(staging/geared-term-linux-x64-*.AppImage)
+          linux_arm64_appimages=(staging/geared-term-linux-arm64-*.AppImage)
+          linux_x64_archives=(staging/geared-term-linux-x64-*.tar.gz)
+          linux_arm64_archives=(staging/geared-term-linux-arm64-*.tar.gz)
+          if (( ${#windows_installers[@]} != 1 )) || (( ${#windows_portables[@]} != 1 )) || (( ${#macos_images[@]} != 1 )) || (( ${#linux_x64_appimages[@]} != 1 )) || (( ${#linux_arm64_appimages[@]} != 1 )) || (( ${#linux_x64_archives[@]} != 1 )) || (( ${#linux_arm64_archives[@]} != 1 )); then
+            echo "Expected one package for each target, got ${#windows_installers[@]} Windows installers, ${#windows_portables[@]} Windows portables, ${#macos_images[@]} macOS images, ${#linux_x64_appimages[@]} x64 AppImages, ${#linux_arm64_appimages[@]} arm64 AppImages, ${#linux_x64_archives[@]} x64 tar.gz archives and ${#linux_arm64_archives[@]} arm64 tar.gz archives."
             exit 1
           fi
 
@@ -300,7 +322,10 @@ jobs:
           cp -- "${macos_images[0]}" release-assets/geared-term-macos-arm64.dmg
           # The versioned DMG is immutable, which is what the Homebrew cask checksum pins to.
           cp -- "${macos_images[0]}" "release-assets/${macos_versioned_image}"
-          cp -- "${linux_images[0]}" release-assets/geared-term-linux-x64.AppImage
+          cp -- "${linux_x64_appimages[0]}" release-assets/geared-term-linux-x64.AppImage
+          cp -- "${linux_arm64_appimages[0]}" release-assets/geared-term-linux-arm64.AppImage
+          cp -- "${linux_x64_archives[0]}" release-assets/geared-term-linux-x64.tar.gz
+          cp -- "${linux_arm64_archives[0]}" release-assets/geared-term-linux-arm64.tar.gz
           cp -- staging/beta.yml release-assets/beta.yml
           (
             cd release-assets
@@ -310,6 +335,9 @@ jobs:
               geared-term-macos-arm64.dmg \
               "${macos_versioned_image}" \
               geared-term-linux-x64.AppImage \
+              geared-term-linux-arm64.AppImage \
+              geared-term-linux-x64.tar.gz \
+              geared-term-linux-arm64.tar.gz \
               beta.yml \
               > SHA256SUMS.txt
           )
@@ -347,6 +375,7 @@ jobs:
           releases_api="repos/${REPOSITORY}/releases"
           release_body="Automated nightly build for commit ${COMMIT_SHA}."
           release_body+=$'\n\nUnsigned development artifacts for macOS, Windows, and Linux.\n\nSHA-256 checksums are included in `SHA256SUMS.txt`.'
+          release_body+=$'\n\nLinux downloads include AppImage and tar.gz packages for x86-64 and arm64.'
           release_body+=$'\n\nmacOS users can install and upgrade through Homebrew:\n\n```sh\nbrew install --cask lihaozhe013/geared-term/geared-term\nbrew upgrade --cask geared-term\n```'
 
           if release_id="$(gh api "${releases_api}/tags/nightly" --jq '.id' 2>/dev/null)"; then
@@ -388,6 +417,9 @@ jobs:
             release-assets/geared-term-macos-arm64.dmg \
             release-assets/geared-term-mac-arm64-*.dmg \
             release-assets/geared-term-linux-x64.AppImage \
+            release-assets/geared-term-linux-arm64.AppImage \
+            release-assets/geared-term-linux-x64.tar.gz \
+            release-assets/geared-term-linux-arm64.tar.gz \
             release-assets/beta.yml \
             release-assets/SHA256SUMS.txt \
             --repo "${REPOSITORY}" \
