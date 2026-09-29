@@ -84,7 +84,7 @@ async function waitForProcessExit(
 
 test('keeps the process resident and restores the window when the app relaunches', async () => {
   test.skip(process.platform === 'darwin', 'Background tray flow is Windows/Linux behavior');
-  session = await launchApp(DOM_RENDERER_ARGS);
+  session = await launchApp(DOM_RENDERER_ARGS, { headless: false });
   const { app, page } = session;
 
   // Fresh installs opt in to background mode explicitly.
@@ -147,7 +147,7 @@ test('keeps the process resident and restores the window when the app relaunches
 
 test('keeps bounded high-volume output flowing while hidden', async () => {
   test.skip(process.platform !== 'linux', 'Uses POSIX shell output tools');
-  session = await launchApp(DOM_RENDERER_ARGS);
+  session = await launchApp(DOM_RENDERER_ARGS, { headless: false });
   const { app, page } = session;
   await setBackgroundMode(true);
   await openLocalTab(app);
@@ -181,7 +181,7 @@ test('keeps bounded high-volume output flowing while hidden', async () => {
 
 test('restores the hidden session when macOS activates the app from the Dock', async () => {
   test.skip(process.platform !== 'darwin', 'Dock activation is macOS-specific');
-  session = await launchApp(DOM_RENDERER_ARGS);
+  session = await launchApp(DOM_RENDERER_ARGS, { headless: false });
   const { app, page } = session;
   await setBackgroundMode(true);
   await openLocalTab(app);
@@ -228,7 +228,7 @@ test('explicitly quitting the app ends a resident background process', async () 
 
 test('quits after closing the window when background mode is disabled', async () => {
   test.skip(process.platform === 'darwin', 'Background tray flow is Windows/Linux behavior');
-  session = await launchApp();
+  session = await launchApp([], { headless: false });
   const { app, page } = session;
 
   await page.evaluate(async () => {

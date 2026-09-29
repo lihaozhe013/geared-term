@@ -26,6 +26,10 @@ export type AppSession = {
   close: () => Promise<void>;
 };
 
+export type AppLaunchOptions = {
+  headless?: boolean;
+};
+
 /**
  * Fresh profiles start gated behind the first-run vault setup. Create the
  * master password through the gate so specs exercise the unlocked workspace.
@@ -49,11 +53,15 @@ export async function openLocalTab(app: ElectronApplication): Promise<void> {
   });
 }
 
-export async function launchApp(chromiumArgs: readonly string[] = []): Promise<AppSession> {
+export async function launchApp(
+  chromiumArgs: readonly string[] = [],
+  options: AppLaunchOptions = {}
+): Promise<AppSession> {
   const mainEntry = join(appDirectory, 'out', 'main', 'index.js');
   if (!existsSync(mainEntry)) {
     throw new Error('Built output is missing; run "pnpm build" before the E2E suite');
   }
+  const headless = options.headless ?? true;
   const electronBinary = require('electron') as unknown as string;
   const userDataDirectory = await fs.mkdtemp(join(tmpdir(), 'geared-e2e-'));
   const app = await electron.launch({
@@ -79,16 +87,19 @@ export async function launchApp(chromiumArgs: readonly string[] = []): Promise<A
     cwd: userDataDirectory,
     env: {
       ...process.env,
-      GEARED_USER_DATA: join(userDataDirectory, 'user-data')
+      GEARED_USER_DATA: join(userDataDirectory, 'user-data'),
+      GEARED_E2E_HEADLESS: headless ? '1' : '0'
     }
   });
   const page = await app.firstWindow();
-  await app.evaluate(({ BrowserWindow }) => {
-    for (const window of BrowserWindow.getAllWindows()) {
-      window.moveTop();
-      window.focus();
-    }
-  });
+  if (!headless) {
+    await app.evaluate(({ BrowserWindow }) => {
+      for (const window of BrowserWindow.getAllWindows()) {
+        window.moveTop();
+        window.focus();
+      }
+    });
+  }
   await page.waitForLoadState('domcontentloaded');
   await passVaultGate(page);
   return {
@@ -97,7 +108,12 @@ export async function launchApp(chromiumArgs: readonly string[] = []): Promise<A
     userDataDirectory,
     close: async () => {
       await app.close();
-      await fs.rm(userDataDirectory, { recursive: true, force: true });
+      await fs.rm(userDataDirectory, {
+        recursive: true,
+        force: true,
+        maxRetries: 10,
+        retryDelay: 200
+      });
     }
   };
 }

@@ -59,6 +59,7 @@ export function showWindowWhenReady(
   const show = (trigger: string): void => {
     if (shown || window.isDestroyed()) return;
     shown = true;
+    if (process.env.GEARED_E2E_HEADLESS === '1') return;
     window.show();
     logger.info('app', 'Window shown', { window: windowName, trigger });
   };

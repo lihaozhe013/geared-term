@@ -65,19 +65,30 @@ export function LocalFilePane({
   const anchorLocal = useRef<string | null>(null);
   const localRef = useRef(localDirectory);
   localRef.current = localDirectory;
+  const directoryDraftRef = useRef(directoryDraft);
+  const directoryRequestRef = useRef(0);
   const refreshSignalRef = useRef(refreshSignal);
 
   const setError = useCallback((text: string): void => setMessage({ text, tone: 'error' }), []);
+  const updateDirectoryDraft = useCallback((value: string): void => {
+    directoryDraftRef.current = value;
+    setDirectoryDraft(value);
+  }, []);
   const clearMessage = (): void => setMessage(null);
 
   const refreshLocal = useCallback(
     async (directory: string | null): Promise<void> => {
+      const requestId = ++directoryRequestRef.current;
+      const draftAtRequest = directoryDraftRef.current;
       try {
         const entries = await window.geared.listLocalFiles(directory);
+        if (requestId !== directoryRequestRef.current) return;
         if (localRef.current !== directory) setLocalQuery('');
         setLocalEntries(entries);
         setLocalDirectory(directory);
-        setDirectoryDraft(directory ?? '');
+        if (directoryDraftRef.current === draftAtRequest) {
+          updateDirectoryDraft(directory ?? '');
+        }
         onDirectoryChange?.(directory);
         setLocalSelected((current) =>
           current.size === 0
@@ -86,6 +97,7 @@ export function LocalFilePane({
         );
         setMessage((current) => (current?.tone === 'error' ? null : current));
       } catch (reason) {
+        if (requestId !== directoryRequestRef.current) return;
         setError(
           reason instanceof Error
             ? ta('sftpLocalUnavailable', { detail: reason.message })
@@ -93,12 +105,12 @@ export function LocalFilePane({
         );
       }
     },
-    [onDirectoryChange, setError, ta, t]
+    [onDirectoryChange, setError, ta, t, updateDirectoryDraft]
   );
 
   useEffect(() => {
     setLocalDirectory(initialDirectory);
-    setDirectoryDraft(initialDirectory ?? '');
+    updateDirectoryDraft(initialDirectory ?? '');
     setLocalQuery('');
     setLocalEntries([]);
     setLocalSelected(new Set());
@@ -107,7 +119,7 @@ export function LocalFilePane({
     setMessage(null);
     anchorLocal.current = null;
     void refreshLocal(initialDirectory);
-  }, [initialDirectory, refreshLocal]);
+  }, [initialDirectory, refreshLocal, updateDirectoryDraft]);
 
   useEffect(() => {
     if (refreshSignal === undefined || refreshSignalRef.current === refreshSignal) return;
@@ -443,7 +455,7 @@ export function LocalFilePane({
       >
         <input
           value={directoryDraft}
-          onChange={(event) => setDirectoryDraft(event.target.value)}
+          onChange={(event) => updateDirectoryDraft(event.target.value)}
           placeholder={t('sftpThisPc')}
           aria-label={t('filesLocalDirectory')}
           spellCheck={false}

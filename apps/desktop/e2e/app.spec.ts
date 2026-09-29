@@ -13,11 +13,11 @@ test.afterEach(async () => {
   await session?.close();
 });
 
-test('opens the main window and connects the secure bridge', async () => {
+test('loads the main window hidden by default and connects the secure bridge', async () => {
   const { page } = session;
   await expect(
     session.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.isVisible())
-  ).resolves.toBe(true);
+  ).resolves.toBe(false);
   await expect(page).toHaveTitle('Geared Term');
   await expect(page.locator('.titlebar-app')).toHaveText('Geared Term');
 });

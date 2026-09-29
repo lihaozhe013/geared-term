@@ -85,8 +85,11 @@ test('runs a local shell and echoes typed commands', async () => {
 });
 
 test('keeps Windows cmd input aligned with its prompt after resize and tab switching', async () => {
+  test.skip((await session.page.evaluate(() => window.geared.platform)) !== 'win32');
+
+  await session.close();
+  session = await launchApp(DOM_RENDERER_ARGS, { headless: false });
   const { page, app } = session;
-  test.skip((await page.evaluate(() => window.geared.platform)) !== 'win32');
 
   await page.getByRole('button', { name: /New session profile|新建会话配置/u }).click();
   await page.getByRole('menuitem', { name: /New local session|新建本地会话/u }).click();
