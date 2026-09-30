@@ -283,9 +283,9 @@ not currently implemented is stated as such instead of being treated as complete
 
 - **TERM-007**: The xterm renderer supports common VT/xterm behavior, 16/256/true color, Unicode,
   CJK, emoji, wide characters, combining characters, Powerline/Nerd Font glyphs, cursor styles,
-  mouse reporting at the xterm layer, and alternate-screen applications. The renderer currently
-  forwards `onData` input but does not separately forward xterm `onBinary` input, so binary mouse
-  reports are not part of the complete backend input path.
+  mouse reporting, and alternate-screen applications. The renderer forwards both `onData` and
+  `onBinary` input through the validated terminal port; binary input is restricted to byte-valued
+  characters and is reconstructed as raw bytes by local PTY and SSH backends.
 - **TERM-008**: The implementation MUST support selection, copy, paste, select all, visible
   scrollbar, scrollback, search with current-match navigation, and web links.
 - **TERM-009**: WebGL rendering SHOULD be used when available and MUST fall back without losing the
@@ -315,6 +315,11 @@ not currently implemented is stated as such instead of being treated as complete
 - **TERM-025**: A normal local or SSH process exit MUST close its owning tab automatically,
   regardless of the reported exit code. A structured SSH failure MUST retain the tab and final
   terminal output until the user closes it.
+- **TERM-026**: The terminal context menu on right-click MUST default to enabled and be controlled
+  by a persisted setting. When enabled, the application MUST show its terminal context menu and
+  suppress the xterm right-button report. When disabled, the browser context menu MUST remain
+  suppressed while xterm receives the right-button event and forwards its mouse report to the
+  terminal backend.
 
 ### 10.3 Terminal context snapshots
 
@@ -608,7 +613,8 @@ not currently implemented is stated as such instead of being treated as complete
 - **SET-002**: User settings MUST include language, theme, UI font/family/size, interface scale,
   terminal primary and ordered fallback fonts, terminal font size, line height, normal-buffer and
   full-screen terminal padding, cursor style, default TERM, command-split presentation, global AI
-  instructions, SFTP open commands, and terminal-context bounds.
+  instructions, SFTP open commands, terminal-context bounds, and the right-click terminal context
+  menu preference.
 - **SET-003**: Terminal fallback fonts MUST support optional scale and horizontal/vertical
   adjustments, preserve order, and remove blanks, duplicates, and the primary font.
 - **SET-004**: Font sizes MUST remain within 8-32 logical pixels and terminal line height within
@@ -629,6 +635,9 @@ not currently implemented is stated as such instead of being treated as complete
   as an integer percentage from 75 to 150 in steps of 5, and default to 100. The scale MUST apply to
   application UI dimensions and controls across the main and auxiliary windows; terminal glyph size
   and terminal padding remain controlled by their dedicated settings.
+- **SET-010**: The terminal context menu on right-click MUST be independently persisted as a boolean
+  setting and default to enabled. Settings, renderer menu, and native application menu MUST reflect
+  the same stored value.
 
 The theme directory is `<userData>/themes/` (the working directory in development). Each `*.json`
 file there MUST contain a single user theme object with a `name` and a `colors` object holding

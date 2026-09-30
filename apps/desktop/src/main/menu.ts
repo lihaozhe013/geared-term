@@ -22,6 +22,7 @@ export type MenuState = {
   locale: MenuLocale;
   language: 'system' | 'en-US' | 'zh-CN';
   theme: string;
+  showTerminalContextMenuOnRightClick: boolean;
   themeNames: string[];
   isDevelopment: boolean;
   keybindings: KeybindingOverrides;
@@ -70,6 +71,7 @@ export function executeApplicationMenuAction(action: string, window: BrowserWind
     case 'zoom-in':
     case 'zoom-out':
     case 'zoom-reset':
+    case 'toggle-terminal-context-menu':
     case 'terminal-add-screen-to-chat':
     case 'terminal-open-screen-snapshot':
       commands.onCommand(action);
@@ -171,6 +173,7 @@ const labels = {
     resetZoom: 'Reset terminal font size',
     zoomIn: 'Increase terminal font size',
     zoomOut: 'Decrease terminal font size',
+    terminalContextMenuOnRightClick: 'Show terminal context menu on right-click',
     toggleFullscreen: 'Toggle full screen',
     panels: 'Panels',
     sftp: 'Files',
@@ -216,6 +219,7 @@ const labels = {
     resetZoom: '重置终端字号',
     zoomIn: '增大终端字号',
     zoomOut: '减小终端字号',
+    terminalContextMenuOnRightClick: '\u542f\u7528\u7ec8\u7aef\u53f3\u952e\u83dc\u5355',
     toggleFullscreen: '切换全屏',
     panels: '面板',
     sftp: '文件',
@@ -351,6 +355,14 @@ export function buildApplicationMenu(state: MenuState, commands: MenuCommands): 
           label: t.zoomOut,
           accelerator: acceleratorFor(bindings, 'terminal.zoomOut'),
           click: () => commands.onCommand('zoom-out')
+        },
+        { type: 'separator' },
+        {
+          id: 'terminal-context-menu-right-click',
+          type: 'checkbox',
+          label: t.terminalContextMenuOnRightClick,
+          checked: state.showTerminalContextMenuOnRightClick,
+          click: () => commands.onCommand('toggle-terminal-context-menu')
         },
         { type: 'separator' },
         { role: 'togglefullscreen', label: t.toggleFullscreen },

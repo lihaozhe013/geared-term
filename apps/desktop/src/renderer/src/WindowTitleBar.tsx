@@ -14,6 +14,7 @@ type WindowTitleBarProps = {
   themeNames?: string[];
   isDevelopment?: boolean;
   showMenu?: boolean;
+  showTerminalContextMenuOnRightClick?: boolean;
   onOpenSettings?: () => void;
   keybindings?: KeybindingOverrides;
 };
@@ -27,6 +28,7 @@ export function WindowTitleBar({
   themeNames = [],
   isDevelopment = false,
   showMenu = true,
+  showTerminalContextMenuOnRightClick = true,
   onOpenSettings,
   keybindings
 }: WindowTitleBarProps): React.JSX.Element {
@@ -44,6 +46,7 @@ export function WindowTitleBar({
             theme={theme}
             themeNames={themeNames}
             isDevelopment={isDevelopment}
+            showTerminalContextMenuOnRightClick={showTerminalContextMenuOnRightClick}
             keybindings={keybindings}
           />
         ) : null}

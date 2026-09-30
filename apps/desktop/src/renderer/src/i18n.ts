@@ -142,6 +142,7 @@ const messages = {
     uiFontFamily: 'UI font family',
     uiFontSize: 'UI font size',
     uiScalePercent: 'Interface scale',
+    terminalContextMenuOnRightClick: 'Show terminal context menu on right-click',
     terminalFontFamily: 'Terminal font family',
     fontLigatures: 'Enable font ligatures',
     fontLigaturesHint:
@@ -676,6 +677,7 @@ const messages = {
     uiFontFamily: '界面字体',
     uiFontSize: '界面字号',
     uiScalePercent: '\u754c\u9762\u7f29\u653e',
+    terminalContextMenuOnRightClick: '\u542f\u7528\u7ec8\u7aef\u53f3\u952e\u83dc\u5355',
     terminalFontFamily: '终端字体',
     fontLigatures: '启用字体连字',
     fontLigaturesHint: '当终端字体支持时，将编程连字（=>、->、!== 等）渲染为单个字形。',

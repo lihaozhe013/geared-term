@@ -124,35 +124,65 @@ describe('LocalTerminalManager', () => {
     );
   });
 
-  it.each([
-    ['write', () => { throw new Error('pipe is closed'); }],
-    ['resize', () => { throw new Error('pipe is closed'); }]
-  ] as const)('reports a PTY %s failure during exit without an uncaught error', async (operation, fail) => {
+  it('writes binary terminal input as raw bytes', async () => {
     const cwd = await mkdtemp(join(tmpdir(), 'geared-local-terminal-'));
-    const terminal = mockPty(operation === 'write' ? { write: fail } : { resize: fail });
+    const terminal = mockPty();
     const channel = port();
-    const appLogger = logger();
     ptyMock.spawn.mockReturnValue(terminal.pty);
-    const manager = new LocalTerminalManager(appLogger);
+    const manager = new LocalTerminalManager(logger());
 
     manager.create(request(cwd), channel.port);
-    expect(() => {
-      if (operation === 'write') {
-        manager.sendInput('local-1', 'exit\r');
-      } else {
-        channel.emitMessage({ kind: 'resize', cols: 100, rows: 30 });
-      }
-    }).not.toThrow();
-    terminal.emitExit();
+    channel.emitMessage({ kind: 'input', data: '\u0080\u00ff', binary: true });
 
-    expect(appLogger.error).toHaveBeenCalledWith(
-      'terminal',
-      'Local terminal operation failed',
-      expect.objectContaining({ operation, error: 'pipe is closed' })
-    );
-    expect(channel.postMessage).toHaveBeenCalledWith(
-      expect.objectContaining({ state: 'failed', detail: `Terminal ${operation} failed: pipe is closed` })
-    );
-    expect(terminal.pty.kill).toHaveBeenCalledTimes(1);
+    expect(terminal.pty.write).toHaveBeenCalledWith(Buffer.from([0x80, 0xff]));
+    manager.closeAll();
   });
+
+  it.each([
+    [
+      'write',
+      () => {
+        throw new Error('pipe is closed');
+      }
+    ],
+    [
+      'resize',
+      () => {
+        throw new Error('pipe is closed');
+      }
+    ]
+  ] as const)(
+    'reports a PTY %s failure during exit without an uncaught error',
+    async (operation, fail) => {
+      const cwd = await mkdtemp(join(tmpdir(), 'geared-local-terminal-'));
+      const terminal = mockPty(operation === 'write' ? { write: fail } : { resize: fail });
+      const channel = port();
+      const appLogger = logger();
+      ptyMock.spawn.mockReturnValue(terminal.pty);
+      const manager = new LocalTerminalManager(appLogger);
+
+      manager.create(request(cwd), channel.port);
+      expect(() => {
+        if (operation === 'write') {
+          manager.sendInput('local-1', 'exit\r');
+        } else {
+          channel.emitMessage({ kind: 'resize', cols: 100, rows: 30 });
+        }
+      }).not.toThrow();
+      terminal.emitExit();
+
+      expect(appLogger.error).toHaveBeenCalledWith(
+        'terminal',
+        'Local terminal operation failed',
+        expect.objectContaining({ operation, error: 'pipe is closed' })
+      );
+      expect(channel.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          state: 'failed',
+          detail: `Terminal ${operation} failed: pipe is closed`
+        })
+      );
+      expect(terminal.pty.kill).toHaveBeenCalledTimes(1);
+    }
+  );
 });

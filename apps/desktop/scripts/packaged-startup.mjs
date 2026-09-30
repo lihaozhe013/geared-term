@@ -49,7 +49,8 @@ function verifyPackagedConpty() {
   const manifestPath = join(appDirectory, 'resources', 'conpty', 'win32-x64', 'manifest.json');
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
   const unpackedRoot = join(dirname(packagedExecutable()), 'resources', 'app.asar.unpacked');
-  if (!existsSync(unpackedRoot)) throw new Error(`Packaged native module directory not found: ${unpackedRoot}`);
+  if (!existsSync(unpackedRoot))
+    throw new Error(`Packaged native module directory not found: ${unpackedRoot}`);
   const bindings = [];
   const walk = (directory) => {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
@@ -59,7 +60,8 @@ function verifyPackagedConpty() {
         entry.isFile() &&
         entry.name === 'conpty.node' &&
         /(?:build[\\/](?:Release|Debug)|prebuilds[\\/]win32-x64)[\\/]conpty\.node$/i.test(path)
-      ) bindings.push(path);
+      )
+        bindings.push(path);
     }
   };
   walk(unpackedRoot);
@@ -69,9 +71,11 @@ function verifyPackagedConpty() {
     const runtimeDirectory = join(dirname(binding), 'conpty');
     for (const [name, expectedHash] of Object.entries(manifest.files)) {
       const path = join(runtimeDirectory, name);
-      if (!existsSync(path)) throw new Error(`Bundled ConPTY file is missing beside ${binding}: ${name}`);
+      if (!existsSync(path))
+        throw new Error(`Bundled ConPTY file is missing beside ${binding}: ${name}`);
       const actualHash = createHash('sha256').update(readFileSync(path)).digest('hex');
-      if (actualHash !== expectedHash) throw new Error(`Bundled ConPTY file failed hash verification: ${path}`);
+      if (actualHash !== expectedHash)
+        throw new Error(`Bundled ConPTY file failed hash verification: ${path}`);
     }
   }
   console.log(`Bundled ConPTY verified (${bindings.length} x64 native binding location(s)).`);
@@ -107,7 +111,12 @@ async function runTerminalSmoke(page, shell, args, marker, timeoutMs = 15000) {
           }
         };
         const timeout = setTimeout(
-          () => finish(new Error(`Terminal smoke timed out for ${shell}; output=${JSON.stringify(output.slice(-1000))}`)),
+          () =>
+            finish(
+              new Error(
+                `Terminal smoke timed out for ${shell}; output=${JSON.stringify(output.slice(-1000))}`
+              )
+            ),
           timeoutMs
         );
         client = window.geared.createLocalTerminal(
@@ -130,10 +139,18 @@ async function runTerminalSmoke(page, shell, args, marker, timeoutMs = 15000) {
             }
             if (message.kind !== 'state') return;
             if (message.state === 'failed') {
-              finish(new Error(`Terminal smoke failed for ${shell}: ${message.detail ?? 'unknown error'}`));
+              finish(
+                new Error(
+                  `Terminal smoke failed for ${shell}: ${message.detail ?? 'unknown error'}`
+                )
+              );
             } else if (message.state === 'exited') {
               if (message.detail && !message.detail.startsWith('exitCode=0;')) {
-                finish(new Error(`Terminal smoke returned a nonzero status for ${shell}: ${message.detail}`));
+                finish(
+                  new Error(
+                    `Terminal smoke returned a nonzero status for ${shell}: ${message.detail}`
+                  )
+                );
               } else if (markerDelayMs === undefined) {
                 finish(new Error(`Terminal smoke output marker was missing for ${shell}`));
               } else {
@@ -153,10 +170,16 @@ async function runPowerShellPromptSmoke(page, timeoutMs = 20000) {
   await expect(page.locator('.terminal-surface')).toHaveAttribute('data-active-status', 'running', {
     timeout: timeoutMs
   });
-  await expect(page.locator('.terminal-wrapper:not([hidden]) .xterm-rows')).toContainText(/PS .+>/, {
-    timeout: timeoutMs
-  });
-  const promptDelayMs = await page.evaluate((startTime) => performance.now() - startTime, startedAt);
+  await expect(page.locator('.terminal-wrapper:not([hidden]) .xterm-rows')).toContainText(
+    /PS .+>/,
+    {
+      timeout: timeoutMs
+    }
+  );
+  const promptDelayMs = await page.evaluate(
+    (startTime) => performance.now() - startTime,
+    startedAt
+  );
   const promptRow = await page.evaluate(() => {
     const rows = [
       ...document.querySelectorAll('.terminal-wrapper:not([hidden]) .xterm-rows > div')
@@ -251,8 +274,9 @@ async function runWslInputAlignmentSmoke(page, distribution, timeoutMs = 30000) 
       () =>
         page.evaluate(
           (value) =>
-            [...document.querySelectorAll('.terminal-wrapper:not([hidden]) .xterm-rows > div')]
-              .filter((row) => row.textContent?.includes(value)).length,
+            [
+              ...document.querySelectorAll('.terminal-wrapper:not([hidden]) .xterm-rows > div')
+            ].filter((row) => row.textContent?.includes(value)).length,
           marker
         ),
       { timeout: timeoutMs }
@@ -355,9 +379,13 @@ try {
       medianPowerShellStartupMs !== undefined &&
       (medianPowerShellStartupMs > 3000 || sortedPowerShellRuns.at(-1) > 8000);
     if (powerShellRuns.length > 0) {
-      console.log(`PowerShell prompt times: ${powerShellRuns.map((value) => Math.round(value)).join(', ')} ms.`);
+      console.log(
+        `PowerShell prompt times: ${powerShellRuns.map((value) => Math.round(value)).join(', ')} ms.`
+      );
       if (powerShellStartupExceededLimit) {
-        console.error(`PowerShell prompt time exceeded the smoke limits: ${powerShellRuns.join(', ')} ms.`);
+        console.error(
+          `PowerShell prompt time exceeded the smoke limits: ${powerShellRuns.join(', ')} ms.`
+        );
       }
     }
 

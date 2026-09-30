@@ -77,6 +77,7 @@ export const defaultSettings: Settings = {
   uiFontFamily: '',
   uiFontSize: 14,
   uiScalePercent: 100,
+  showTerminalContextMenuOnRightClick: true,
   terminalFontFamily: 'JetBrains Mono',
   terminalFontLigatures: true,
   keybindings: {},

@@ -106,6 +106,14 @@ Binary chunks use transferable `ArrayBuffer` instances. The main process caps ou
 unacknowledged bytes, coalesces adjacent output, and defines whether overload pauses the source or
 terminates the session with a structured error. It never silently drops bytes.
 
+Terminal input is validated on the preload and main-process sides. Ordinary xterm `onData` input is
+sent as text; `onBinary` input is accepted only when every character represents one byte and is
+rebuilt as a `Buffer` before writing to a local PTY or SSH channel. The persisted
+`showTerminalContextMenuOnRightClick` preference is reflected in Settings, the renderer View menu,
+and the native View menu. With the preference enabled, the app handles right-click for its terminal
+context menu. With it disabled, the app suppresses the browser menu but allows xterm to send its
+mouse report to the terminal backend.
+
 On Windows x64, local `node-pty` sessions use the Microsoft ConPTY runtime pinned in
 [`apps/desktop/resources/conpty/win32-x64/README.md`](../apps/desktop/resources/conpty/win32-x64/README.md).
 The development staging script and Electron `afterPack` hook verify the pinned SHA-256 digests and

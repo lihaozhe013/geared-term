@@ -175,8 +175,10 @@ const api = Object.freeze({
     channel.port1.start();
     ipcRenderer.postMessage('terminal:create-local', request, [channel.port2]);
     return Object.freeze({
-      sendInput: (data: string) =>
-        channel.port1.postMessage(TerminalClientMessageSchema.parse({ kind: 'input', data })),
+      sendInput: (data: string, binary = false) =>
+        channel.port1.postMessage(
+          TerminalClientMessageSchema.parse({ kind: 'input', data, binary })
+        ),
       sendCdLine: (line: string) =>
         channel.port1.postMessage(TerminalClientMessageSchema.parse({ kind: 'cd-line', line })),
       resize: (cols: number, rows: number) =>
@@ -201,8 +203,10 @@ const api = Object.freeze({
     channel.port1.start();
     ipcRenderer.postMessage('terminal:create-ssh', request, [channel.port2]);
     return Object.freeze({
-      sendInput: (data: string) =>
-        channel.port1.postMessage(TerminalClientMessageSchema.parse({ kind: 'input', data })),
+      sendInput: (data: string, binary = false) =>
+        channel.port1.postMessage(
+          TerminalClientMessageSchema.parse({ kind: 'input', data, binary })
+        ),
       sendCdLine: (line: string) =>
         channel.port1.postMessage(TerminalClientMessageSchema.parse({ kind: 'cd-line', line })),
       resize: (cols: number, rows: number) =>
@@ -234,8 +238,10 @@ const api = Object.freeze({
     channel.port1.start();
     ipcRenderer.postMessage('terminal:create-saved-ssh', request, [channel.port2]);
     return Object.freeze({
-      sendInput: (data: string) =>
-        channel.port1.postMessage(TerminalClientMessageSchema.parse({ kind: 'input', data })),
+      sendInput: (data: string, binary = false) =>
+        channel.port1.postMessage(
+          TerminalClientMessageSchema.parse({ kind: 'input', data, binary })
+        ),
       sendCdLine: (line: string) =>
         channel.port1.postMessage(TerminalClientMessageSchema.parse({ kind: 'cd-line', line })),
       resize: (cols: number, rows: number) =>

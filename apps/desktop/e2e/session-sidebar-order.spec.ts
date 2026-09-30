@@ -216,7 +216,8 @@ test('keeps the create menu inside the viewport and flips or scrolls as needed',
   expect(menuBox!.y).toBeGreaterThanOrEqual(0);
   expect(menuBox!.x + menuBox!.width).toBeLessThanOrEqual(viewport.width);
   expect(menuBox!.y + menuBox!.height).toBeLessThanOrEqual(viewport.height);
-  await expect.poll(() => menu.evaluate((element) => element.scrollHeight > element.clientHeight))
+  await expect
+    .poll(() => menu.evaluate((element) => element.scrollHeight > element.clientHeight))
     .toBe(true);
 });
 

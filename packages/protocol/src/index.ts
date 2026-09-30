@@ -249,6 +249,7 @@ export const SettingsRecordSchema = z
     uiFontFamily: z.string().max(256).default(''),
     uiFontSize: z.number().min(10).max(24).default(13),
     uiScalePercent: z.number().int().min(75).max(150).multipleOf(5).default(100),
+    showTerminalContextMenuOnRightClick: z.boolean().default(true),
     terminalFontFamily: z.string().min(1).max(256).default('Cascadia Code'),
     terminalFontLigatures: z.boolean().default(false),
     keybindings: KeybindingOverridesSchema,
@@ -638,8 +639,24 @@ export const LocalTerminalRequestSchema = z.object({
   term: z.enum(['xterm-256color', 'xterm', 'vt520', 'linux', 'screen']).default('xterm-256color')
 });
 
+const TerminalInputMessageSchema = z
+  .object({
+    kind: z.literal('input'),
+    data: z.string().max(64 * 1024),
+    binary: z.boolean().default(false)
+  })
+  .superRefine((message, context) => {
+    if (message.binary && [...message.data].some((character) => character.codePointAt(0)! > 0xff)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['data'],
+        message: 'Binary terminal input must contain only byte values'
+      });
+    }
+  });
+
 export const TerminalClientMessageSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('input'), data: z.string().max(64 * 1024) }),
+  TerminalInputMessageSchema,
   z.object({
     kind: z.literal('resize'),
     cols: z.number().int().min(2).max(500),

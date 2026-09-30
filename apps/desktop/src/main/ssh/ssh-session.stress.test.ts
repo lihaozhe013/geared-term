@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer, connect, type Socket } from 'node:net';
 import { MessageChannel, type MessagePort } from 'node:worker_threads';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { MessagePortMain } from 'electron';
 import type { TerminalPortMessage } from '@geared-term/protocol';
 import { createLogger } from '../logging';
@@ -459,6 +459,12 @@ describe('SSH session stress and fault tolerance', () => {
     expect(
       session.messages.some((message) => message.kind === 'state' && message.state === 'failed')
     ).toBe(false);
+  });
+
+  it('forwards binary terminal input to the SSH channel as raw byte values', async () => {
+    const session = await openSession();
+    session.send({ kind: 'input', data: '\u0080\u00ff', binary: true });
+    await vi.waitFor(() => expect(server.trace.shellInput).toContain('\u0080\u00ff'));
   });
 
   it('does not report an error when the user closes an SSH session', async () => {

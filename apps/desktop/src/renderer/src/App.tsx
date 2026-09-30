@@ -89,6 +89,7 @@ const defaultSettings: SettingsRecord = {
   uiFontFamily: '',
   uiFontSize: 13,
   uiScalePercent: 100,
+  showTerminalContextMenuOnRightClick: true,
   terminalFontFamily: 'Cascadia Code',
   terminalFontLigatures: true,
   terminalFontFallbacks: [],
@@ -816,6 +817,16 @@ export function App(): React.JSX.Element {
         handlers.zoomFont('reset');
         return;
       }
+      if (command === 'toggle-terminal-context-menu') {
+        void handlers
+          .saveSettings({
+            ...handlers.settings,
+            showTerminalContextMenuOnRightClick:
+              !handlers.settings.showTerminalContextMenuOnRightClick
+          })
+          .catch(() => undefined);
+        return;
+      }
       if (command.startsWith('theme:')) {
         const name = command.slice(6);
         void handlers.saveSettings({ ...handlers.settings, theme: name }).catch(() => undefined);
@@ -888,6 +899,7 @@ export function App(): React.JSX.Element {
         isDevelopment={!info?.isPackaged}
         onOpenSettings={() => void window.geared.openSettings()}
         keybindings={settings.keybindings}
+        showTerminalContextMenuOnRightClick={settings.showTerminalContextMenuOnRightClick}
       />
 
       {settings.autoCheckUpdates && updateNotice ? (

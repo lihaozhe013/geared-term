@@ -21,6 +21,7 @@ type MenuItem =
       action: MenuAction;
       shortcut?: string;
       checked?: boolean;
+      checkable?: boolean;
       disabled?: boolean;
     }
   | { kind: 'submenu'; id: string; label: string; items: MenuItem[] };
@@ -32,6 +33,7 @@ type DesktopMenuBarProps = {
   theme: string;
   themeNames: string[];
   isDevelopment: boolean;
+  showTerminalContextMenuOnRightClick: boolean;
   keybindings?: KeybindingOverrides;
 };
 
@@ -58,6 +60,7 @@ type MenuLabels = {
   actualSize: string;
   zoomIn: string;
   zoomOut: string;
+  terminalContextMenuOnRightClick: string;
   fullScreen: string;
   panels: string;
   sftp: string;
@@ -100,6 +103,7 @@ const labels: Record<'en-US' | 'zh-CN', MenuLabels> = {
     actualSize: 'Reset terminal font size',
     zoomIn: 'Increase terminal font size',
     zoomOut: 'Decrease terminal font size',
+    terminalContextMenuOnRightClick: 'Show terminal context menu on right-click',
     fullScreen: 'Toggle full screen',
     panels: 'Panels',
     sftp: 'Files',
@@ -140,6 +144,7 @@ const labels: Record<'en-US' | 'zh-CN', MenuLabels> = {
     actualSize: '重置终端字号',
     zoomIn: '增大终端字号',
     zoomOut: '减小终端字号',
+    terminalContextMenuOnRightClick: '\u542f\u7528\u7ec8\u7aef\u53f3\u952e\u83dc\u5355',
     fullScreen: '切换全屏',
     panels: '面板',
     sftp: '文件',
@@ -168,7 +173,10 @@ function action(
   id: string,
   label: string,
   menuAction: string,
-  options: Pick<MenuItem & { kind: 'action' }, 'shortcut' | 'checked' | 'disabled'> = {}
+  options: Pick<
+    MenuItem & { kind: 'action' },
+    'shortcut' | 'checked' | 'checkable' | 'disabled'
+  > = {}
 ): MenuItem {
   return { kind: 'action', id, label, action: menuAction, ...options };
 }
@@ -195,7 +203,8 @@ function createMenus(
   theme: string,
   themeNames: string[],
   isDevelopment: boolean,
-  bindings: KeybindingMap
+  bindings: KeybindingMap,
+  showTerminalContextMenuOnRightClick: boolean
 ): MenuDefinition[] {
   const t = labels[resolveLocale(language)];
   const themeGroups = groupThemeNames(themeNames, t.customThemes);
@@ -252,6 +261,13 @@ function createMenus(
         action('zoom-in', t.zoomIn, 'zoom-in', { shortcut: hint('terminal.zoomIn') }),
         action('zoom-out', t.zoomOut, 'zoom-out', { shortcut: hint('terminal.zoomOut') }),
         separator('view-divider-2'),
+        action(
+          'terminal-context-menu-right-click',
+          t.terminalContextMenuOnRightClick,
+          'toggle-terminal-context-menu',
+          { checked: showTerminalContextMenuOnRightClick, checkable: true }
+        ),
+        separator('view-divider-3'),
         action('fullscreen', t.fullScreen, 'toggle-fullscreen'),
         submenu('panels', t.panels, [
           action('sftp', t.sftp, 'toggle-sftp'),
@@ -454,7 +470,13 @@ function MenuEntry({
     <button
       type="button"
       className="desktop-menu-entry"
-      role={item.checked === undefined ? 'menuitem' : 'menuitemradio'}
+      role={
+        item.checkable
+          ? 'menuitemcheckbox'
+          : item.checked === undefined
+            ? 'menuitem'
+            : 'menuitemradio'
+      }
       aria-checked={item.checked}
       disabled={item.disabled}
       onClick={() => onAction(item.action)}
@@ -473,6 +495,7 @@ export function DesktopMenuBar({
   theme,
   themeNames,
   isDevelopment,
+  showTerminalContextMenuOnRightClick,
   keybindings
 }: DesktopMenuBarProps): React.JSX.Element {
   const [openMenu, setOpenMenu] = useState<string | null>(null);
@@ -482,7 +505,14 @@ export function DesktopMenuBar({
     () => resolveKeybindings(keybindings, normalizePlatform(window.geared.platform)),
     [keybindings]
   );
-  const menus = createMenus(language, theme, themeNames, isDevelopment, bindings);
+  const menus = createMenus(
+    language,
+    theme,
+    themeNames,
+    isDevelopment,
+    bindings,
+    showTerminalContextMenuOnRightClick
+  );
 
   const openSubmenuPath = (path: string, parentPath: string): void => {
     setOpenSubmenuPaths((current) => {

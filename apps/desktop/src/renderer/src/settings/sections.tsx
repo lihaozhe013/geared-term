@@ -416,6 +416,18 @@ export function TerminalSection({
   };
   return (
     <Section title={t('groupTerminal')}>
+      <label className="settings-check">
+        <input
+          type="checkbox"
+          checked={settings.showTerminalContextMenuOnRightClick}
+          onChange={(event) =>
+            void onSave({ showTerminalContextMenuOnRightClick: event.target.checked }).catch(
+              () => undefined
+            )
+          }
+        />
+        <span>{t('terminalContextMenuOnRightClick')}</span>
+      </label>
       <Row label={t('defaultTerm')}>
         <select
           className="settings-select"

@@ -123,3 +123,21 @@ describe('SettingsRecordSchema interface scale', () => {
     }
   });
 });
+
+describe('SettingsRecordSchema terminal context menu preference', () => {
+  it('defaults to showing the terminal context menu and validates explicit values', () => {
+    expect(SettingsRecordSchema.parse(baseSettings).showTerminalContextMenuOnRightClick).toBe(true);
+    expect(
+      SettingsRecordSchema.parse({
+        ...baseSettings,
+        showTerminalContextMenuOnRightClick: false
+      }).showTerminalContextMenuOnRightClick
+    ).toBe(false);
+    expect(
+      SettingsRecordSchema.safeParse({
+        ...baseSettings,
+        showTerminalContextMenuOnRightClick: 'false'
+      }).success
+    ).toBe(false);
+  });
+});

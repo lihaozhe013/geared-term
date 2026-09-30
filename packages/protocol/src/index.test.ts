@@ -22,6 +22,7 @@ import {
   SessionProfileSaveRequestSchema,
   SettingsRecordSchema,
   TerminalCommandActionSchema,
+  TerminalClientMessageSchema,
   TerminalPortMessageSchema
 } from './index';
 
@@ -271,6 +272,30 @@ describe('protocol schemas', () => {
         (sequence) => sequence.length >= 2 && sequence.length <= 8
       )
     ).toBe(true);
+  });
+});
+
+describe('TerminalClientMessageSchema binary input', () => {
+  it('defaults text input to UTF-8 and accepts byte-sized binary data', () => {
+    expect(TerminalClientMessageSchema.parse({ kind: 'input', data: 'hello' })).toMatchObject({
+      binary: false
+    });
+    expect(
+      TerminalClientMessageSchema.parse({ kind: 'input', data: '\u0080\u00ff', binary: true })
+    ).toMatchObject({ binary: true });
+  });
+
+  it('rejects non-byte code points and oversized input', () => {
+    expect(
+      TerminalClientMessageSchema.safeParse({ kind: 'input', data: '\u0100', binary: true }).success
+    ).toBe(false);
+    expect(
+      TerminalClientMessageSchema.safeParse({
+        kind: 'input',
+        data: 'x'.repeat(64 * 1024 + 1),
+        binary: true
+      }).success
+    ).toBe(false);
   });
 });
 

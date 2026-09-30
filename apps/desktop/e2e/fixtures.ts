@@ -28,6 +28,7 @@ export type AppSession = {
 
 export type AppLaunchOptions = {
   headless?: boolean;
+  userDataDirectory?: string;
 };
 
 /**
@@ -38,7 +39,10 @@ async function passVaultGate(page: Page): Promise<void> {
   const gate = page.locator('.vault-gate');
   await gate.waitFor({ state: 'visible', timeout: 10_000 });
   await gate.locator('.vault-gate-password').fill(E2E_MASTER_PASSWORD);
-  await gate.locator('.vault-gate-confirm').fill(E2E_MASTER_PASSWORD);
+  const confirmation = gate.locator('.vault-gate-confirm');
+  if ((await confirmation.count()) > 0) {
+    await confirmation.fill(E2E_MASTER_PASSWORD);
+  }
   await gate.locator('.vault-gate-submit').click();
   await gate.waitFor({ state: 'detached', timeout: 10_000 });
 }
@@ -63,7 +67,8 @@ export async function launchApp(
   }
   const headless = options.headless ?? true;
   const electronBinary = require('electron') as unknown as string;
-  const userDataDirectory = await fs.mkdtemp(join(tmpdir(), 'geared-e2e-'));
+  const userDataDirectory =
+    options.userDataDirectory ?? (await fs.mkdtemp(join(tmpdir(), 'geared-e2e-')));
   const app = await electron.launch({
     // On a real (non-Xvfb) display a test window can be occluded by other
     // windows; Chromium then stops presenting frames for it, and click

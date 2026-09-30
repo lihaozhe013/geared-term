@@ -23,22 +23,21 @@ close to your terminal — but never in control of it.
 ### Conversation, not autonomy
 
 Geared Term is not an agent. The AI never drives your terminal and never executes anything on its
-own; it talks with you. What makes the conversation genuinely useful is context: your selection or
-a snapshot of the viewport can be attached to a prompt as a clearly delimited observation, so the
-AI sees what you see without any background plumbing.
+own; it talks with you. What makes the conversation genuinely useful is context: your selection or a
+snapshot of the viewport can be attached to a prompt as a clearly delimited observation, so the AI
+sees what you see without any background plumbing.
 
 ### Interaction upgrade
 
-Answers containing shell commands arrive as reviewable command cards. Copy a command, insert it
-into the terminal with one click — insertion never submits — or run it, which always requires an
-explicit click. Every command the AI proposes passes under your eyes before anything touches your
-shell. The terminal stays yours; the AI just makes it faster to drive.
+Answers containing shell commands arrive as reviewable command cards. Copy a command, insert it into
+the terminal with one click — insertion never submits — or run it, which always requires an explicit
+click. Every command the AI proposes passes under your eyes before anything touches your shell. The
+terminal stays yours; the AI just makes it faster to drive.
 
 ### Your data, your rules
 
-You decide what leaves the machine. Terminal context is attached only when you choose to attach
-it, and you control what goes in — including keeping sensitive information out of what the AI
-receives.
+You decide what leaves the machine. Terminal context is attached only when you choose to attach it,
+and you control what goes in — including keeping sensitive information out of what the AI receives.
 
 ### Zero footprint on your servers
 

@@ -370,7 +370,7 @@ export class SshSessionManager {
     }
     const message = result.data;
     if (message.kind === 'input') {
-      session.channel?.write(message.data);
+      session.channel?.write(message.binary ? Buffer.from(message.data, 'latin1') : message.data);
     } else if (message.kind === 'cd-line') {
       // Submitted command lines are reconstructed (and screen-echo recovered)
       // by the renderer; the main process only owns the tracking state.

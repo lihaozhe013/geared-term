@@ -92,7 +92,7 @@ declare global {
         input: LocalTerminalRequest,
         onMessage: (message: unknown) => void
       ) => {
-        sendInput: (data: string) => void;
+        sendInput: (data: string, binary?: boolean) => void;
         sendCdLine: (line: string) => void;
         resize: (cols: number, rows: number) => void;
         acknowledge: (bytes: number) => void;
@@ -102,7 +102,7 @@ declare global {
         input: SshTerminalRequest,
         onMessage: (message: unknown) => void
       ) => {
-        sendInput: (data: string) => void;
+        sendInput: (data: string, binary?: boolean) => void;
         sendCdLine: (line: string) => void;
         resize: (cols: number, rows: number) => void;
         acknowledge: (bytes: number) => void;
@@ -113,7 +113,7 @@ declare global {
         input: SshProfileTerminalRequest,
         onMessage: (message: unknown) => void
       ) => {
-        sendInput: (data: string) => void;
+        sendInput: (data: string, binary?: boolean) => void;
         sendCdLine: (line: string) => void;
         resize: (cols: number, rows: number) => void;
         acknowledge: (bytes: number) => void;

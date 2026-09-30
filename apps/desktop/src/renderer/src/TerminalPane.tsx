@@ -287,6 +287,7 @@ export function TerminalPane({
     let disposed = false;
     let client: TerminalClient | undefined;
     let inputSubscription: { dispose: () => void } | undefined;
+    let binaryInputSubscription: { dispose: () => void } | undefined;
     let resizeSubscription: { dispose: () => void } | undefined;
     let lineTracker = createLineTracker();
     let alternateActive = false;
@@ -398,6 +399,7 @@ export function TerminalPane({
         };
         sendToShellRef.current = sendToShell;
         inputSubscription = terminal.onData(sendToShell);
+        binaryInputSubscription = terminal.onBinary((data) => client?.sendInput(data, true));
         resizeSubscription = terminal.onResize(sendResize);
         sendResize();
         terminal.focus();
@@ -450,6 +452,7 @@ export function TerminalPane({
       disposed = true;
       resizeObserver.disconnect();
       inputSubscription?.dispose();
+      binaryInputSubscription?.dispose();
       resizeSubscription?.dispose();
       handlerEnter.dispose();
       handlerLeave.dispose();
@@ -565,9 +568,20 @@ export function TerminalPane({
 
   const openContextMenu = (event: React.MouseEvent): void => {
     event.preventDefault();
+    if (!settingsRef.current.showTerminalContextMenuOnRightClick) {
+      contextMenuOpenRef.current = false;
+      setContextMenu(null);
+      return;
+    }
     contextMenuOpenRef.current = true;
     setContextMenu({ x: event.clientX, y: event.clientY });
   };
+
+  useEffect(() => {
+    if (settings.showTerminalContextMenuOnRightClick) return;
+    contextMenuOpenRef.current = false;
+    setContextMenu(null);
+  }, [settings.showTerminalContextMenuOnRightClick]);
 
   const contextMenuItems = contextMenu
     ? buildTerminalContextMenu({
@@ -711,6 +725,11 @@ export function TerminalPane({
             : 'Local terminal'
         }
         onContextMenu={openContextMenu}
+        onMouseDownCapture={(event) => {
+          if (event.button === 2 && settingsRef.current.showTerminalContextMenuOnRightClick) {
+            event.stopPropagation();
+          }
+        }}
       />
       {contextMenu ? (
         <ContextMenu

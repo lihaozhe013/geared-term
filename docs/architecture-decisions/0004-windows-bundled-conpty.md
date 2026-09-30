@@ -47,7 +47,8 @@ Windows Terminal `v1.24.10921.0` release as NuGet package version `1.24.26040200
   native ConPTY implementation locates the DLL relative to `conpty.node`. The backend is selected
   only for Windows x64, and no downloaded or renderer-supplied path is used for these assets.
 - The existing shell spawn boundary remains the same. The only spawn-option change selects
-  node-pty's local ConPTY DLL backend; it does not alter shell resolution or user-provided arguments.
+  node-pty's local ConPTY DLL backend; it does not alter shell resolution or user-provided
+  arguments.
 - Updating the Microsoft runtime requires reviewing its release, license, Authenticode signatures,
   and hashes, then repeating the packaged smoke and affected-machine exit checks.
 
@@ -56,17 +57,16 @@ Windows Terminal `v1.24.10921.0` release as NuGet package version `1.24.26040200
 Unit coverage checks Windows x64 backend selection, natural-exit cleanup, and write/resize errors
 during shutdown. Windows x64 packaged smoke verifies hashes beside every loadable native binding,
 starts cmd, verifies that typed input stays on the PowerShell prompt row, and measures the prompt
-through the packaged app's xterm UI. The latest run
-verified the hashes, cmd, and interactive archlinux WSL input alignment; PowerShell prompt times
-were 2.577, 0.439, and 0.466 seconds. The median (0.466 seconds) and maximum (2.577 seconds)
-passed the 3-second median and 8-second maximum
-limits. The first PowerShell launch includes a cold-start delay; subsequent launches were under
-500 ms. The node-pty issue reporting roughly 3.5 seconds with a raw PTY listener does not account
-for terminal-generated responses, which the packaged UI smoke now supplies through xterm:
+through the packaged app's xterm UI. The latest run verified the hashes, cmd, and interactive
+archlinux WSL input alignment; PowerShell prompt times were 2.577, 0.439, and 0.466 seconds. The
+median (0.466 seconds) and maximum (2.577 seconds) passed the 3-second median and 8-second maximum
+limits. The first PowerShell launch includes a cold-start delay; subsequent launches were under 500
+ms. The node-pty issue reporting roughly 3.5 seconds with a raw PTY listener does not account for
+terminal-generated responses, which the packaged UI smoke now supplies through xterm:
 https://github.com/microsoft/node-pty/issues/894.
 
-The packaged interactive WSL check opens the first installed distribution, waits for its prompt,
-and confirms that the first typed command stays on the prompt row.
+The packaged interactive WSL check opens the first installed distribution, waits for its prompt, and
+confirms that the first typed command stays on the prompt row.
 
 The manual OpenCode acceptance remains outstanding: on the affected Windows machine, run `opencode`,
 enter `/exit`, and confirm the PowerShell prompt returns with the terminal tab open. Confirm no

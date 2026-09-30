@@ -259,6 +259,7 @@ async function rebuildApplicationMenu(): Promise<void> {
       locale,
       language: settings.language,
       theme: settings.theme,
+      showTerminalContextMenuOnRightClick: settings.showTerminalContextMenuOnRightClick,
       themeNames: [
         ...new Set([...BUILTIN_THEME_NAMES, ...userThemes.themes.map((theme) => theme.name)])
       ],

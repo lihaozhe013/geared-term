@@ -375,7 +375,7 @@ export async function startControlledServer(): Promise<ControlledServer> {
         channel.write('ready\r\n');
         let lineBuffer = '';
         channel.on('data', (data: string | Buffer) => {
-          const text = typeof data === 'string' ? data : data.toString();
+          const text = typeof data === 'string' ? data : data.toString('latin1');
           trace.shellInput += text;
           lineBuffer += text;
           const lines = lineBuffer.split(/\r\n|\r|\n/);

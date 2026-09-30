@@ -233,7 +233,7 @@ export class LocalTerminalManager {
     const message = result.data;
     if (message.kind === 'input') {
       try {
-        session.pty.write(message.data);
+        session.pty.write(message.binary ? Buffer.from(message.data, 'latin1') : message.data);
       } catch (error) {
         this.failPtyOperation(session, 'write', error);
       }
@@ -339,7 +339,11 @@ export class LocalTerminalManager {
     this.logger.info('terminal', 'Local terminal closed', { sessionId: session.id, reason });
   }
 
-  private failPtyOperation(session: LocalSession, operation: 'write' | 'resize', error: unknown): void {
+  private failPtyOperation(
+    session: LocalSession,
+    operation: 'write' | 'resize',
+    error: unknown
+  ): void {
     if (session.closed) {
       return;
     }
