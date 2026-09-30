@@ -41,7 +41,7 @@ import {
 } from './TerminalPane';
 import { TabBar } from './terminal/tab-bar';
 import { tabShortcutsFor } from './terminal/tab-context-menu';
-import { applyTerminalTabState } from './terminal/tab-state';
+import { applyTerminalTabState, shouldAutoCloseTerminalTab } from './terminal/tab-state';
 import { filePanelMode } from './terminal/file-panel';
 import { formatChatInsert } from './terminal/extract';
 import {
@@ -832,15 +832,16 @@ export function App(): React.JSX.Element {
 
   const handleState = useCallback(
     (tabId: string, message: TerminalPortMessage & { kind: 'state' }): void => {
-      const isSshTab = tabs.some(
-        (tab) => tab.id === tabId && ('host' in tab.request || 'profileId' in tab.request)
-      );
+      const tab = tabs.find((entry) => entry.id === tabId);
+      if (!tab) return;
+      const isSshTab = 'host' in tab.request || 'profileId' in tab.request;
+      const shouldClose = shouldAutoCloseTerminalTab(tab, message);
       setTabs((current) =>
         current.map((tab) =>
           tab.id === tabId ? applyTerminalTabState(tab, message, isSshTab) : tab
         )
       );
-      if (message.state === 'exited' && !isSshTab) closeTab(tabId);
+      if (shouldClose) closeTab(tabId);
     },
     [closeTab, tabs]
   );

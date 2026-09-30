@@ -15,7 +15,8 @@ Users therefore could lose the final screen without seeing why the session stopp
 - Emit one `failed` state with a validated failure code for transport, authentication, host-key,
   shell-request, and unexpected remote-channel failures. Log detailed errors in the SSH domain log;
   do not send them through the renderer message port.
-- Treat a remote exit report as a normal exit. Treat user-requested closure as intentional.
+- Treat a remote exit report as a normal exit and close its tab automatically, regardless of the
+  reported exit status. Treat user-requested closure as intentional.
 - Keep a failed SSH tab and its final terminal output available. Mark the tab and show a localized
   inline notice with an action to close the tab. Do not reconnect automatically.
 
@@ -31,5 +32,5 @@ or secret-bearing renderer data is introduced.
 ## Validation
 
 The controlled SSH integration suite covers abrupt disconnects, dropped keepalive responses,
-unexpected shell-channel closure, normal remote exit, and user-requested closure. Renderer tests
-cover failure-state retention, tab status, and localized error copy.
+unexpected shell-channel closure, zero/non-zero normal remote exit, and user-requested closure.
+Renderer tests cover failure-state retention, tab status, and localized error copy.

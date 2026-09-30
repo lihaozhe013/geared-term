@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SshFailureCode, TerminalPortMessage } from '@geared-term/protocol';
-import { applyTerminalTabState } from './tab-state';
+import { applyTerminalTabState, shouldAutoCloseTerminalTab } from './tab-state';
 
 const tab = { status: 'running' as const };
 
@@ -32,5 +32,24 @@ describe('applyTerminalTabState', () => {
 
   it('leaves local close handling available to its existing lifecycle', () => {
     expect(applyTerminalTabState(tab, state('closed'), false).status).toBe('closed');
+  });
+});
+
+describe('shouldAutoCloseTerminalTab', () => {
+  it('closes a running tab after an exit report regardless of exit status', () => {
+    expect(shouldAutoCloseTerminalTab(tab, { ...state('exited'), detail: 'exitCode=23' })).toBe(
+      true
+    );
+  });
+
+  it('keeps a failed SSH tab even if a late exit report arrives', () => {
+    expect(
+      shouldAutoCloseTerminalTab({ status: 'failed' }, { ...state('exited'), detail: 'exitCode=0' })
+    ).toBe(false);
+  });
+
+  it('does not close a tab on intermediate or failure states', () => {
+    expect(shouldAutoCloseTerminalTab(tab, state('running'))).toBe(false);
+    expect(shouldAutoCloseTerminalTab(tab, state('failed', 'connection-lost'))).toBe(false);
   });
 });

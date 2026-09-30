@@ -7,6 +7,13 @@ export type TerminalTabState = {
 
 type StateMessage = Extract<TerminalPortMessage, { kind: 'state' }>;
 
+export function shouldAutoCloseTerminalTab(
+  tab: Pick<TerminalTabState, 'status'>,
+  message: StateMessage
+): boolean {
+  return tab.status !== 'failed' && message.state === 'exited';
+}
+
 export function applyTerminalTabState<T extends TerminalTabState>(
   tab: T,
   message: StateMessage,

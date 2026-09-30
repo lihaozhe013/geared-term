@@ -312,6 +312,9 @@ not currently implemented is stated as such instead of being treated as complete
   probing the configured font's actual OpenType tables, with a bounded fallback sequence set when
   font inspection is unavailable. Ligature rendering MUST NOT alter cell input, selection, or
   snapshot extraction semantics.
+- **TERM-025**: A normal local or SSH process exit MUST close its owning tab automatically,
+  regardless of the reported exit code. A structured SSH failure MUST retain the tab and final
+  terminal output until the user closes it.
 
 ### 10.3 Terminal context snapshots
 

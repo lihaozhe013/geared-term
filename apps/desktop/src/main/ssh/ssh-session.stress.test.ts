@@ -447,11 +447,14 @@ describe('SSH session stress and fault tolerance', () => {
     await waitForState(session.messages, 'closed');
   });
 
-  it('retains normal SSH shell exit status without reporting a failure', async () => {
+  it.each([
+    ['exit', 'exitCode=0'],
+    ['exit-nonzero', 'exitCode=23']
+  ])('reports and closes on the normal remote shell exit command %s', async (command, detail) => {
     const session = await openSession();
-    session.send({ kind: 'input', data: 'exit\r' });
+    session.send({ kind: 'input', data: `${command}\r` });
     const exited = await waitForState(session.messages, 'exited');
-    expect(exited.detail).toBe('exitCode=0');
+    expect(exited.detail).toBe(detail);
     await waitForState(session.messages, 'closed');
     expect(
       session.messages.some((message) => message.kind === 'state' && message.state === 'failed')

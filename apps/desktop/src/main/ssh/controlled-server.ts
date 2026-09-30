@@ -298,6 +298,11 @@ function handleShellCommand(command: string, channel: ServerChannelLike): void {
     channel.close();
     return;
   }
+  if (command === 'exit-nonzero') {
+    channel.exit(23);
+    channel.close();
+    return;
+  }
   if (command === 'close-shell') {
     channel.close();
     return;
