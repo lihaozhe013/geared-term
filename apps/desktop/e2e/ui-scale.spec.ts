@@ -18,7 +18,10 @@ async function setScale(scale: number): Promise<void> {
   }, scale);
 }
 
-async function metric(selector: string, property: 'height' | 'fontSize'): Promise<number> {
+async function metric(
+  selector: string,
+  property: 'height' | 'width' | 'fontSize'
+): Promise<number> {
   return session.page.evaluate(
     ([query, key]) => {
       const element = document.querySelector(query);
@@ -28,11 +31,7 @@ async function metric(selector: string, property: 'height' | 'fontSize'): Promis
   );
 }
 
-async function terminalRowCount(): Promise<number> {
-  return session.page.locator('.terminal-wrapper:not([hidden]) .xterm-rows > div').count();
-}
-
-test('persists interface scale across the main and settings windows while preserving terminal font size', async () => {
+test('persists interface scale and reflows the terminal viewport without changing its font size', async () => {
   const { app, page } = session;
   await openLocalTab(app);
   await expect(page.locator('.terminal-surface')).toHaveAttribute('data-active-status', 'running', {
@@ -44,7 +43,7 @@ test('persists interface scale across the main and settings windows while preser
     titlebar: await metric('.titlebar', 'height'),
     sidebar: await metric('.sidebar-switcher', 'height'),
     terminal: await metric('.terminal-wrapper:not([hidden]) .xterm-rows', 'fontSize'),
-    terminalRows: await terminalRowCount()
+    terminalWidth: await metric('.terminal-wrapper:not([hidden]) .terminal-host', 'width')
   };
 
   await setScale(150);
@@ -56,7 +55,9 @@ test('persists interface scale across the main and settings windows while preser
     base.terminal,
     1
   );
-  expect(await terminalRowCount()).toBeLessThan(base.terminalRows);
+  expect(await metric('.terminal-wrapper:not([hidden]) .terminal-host', 'width')).toBeLessThan(
+    base.terminalWidth
+  );
   expect(await page.evaluate(async () => (await window.geared.getSettings()).uiScalePercent)).toBe(
     150
   );
@@ -80,7 +81,9 @@ test('persists interface scale across the main and settings windows while preser
     base.terminal,
     1
   );
-  expect(await terminalRowCount()).toBeGreaterThan(base.terminalRows);
+  expect(await metric('.terminal-wrapper:not([hidden]) .terminal-host', 'width')).toBeGreaterThan(
+    base.terminalWidth
+  );
   expect(
     await settingsPage
       .locator('.settings-nav-item')
