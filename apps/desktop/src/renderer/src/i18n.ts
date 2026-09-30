@@ -141,6 +141,7 @@ const messages = {
     activityPagesRead: '{count} pages read',
     uiFontFamily: 'UI font family',
     uiFontSize: 'UI font size',
+    uiScalePercent: 'Interface scale',
     terminalFontFamily: 'Terminal font family',
     fontLigatures: 'Enable font ligatures',
     fontLigaturesHint:
@@ -674,6 +675,7 @@ const messages = {
     activityPagesRead: '阅读 {count} 个页面',
     uiFontFamily: '界面字体',
     uiFontSize: '界面字号',
+    uiScalePercent: '\u754c\u9762\u7f29\u653e',
     terminalFontFamily: '终端字体',
     fontLigatures: '启用字体连字',
     fontLigaturesHint: '当终端字体支持时，将编程连字（=>、->、!== 等）渲染为单个字形。',

@@ -113,7 +113,7 @@ export function SettingsWindow(): React.JSX.Element {
   useEffect(() => {
     if (!palette || !settings) return;
     applyPalette(palette);
-    applyTypography(settings.uiFontSize, settings.uiFontFamily);
+    applyTypography(settings.uiFontSize, settings.uiFontFamily, settings.uiScalePercent);
     applyTerminalLayout(settings.terminalPadding, settings.fullScreenTerminalPadding);
   }, [palette, settings]);
 

@@ -88,6 +88,7 @@ const defaultSettings: SettingsRecord = {
   remoteFileCommands: 'cat\nless\nvim',
   uiFontFamily: '',
   uiFontSize: 13,
+  uiScalePercent: 100,
   terminalFontFamily: 'Cascadia Code',
   terminalFontLigatures: true,
   terminalFontFallbacks: [],
@@ -341,12 +342,13 @@ export function App(): React.JSX.Element {
 
   useEffect(() => {
     applyPalette(palette);
-    applyTypography(settings.uiFontSize, settings.uiFontFamily);
+    applyTypography(settings.uiFontSize, settings.uiFontFamily, settings.uiScalePercent);
     applyTerminalLayout(settings.terminalPadding, settings.fullScreenTerminalPadding);
   }, [
     palette,
     settings.uiFontFamily,
     settings.uiFontSize,
+    settings.uiScalePercent,
     settings.terminalPadding,
     settings.fullScreenTerminalPadding
   ]);
@@ -475,18 +477,23 @@ export function App(): React.JSX.Element {
   const uiStateRef = useRef(uiState);
   uiStateRef.current = uiState;
 
-  const handleResizeMove = useCallback((event: PointerEvent): void => {
-    const drag = dragRef.current;
-    if (!drag) return;
-    if (drag.side === 'sidebar') {
-      const sidebarWidth = clampWidth(drag.startWidth + event.clientX - drag.startX, 170, 520);
-      uiStateRef.current = { ...uiStateRef.current, sidebarWidth };
-    } else {
-      const rightPanelWidth = clampWidth(drag.startWidth - (event.clientX - drag.startX), 280, 760);
-      uiStateRef.current = { ...uiStateRef.current, rightPanelWidth };
-    }
-    setUiState(uiStateRef.current);
-  }, []);
+  const handleResizeMove = useCallback(
+    (event: PointerEvent): void => {
+      const drag = dragRef.current;
+      if (!drag) return;
+      const scale = settings.uiScalePercent / 100;
+      const delta = (event.clientX - drag.startX) / scale;
+      if (drag.side === 'sidebar') {
+        const sidebarWidth = clampWidth(drag.startWidth + delta, 170, 520);
+        uiStateRef.current = { ...uiStateRef.current, sidebarWidth };
+      } else {
+        const rightPanelWidth = clampWidth(drag.startWidth - delta, 280, 760);
+        uiStateRef.current = { ...uiStateRef.current, rightPanelWidth };
+      }
+      setUiState(uiStateRef.current);
+    },
+    [settings.uiScalePercent]
+  );
 
   const handleResizeEnd = useCallback((): void => {
     dragRef.current = null;
@@ -860,6 +867,7 @@ export function App(): React.JSX.Element {
   const rightPanelOpen = Boolean(uiState.rightPanel && !uiState.rightPanelCollapsed);
   const sidebarWidth = uiState.sidebarWidth ?? 240;
   const rightPanelWidth = uiState.rightPanelWidth ?? 360;
+  const interfaceScale = settings.uiScalePercent / 100;
 
   const activeLabel = activeTab ? tabDisplayLabel(activeTab, profiles) : undefined;
 
@@ -897,8 +905,8 @@ export function App(): React.JSX.Element {
       <section
         className={`workspace ${uiState.sidebarCollapsed ? 'sidebar-collapsed' : ''}`}
         style={{
-          gridTemplateColumns: `${uiState.sidebarCollapsed ? '40px' : `${sidebarWidth}px`} minmax(0, 1fr) ${
-            rightPanelOpen ? `${rightPanelWidth}px` : '40px'
+          gridTemplateColumns: `${(uiState.sidebarCollapsed ? 40 : sidebarWidth) * interfaceScale}px minmax(0, 1fr) ${
+            rightPanelOpen ? `${rightPanelWidth * interfaceScale}px` : `${40 * interfaceScale}px`
           }`
         }}
         aria-label={t('workspace')}
@@ -1206,7 +1214,7 @@ export function App(): React.JSX.Element {
             role="separator"
             aria-orientation="vertical"
             aria-label="Resize sessions sidebar"
-            style={{ left: sidebarWidth - 3 }}
+            style={{ left: sidebarWidth * interfaceScale - 3 * interfaceScale }}
             onPointerDown={(event) => beginPanelResize(event, 'sidebar')}
           />
         ) : null}
@@ -1216,7 +1224,7 @@ export function App(): React.JSX.Element {
             role="separator"
             aria-orientation="vertical"
             aria-label="Resize right panel"
-            style={{ right: rightPanelWidth - 3 }}
+            style={{ right: rightPanelWidth * interfaceScale - 3 * interfaceScale }}
             onPointerDown={(event) => beginPanelResize(event, 'right')}
           />
         ) : null}

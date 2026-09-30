@@ -602,10 +602,10 @@ not currently implemented is stated as such instead of being treated as complete
 
 - **SET-001**: Settings MUST cover General, Appearance, Terminal, SFTP, AI Connections, AI
   Assistant, Security & Vault, and About.
-- **SET-002**: User settings MUST include language, theme, UI font/family/size, terminal primary and
-  ordered fallback fonts, terminal font size, line height, normal-buffer and full-screen terminal
-  padding, cursor style, default TERM, command-split presentation, global AI instructions, SFTP open
-  commands, and terminal-context bounds.
+- **SET-002**: User settings MUST include language, theme, UI font/family/size, interface scale,
+  terminal primary and ordered fallback fonts, terminal font size, line height, normal-buffer and
+  full-screen terminal padding, cursor style, default TERM, command-split presentation, global AI
+  instructions, SFTP open commands, and terminal-context bounds.
 - **SET-003**: Terminal fallback fonts MUST support optional scale and horizontal/vertical
   adjustments, preserve order, and remove blanks, duplicates, and the primary font.
 - **SET-004**: Font sizes MUST remain within 8-32 logical pixels and terminal line height within
@@ -622,6 +622,10 @@ not currently implemented is stated as such instead of being treated as complete
   preference. Repository-facing source and documentation remain English.
 - **SET-008**: A language change MUST refresh windows, menus, dialogs, and errors without requiring
   a process restart where technically practical.
+- **SET-009**: Interface scale MUST be independently adjustable from terminal font size, persisted
+  as an integer percentage from 75 to 150 in steps of 5, and default to 100. The scale MUST apply to
+  application UI dimensions and controls across the main and auxiliary windows; terminal glyph size
+  and terminal padding remain controlled by their dedicated settings.
 
 The theme directory is `<userData>/themes/` (the working directory in development). Each `*.json`
 file there MUST contain a single user theme object with a `name` and a `colors` object holding

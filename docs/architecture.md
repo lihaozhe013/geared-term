@@ -244,6 +244,11 @@ semantics are recorded in [ADR 0001](architecture-decisions/0001-auto-unlock-pol
 Each auxiliary window is created with the same security boundary as the main window (`SEC-001`) and
 is driven by business-named, validated IPC.
 
+Renderer typography uses the persisted UI font settings and `uiScalePercent`. The interface scale is
+applied through CSS dimensions in the shared renderer stylesheet and scales resizable side-panel
+widths at render time; persisted panel widths remain logical design widths. Terminal font size and
+terminal padding are applied independently.
+
 - **Settings window** (`settings-window.ts`): single instance; re-opening focuses the existing
   window and can navigate it to a category (General, Appearance, Terminal, Shortcuts, SFTP, AI
   Connections, AI Assistant, Security & Vault, About).

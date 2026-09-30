@@ -528,14 +528,20 @@ export function applyPalette(palette: Palette): void {
   }
 }
 
-/* styles.css anchors every font token and chrome metric to these two custom
-   properties; the ratio is relative to the 13px design baseline. */
+/* styles.css anchors UI font tokens to the selected font and scales fixed
+   interface dimensions independently through --gt-interface-scale. */
 const UI_FONT_BASE_PX = 13;
 
-export function applyTypography(uiFontSize: number, uiFontFamily: string): void {
+export function applyTypography(
+  uiFontSize: number,
+  uiFontFamily: string,
+  uiScalePercent = 100
+): void {
   const style = document.documentElement.style;
-  style.setProperty('--gt-ui-font-size', `${uiFontSize}px`);
-  style.setProperty('--gt-ui-scale', String(uiFontSize / UI_FONT_BASE_PX));
+  const interfaceScale = uiScalePercent / 100;
+  style.setProperty('--gt-interface-scale', String(interfaceScale));
+  style.setProperty('--gt-ui-font-size', `${uiFontSize * interfaceScale}px`);
+  style.setProperty('--gt-ui-scale', String((uiFontSize / UI_FONT_BASE_PX) * interfaceScale));
   const family = uiFontFamily.trim();
   if (family) {
     style.setProperty('--gt-ui-font-family', family);

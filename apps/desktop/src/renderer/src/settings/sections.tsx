@@ -137,6 +137,7 @@ export function AppearanceSection({
     await onSave({
       uiFontFamily: draft.uiFontFamily,
       uiFontSize: draft.uiFontSize,
+      uiScalePercent: draft.uiScalePercent,
       terminalFontFamily: draft.terminalFontFamily.trim() || 'Cascadia Code',
       terminalFontLigatures: draft.terminalFontLigatures,
       terminalFontSize: draft.terminalFontSize,
@@ -194,6 +195,16 @@ export function AppearanceSection({
           min={10}
           max={24}
           onChange={(value) => update('uiFontSize', value)}
+        />
+      </Row>
+      <Row label={t('uiScalePercent')}>
+        <Stepper
+          value={draft.uiScalePercent}
+          min={75}
+          max={150}
+          step={5}
+          format={(value) => `${value}%`}
+          onChange={(value) => update('uiScalePercent', value)}
         />
       </Row>
       <Row label={t('terminalFontFamily')}>

@@ -30,7 +30,7 @@ export function TerminalSnapshotDraftWindow(): React.JSX.Element {
   useEffect(() => {
     const apply = (settings: SettingsRecord, userThemes: UserTheme[]): void => {
       applyPalette(resolvePalette(settings.theme, userThemes));
-      applyTypography(settings.uiFontSize, settings.uiFontFamily);
+      applyTypography(settings.uiFontSize, settings.uiFontFamily, settings.uiScalePercent);
       document.documentElement.style.setProperty(
         '--gt-editor-font',
         settings.terminalFontFamily || 'monospace'
@@ -104,7 +104,11 @@ export function TerminalSnapshotDraftWindow(): React.JSX.Element {
                 <WrapText size={14} aria-hidden="true" />
                 {t('sftpEditorWrap')}
               </button>
-              <button type="button" className="toolbar-button" onClick={() => void addToAssistant()}>
+              <button
+                type="button"
+                className="toolbar-button"
+                onClick={() => void addToAssistant()}
+              >
                 {t('terminalSnapshotAddToAi')}
               </button>
             </div>

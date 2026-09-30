@@ -248,6 +248,7 @@ export const SettingsRecordSchema = z
     remoteFileCommands: z.string().max(4096).default('cat\nless\nvim'),
     uiFontFamily: z.string().max(256).default(''),
     uiFontSize: z.number().min(10).max(24).default(13),
+    uiScalePercent: z.number().int().min(75).max(150).multipleOf(5).default(100),
     terminalFontFamily: z.string().min(1).max(256).default('Cascadia Code'),
     terminalFontLigatures: z.boolean().default(false),
     keybindings: KeybindingOverridesSchema,

@@ -60,7 +60,7 @@ export function HistoryWindow(): React.JSX.Element {
     const apply = (settings: SettingsRecord, userThemes: UserTheme[]): void => {
       const palette = resolvePalette(settings.theme, userThemes);
       applyPalette(palette);
-      applyTypography(settings.uiFontSize, settings.uiFontFamily);
+      applyTypography(settings.uiFontSize, settings.uiFontFamily, settings.uiScalePercent);
       setLanguage(settings.language);
     };
     let themes: UserTheme[] = [];

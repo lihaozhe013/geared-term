@@ -106,3 +106,20 @@ describe('SettingsRecordSchema terminal padding', () => {
     ).toBe(false);
   });
 });
+
+describe('SettingsRecordSchema interface scale', () => {
+  it('defaults and validates the interface scale percentage', () => {
+    expect(SettingsRecordSchema.parse(baseSettings).uiScalePercent).toBe(100);
+    expect(SettingsRecordSchema.parse({ ...baseSettings, uiScalePercent: 75 }).uiScalePercent).toBe(
+      75
+    );
+    expect(
+      SettingsRecordSchema.parse({ ...baseSettings, uiScalePercent: 150 }).uiScalePercent
+    ).toBe(150);
+    for (const value of [70, 155, 102, 100.5]) {
+      expect(
+        SettingsRecordSchema.safeParse({ ...baseSettings, uiScalePercent: value }).success
+      ).toBe(false);
+    }
+  });
+});

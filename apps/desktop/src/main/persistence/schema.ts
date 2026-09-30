@@ -76,6 +76,7 @@ export const defaultSettings: Settings = {
   remoteFileCommands: 'cat\nless\nvim',
   uiFontFamily: '',
   uiFontSize: 14,
+  uiScalePercent: 100,
   terminalFontFamily: 'JetBrains Mono',
   terminalFontLigatures: true,
   keybindings: {},

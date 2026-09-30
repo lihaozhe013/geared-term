@@ -54,7 +54,7 @@ export function RemoteEditorWindow(): React.JSX.Element {
   useEffect(() => {
     const apply = (settings: SettingsRecord, userThemes: UserTheme[]): void => {
       applyPalette(resolvePalette(settings.theme, userThemes));
-      applyTypography(settings.uiFontSize, settings.uiFontFamily);
+      applyTypography(settings.uiFontSize, settings.uiFontFamily, settings.uiScalePercent);
       document.documentElement.style.setProperty(
         '--gt-editor-font',
         settings.terminalFontFamily || 'monospace'
