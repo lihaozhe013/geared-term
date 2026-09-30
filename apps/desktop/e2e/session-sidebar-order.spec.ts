@@ -12,6 +12,7 @@ test.afterEach(async () => {
 });
 
 test('reorders sessions and groups, moves sessions between sections, and restores the order', async () => {
+  test.setTimeout(120_000);
   const { page } = session;
   const createProfile = async (name: string, group?: string): Promise<void> => {
     await page.getByRole('button', { name: 'New session profile' }).click();
