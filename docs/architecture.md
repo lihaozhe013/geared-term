@@ -267,6 +267,9 @@ applied through CSS dimensions in the shared renderer stylesheet and scales resi
 widths at render time; persisted panel widths remain logical design widths. Terminal font size and
 terminal padding are applied independently.
 
+Collapsed side panels occupy zero grid width. Their expand controls sit at the centered workspace
+edges and do not affect the terminal column or panel-width persistence.
+
 - **Settings window** (`settings-window.ts`): single instance; re-opening focuses the existing
   window and can navigate it to a category (General, Appearance, Terminal, Shortcuts, SFTP, AI
   Connections, AI Assistant, Security & Vault, About).

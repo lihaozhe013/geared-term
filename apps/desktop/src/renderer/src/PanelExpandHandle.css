@@ -1,0 +1,48 @@
+.panel-expand-handle {
+  position: absolute;
+  top: 50%;
+  z-index: 8;
+  display: grid;
+  width: calc(24px * var(--gt-interface-scale, 1));
+  height: calc(36px * var(--gt-interface-scale, 1));
+  padding: 0;
+  transform: translateY(-50%);
+  place-items: center;
+  border: 1px solid var(--gt-border-strong, #344157);
+  color: var(--gt-text-muted, #9aa8bd);
+  background: var(--gt-window-panel, var(--gt-background, #0d1117));
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.panel-expand-handle-left {
+  left: 0;
+  border-left: 0;
+  border-radius: 0 var(--gt-radius-md) var(--gt-radius-md) 0;
+}
+
+.panel-expand-handle-right {
+  right: 0;
+  border-right: 0;
+  border-radius: var(--gt-radius-md) 0 0 var(--gt-radius-md);
+}
+
+.panel-expand-handle:hover {
+  border-color: var(--gt-border-strong, #344157);
+  color: var(--gt-text, #e4eaf3);
+  background: var(--gt-hover, #1a2332);
+}
+
+.panel-expand-handle:focus-visible {
+  outline: 2px solid var(--gt-accent, #5c8ea5);
+  outline-offset: -3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel-expand-handle {
+    transition: none;
+  }
+}

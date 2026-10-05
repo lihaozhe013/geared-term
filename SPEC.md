@@ -106,6 +106,8 @@ is not supported until its packaged application passes the same smoke tests.
 
 - **APP-001**: The main window MUST contain custom application chrome, a collapsible session
   sidebar, a terminal tab strip, the active terminal, and a collapsible right panel.
+- When either side panel is collapsed, its layout column MUST have zero width and expose only a
+  vertically centered, edge-mounted expand button; a full-height rail MUST NOT remain.
 - **APP-002**: The right panel MUST switch between Files and AI Assistant views. Files MUST render a
   dual-pane SFTP browser for SSH sessions and a single-pane local browser for ordinary local shells.
 - **APP-003**: The divider between the terminal and right panel MUST be draggable and MUST preserve

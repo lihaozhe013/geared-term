@@ -16,14 +16,7 @@ import type {
   VaultStatus,
   WslDistribution
 } from '@geared-term/protocol';
-import {
-  Bot,
-  FolderSync,
-  PanelLeftOpen,
-  PanelRightClose,
-  PanelRightOpen,
-  SquareTerminal
-} from 'lucide-react';
+import { Bot, FolderSync, PanelRightClose, SquareTerminal } from 'lucide-react';
 import { applyPalette, applyTypography, applyTerminalLayout, resolvePalette } from './themes';
 import { translate } from './i18n';
 import type { MessageKey } from './i18n';
@@ -33,6 +26,7 @@ import { ProfileEditor } from './ProfileEditor';
 import { CreateGroupDialog } from './CreateGroupDialog';
 import { QuickSshDialog } from './QuickSshDialog';
 import { Sidebar } from './Sidebar';
+import { PanelExpandHandle } from './PanelExpandHandle';
 import { SftpPanel } from './SftpPanel';
 import {
   TerminalPane,
@@ -548,6 +542,16 @@ export function App(): React.JSX.Element {
     });
   }, [uiState, t]);
 
+  const expandRightPanel = useCallback((): void => {
+    const next: UiStateRecord = {
+      ...uiState,
+      rightPanel: uiState.rightPanel ?? 'assistant',
+      rightPanelCollapsed: false
+    };
+    setUiState(next);
+    void window.geared.saveUiState(next).catch(() => undefined);
+  }, [uiState]);
+
   // Once opened, the assistant panel stays mounted (hidden via CSS) so an
   // in-flight conversation and its streaming state survive panel switches.
   const [assistantKeepAlive, setAssistantKeepAlive] = useState(
@@ -978,10 +982,10 @@ export function App(): React.JSX.Element {
       ) : null}
 
       <section
-        className={`workspace ${uiState.sidebarCollapsed ? 'sidebar-collapsed' : ''}`}
+        className="workspace"
         style={{
-          gridTemplateColumns: `${(uiState.sidebarCollapsed ? 40 : sidebarWidth) * interfaceScale}px minmax(0, 1fr) ${
-            rightPanelOpen ? `${rightPanelWidth * interfaceScale}px` : `${40 * interfaceScale}px`
+          gridTemplateColumns: `${(uiState.sidebarCollapsed ? 0 : sidebarWidth) * interfaceScale}px minmax(0, 1fr) ${
+            rightPanelOpen ? `${rightPanelWidth * interfaceScale}px` : '0px'
           }`
         }}
         aria-label={t('workspace')}
@@ -1008,19 +1012,7 @@ export function App(): React.JSX.Element {
             onRefreshWsl={() => void discoverWsl()}
             onCollapse={toggleSidebar}
           />
-        ) : (
-          <aside className="sidebar collapsed-sidebar">
-            <button
-              type="button"
-              className="icon-button"
-              onClick={toggleSidebar}
-              aria-label={t('expandSessionsSidebar')}
-              title={t('expandSessionsSidebar')}
-            >
-              <PanelLeftOpen size={14} aria-hidden="true" />
-            </button>
-          </aside>
-        )}
+        ) : null}
 
         <section className="terminal-card" aria-label="Terminal workspace">
           {!settings.minimalMode ? tabBar : null}
@@ -1239,26 +1231,15 @@ export function App(): React.JSX.Element {
             ) : null}
           </div>
         ) : null}
-        {!uiState.rightPanel || uiState.rightPanelCollapsed ? (
-          <aside className="right-rail">
-            <button
-              type="button"
-              className="icon-button"
-              aria-label="Expand panel"
-              title="Expand panel"
-              onClick={() => {
-                const next: UiStateRecord = {
-                  ...uiState,
-                  rightPanel: uiState.rightPanel ?? 'assistant',
-                  rightPanelCollapsed: false
-                };
-                setUiState(next);
-                void window.geared.saveUiState(next).catch(() => undefined);
-              }}
-            >
-              <PanelRightOpen size={14} aria-hidden="true" />
-            </button>
-          </aside>
+        {uiState.sidebarCollapsed ? (
+          <PanelExpandHandle
+            side="left"
+            label={t('expandSessionsSidebar')}
+            onExpand={toggleSidebar}
+          />
+        ) : null}
+        {!rightPanelOpen ? (
+          <PanelExpandHandle side="right" label="Expand panel" onExpand={expandRightPanel} />
         ) : null}
         {!uiState.sidebarCollapsed ? (
           <div
