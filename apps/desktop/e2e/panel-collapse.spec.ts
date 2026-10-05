@@ -248,15 +248,22 @@ test('edge handle dimensions follow interface scale', async () => {
 });
 
 test('edge handle colors follow light and dark themes', async () => {
-  const { page } = session;
-  await page.locator('.workspace > .sidebar .sidebar-switcher > button:last-child').click();
-  const handle = page.locator('.panel-expand-handle-left');
+  const { app, page, userDataDirectory } = session;
+  await page.evaluate(async () => {
+    const settings = await window.geared.getSettings();
+    await window.geared.saveSettings({ ...settings, windowEffect: 'solid' });
+  });
+  await app.close();
+  session = await launchApp(undefined, { userDataDirectory });
+  const solidPage = session.page;
+  await solidPage.locator('.workspace > .sidebar .sidebar-switcher > button:last-child').click();
+  const handle = solidPage.locator('.panel-expand-handle-left');
 
   for (const [theme, expectedBackground] of [
     ['Light', 'rgb(246, 248, 251)'],
     ['Geared Dark', 'rgb(13, 17, 23)']
   ] as const) {
-    await page.evaluate(async (nextTheme) => {
+    await solidPage.evaluate(async (nextTheme) => {
       const settings = await window.geared.getSettings();
       await window.geared.saveSettings({ ...settings, theme: nextTheme });
     }, theme);

@@ -70,7 +70,7 @@ type TerminalTab = {
 const defaultSettings: SettingsRecord = {
   schemaVersion: 1,
   language: 'system',
-  theme: 'Catppuccin Mocha',
+  theme: 'Claude Dark',
   terminalFontSize: 14,
   terminalLineHeight: 1.2,
   terminalPadding: 14,
@@ -87,9 +87,9 @@ const defaultSettings: SettingsRecord = {
   uiFontFamily: '',
   uiFontSize: 13,
   uiScalePercent: 100,
-  minimalMode: false,
-  windowEffect: 'solid',
-  windowBackgroundOpacityPercent: 85,
+  minimalMode: true,
+  windowEffect: 'frosted',
+  windowBackgroundOpacityPercent: 75,
   showTerminalContextMenuOnRightClick: true,
   terminalFontFamily: 'Cascadia Code',
   terminalFontLigatures: true,
@@ -352,7 +352,7 @@ export function App(): React.JSX.Element {
     applyTerminalLayout(settings.terminalPadding, settings.fullScreenTerminalPadding);
     const activeEffect = effectiveWindowEffect(
       settings.windowEffect,
-      windowEffectAtLaunch ?? 'solid',
+      windowEffectAtLaunch ?? settings.windowEffect,
       info
     );
     applyWindowSurface(activeEffect, settings.windowBackgroundOpacityPercent);

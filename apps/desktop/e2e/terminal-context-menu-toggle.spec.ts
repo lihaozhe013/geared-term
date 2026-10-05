@@ -7,7 +7,7 @@ test.beforeEach(async () => {
   session = await launchApp(DOM_RENDERER_ARGS);
   await session.page.evaluate(async () => {
     const settings = await window.geared.getSettings();
-    await window.geared.saveSettings({ ...settings, language: 'en-US' });
+    await window.geared.saveSettings({ ...settings, language: 'en-US', minimalMode: false });
   });
 });
 

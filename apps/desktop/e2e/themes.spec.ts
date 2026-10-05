@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { launchApp, type AppSession } from './fixtures';
+import { launchApp, openSettingsWindow, type AppSession } from './fixtures';
 
 let session: AppSession;
 
@@ -12,8 +12,7 @@ test.afterEach(async () => {
 });
 
 test('groups built-in themes in settings and both menus, then persists the selected theme', async () => {
-  const { app, page } = session;
-  const nativeGroups = await app.evaluate(({ Menu }) => {
+  const nativeGroups = await session.app.evaluate(({ Menu }) => {
     const view = Menu.getApplicationMenu()?.items.find((item) => item.label === 'View');
     const theme = view?.submenu?.items.find((item) => item.label === 'Theme');
     return theme?.submenu?.items.map((group) => ({
@@ -27,11 +26,19 @@ test('groups built-in themes in settings and both menus, then persists the selec
     'Tokyo Night Light'
   ]);
 
-  await page.getByRole('button', { name: 'Settings' }).click();
-  const settingsWindow = await app.waitForEvent('window');
-  await settingsWindow.waitForLoadState('domcontentloaded');
-  await settingsWindow.getByRole('button', { name: 'Appearance' }).click();
-  const themePicker = settingsWindow.locator('.settings-select').first();
+  const userDataDirectory = session.userDataDirectory;
+  await session.page.evaluate(async () => {
+    const settings = await window.geared.getSettings();
+    await window.geared.saveSettings({ ...settings, minimalMode: false });
+  });
+  await session.app.close();
+  session = await launchApp(undefined, { userDataDirectory });
+  const { page } = session;
+  const settingsWindow = await openSettingsWindow(session, 'Appearance');
+  const themePicker = settingsWindow
+    .locator('.settings-row')
+    .filter({ hasText: 'Theme' })
+    .locator('.settings-select');
   await expect(themePicker.locator('option')).toHaveCount(34);
   await expect(themePicker.locator('optgroup[label="Tokyo Night"] option')).toHaveCount(3);
   await themePicker.selectOption('Tokyo Night Light');
@@ -90,9 +97,11 @@ test('groups built-in themes in settings and both menus, then persists the selec
     )
     .toBe('#faf9f5');
 
-  await page.getByRole('button', { name: 'Settings' }).click();
-  const reopenedSettings = await app.waitForEvent('window');
-  await reopenedSettings.waitForLoadState('domcontentloaded');
-  await reopenedSettings.getByRole('button', { name: 'Appearance' }).click();
-  await expect(reopenedSettings.locator('.settings-select').first()).toHaveValue('Claude Light');
+  const reopenedSettings = await openSettingsWindow(session, 'Appearance');
+  await expect(
+    reopenedSettings
+      .locator('.settings-row')
+      .filter({ hasText: 'Theme' })
+      .locator('.settings-select')
+  ).toHaveValue('Claude Light');
 });

@@ -193,7 +193,7 @@ test('starts with no tabs and supports closing the last one', async () => {
   await expect(terminalTabs(page)).toHaveCount(0);
   await expect(page.locator('.terminal-empty')).toBeVisible();
 
-  await page.getByRole('button', { name: 'New local terminal' }).click();
+  await page.locator('.terminal-empty').getByRole('button', { name: 'New local terminal' }).click();
   await waitForRunning(page);
   await expect(terminalTabs(page)).toHaveCount(1);
 

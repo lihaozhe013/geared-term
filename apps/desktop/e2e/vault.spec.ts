@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { E2E_MASTER_PASSWORD, launchApp, type AppSession } from './fixtures';
+import { E2E_MASTER_PASSWORD, launchApp, openSettingsWindow, type AppSession } from './fixtures';
 
 let session: AppSession;
 
@@ -12,11 +12,7 @@ test.afterEach(async () => {
 });
 
 async function openSecurityTab({ page, app }: AppSession): Promise<Page> {
-  await page.getByRole('button', { name: 'Settings' }).click();
-  const settingsWindow = await app.waitForEvent('window');
-  await settingsWindow.waitForLoadState('domcontentloaded');
-  await settingsWindow.getByRole('button', { name: 'Security & Vault' }).click();
-  return settingsWindow;
+  return openSettingsWindow({ page, app }, 'Security & Vault');
 }
 
 test('locking from settings gates the workspace and the master password unlocks it', async () => {

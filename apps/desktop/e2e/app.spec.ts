@@ -19,7 +19,8 @@ test('loads the main window hidden by default and connects the secure bridge', a
     session.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.isVisible())
   ).resolves.toBe(false);
   await expect(page).toHaveTitle('Geared Term');
-  await expect(page.locator('.titlebar-app')).toHaveText('Geared Term');
+  await expect(page.locator('.app-shell')).toHaveClass(/app-shell-minimal/u);
+  await expect(page.locator('.compact-menu-trigger')).toBeVisible();
 });
 
 test('keeps the renderer sandboxed behind a frozen preload allowlist', async () => {
@@ -272,8 +273,8 @@ test('renders and executes the virtual menu on non-macOS platforms', async () =>
   test.skip(process.platform === 'darwin', 'macOS uses the native application menu');
   const { page } = session;
   await expect(page.locator('.desktop-menu')).toBeVisible();
-  await page.locator('.desktop-menu-button').first().click();
-  await expect(page.locator('.desktop-menu-popover').first()).toBeVisible();
+  await page.locator('.compact-menu-trigger').click();
+  await expect(page.locator('.compact-menu-popover')).toBeVisible();
   await page.getByRole('menuitem', { name: 'New local terminal' }).click();
   await expect(page.locator('.terminal-tab')).toHaveCount(1);
 });

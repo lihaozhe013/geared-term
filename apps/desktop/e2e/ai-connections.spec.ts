@@ -1,7 +1,7 @@
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { expect, test } from '@playwright/test';
-import { launchApp, type AppSession } from './fixtures';
+import { launchApp, openSettingsWindow, type AppSession } from './fixtures';
 
 let session: AppSession;
 
@@ -32,11 +32,7 @@ test('searches and saves a discovered model beyond the first 256 results', async
 
   try {
     const address = server.address() as AddressInfo;
-    const { page, app } = session;
-    await page.getByRole('button', { name: 'Settings' }).click();
-    const settingsWindow = await app.waitForEvent('window');
-    await settingsWindow.waitForLoadState('domcontentloaded');
-    await settingsWindow.getByRole('button', { name: 'AI Connections' }).click();
+    const settingsWindow = await openSettingsWindow(session, 'AI Connections');
 
     const editor = settingsWindow.locator('.connection-editor');
     await editor

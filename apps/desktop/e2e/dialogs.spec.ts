@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { launchApp, type AppSession } from './fixtures';
+import { launchApp, openSettingsWindow, type AppSession } from './fixtures';
 
 let session: AppSession;
 
@@ -12,10 +12,7 @@ test.afterEach(async () => {
 });
 
 test('opens the settings window with category navigation', async () => {
-  const { page, app } = session;
-  await page.getByRole('button', { name: 'Settings' }).click();
-  const settingsWindow = await app.waitForEvent('window');
-  await settingsWindow.waitForLoadState('domcontentloaded');
+  const settingsWindow = await openSettingsWindow(session);
   await expect(settingsWindow.locator('.settings-nav')).toBeVisible();
   await expect(settingsWindow.getByRole('heading', { name: 'General' })).toBeVisible();
   await settingsWindow.getByRole('button', { name: 'Appearance' }).click();
@@ -30,11 +27,7 @@ test('opens the settings window with category navigation', async () => {
 });
 
 test('persists the automatic update check preference in About settings', async () => {
-  const { page, app } = session;
-  await page.getByRole('button', { name: 'Settings' }).click();
-  const settingsWindow = await app.waitForEvent('window');
-  await settingsWindow.waitForLoadState('domcontentloaded');
-  await settingsWindow.getByRole('button', { name: 'About' }).click();
+  const settingsWindow = await openSettingsWindow(session, 'About');
 
   const autoCheck = settingsWindow.getByRole('checkbox', {
     name: 'Automatically check for updates'
@@ -51,10 +44,7 @@ test('persists the automatic update check preference in About settings', async (
   await expect(autoCheck).not.toBeChecked();
 
   await settingsWindow.close();
-  await page.getByRole('button', { name: 'Settings' }).click();
-  const reopenedSettings = await app.waitForEvent('window');
-  await reopenedSettings.waitForLoadState('domcontentloaded');
-  await reopenedSettings.getByRole('button', { name: 'About' }).click();
+  const reopenedSettings = await openSettingsWindow(session, 'About');
   await expect(
     reopenedSettings.getByRole('checkbox', { name: 'Automatically check for updates' })
   ).not.toBeChecked();

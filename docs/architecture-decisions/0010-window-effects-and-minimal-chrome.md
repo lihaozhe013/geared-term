@@ -12,8 +12,8 @@ changes native resize and maximize behavior, and xterm must enable transparency 
 ## Decision
 
 - Persist `minimalMode`, `windowEffect`, and `windowBackgroundOpacityPercent` in the existing
-  version-1 settings record. Defaults are `false`, `solid`, and `85`; opacity is an integer from 60
-  through 100 in increments of 5. Zod defaults keep existing settings valid.
+  version-1 settings record. Defaults for new settings are `true`, `frosted`, and `75`; opacity is
+  an integer from 60 through 100 in increments of 5. Zod defaults keep existing settings valid.
 - Apply effects only to the main window. Auxiliary windows remain solid so settings are available to
   recover from a poor main-window appearance choice.
 - Create the main BrowserWindow with a transparent native surface only when its saved startup effect
@@ -34,7 +34,8 @@ changes native resize and maximize behavior, and xterm must enable transparency 
 
 ## Consequences
 
-- Existing installs stay solid and use the current standard layout until users opt in.
+- Existing installs keep their saved effect and layout; new settings start with minimal chrome and
+  frosted glass at 75% background opacity.
 - Selecting translucency/frosted glass from a solid-started window requires restarting the
   application. Opacity and transitions between translucent and supported frosted glass can apply
   live when the window started with transparency enabled.

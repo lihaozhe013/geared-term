@@ -198,11 +198,11 @@ When terminal focus is active, the following behavior is required:
   by the terminal (OSC 0/1/2) MUST NOT change the label and are surfaced as a tab hover tooltip. The
   window title MUST follow the active tab's label (`<label> — Geared Term`) and fall back to the
   application name when no tab is open.
-- **APP-028**: Minimal mode MUST be independently persisted and default to off. When enabled, the
-  standard title/menu chrome MUST be replaced by one compact top row containing an application-menu
-  button immediately before the tab strip, a draggable area, and the platform's window controls.
-  macOS MUST retain its native traffic lights and system application menu. Disabling minimal mode
-  MUST restore the standard chrome immediately.
+- **APP-028**: Minimal mode MUST be independently persisted and default to on for new settings. When
+  enabled, the standard title/menu chrome MUST be replaced by one compact top row containing an
+  application-menu button immediately before the tab strip, a draggable area, and the platform's
+  window controls. macOS MUST retain its native traffic lights and system application menu.
+  Disabling minimal mode MUST restore the standard chrome immediately.
 - **APP-029**: The minimal-mode application menu MUST expose the existing File, Edit, View, Window,
   and Help actions and MUST route actions through the existing allowlisted menu operation. It MUST
   provide keyboard and pointer access without sending menu navigation keys to the terminal.
@@ -640,8 +640,9 @@ not currently implemented is stated as such instead of being treated as complete
   integer between 0 and 32 logical pixels and MUST default to 14. Normal-buffer padding MUST apply
   only while the normal buffer is active; full-screen padding MUST apply while the alternate screen
   buffer is active.
-- **SET-005**: Built-in themes MUST include a dark default theme and the four Catppuccin variants.
-  UI, terminal, selection, cursor, search, and code highlighting colors MUST remain coordinated.
+- **SET-005**: Built-in themes MUST include Claude Dark as the default theme and the four Catppuccin
+  variants. UI, terminal, selection, cursor, search, and code highlighting colors MUST remain
+  coordinated.
 - **SET-006**: User theme JSON files MUST be loadable from a documented theme directory. A valid
   user theme MAY override a built-in theme of the same name. Invalid files MUST be isolated and
   reported without blocking startup.
@@ -657,11 +658,11 @@ not currently implemented is stated as such instead of being treated as complete
   setting and default to enabled. Settings, renderer menu, and native application menu MUST reflect
   the same stored value.
 - **SET-011**: `windowEffect` MUST be independently persisted with `solid`, `translucent`, and
-  `frosted` values, defaulting to `solid`. Effects MUST apply to the main window only; auxiliary
-  windows MUST remain opaque. Foreground text and controls MUST remain fully opaque. The background
-  opacity MUST be independently persisted as an integer percentage from 60 through 100 in steps of
-  5, defaulting to 85, and MUST affect renderer background surfaces only while translucency or
-  frosted glass is active.
+  `frosted` values, defaulting to `frosted` for new settings. Effects MUST apply to the main window
+  only; auxiliary windows MUST remain opaque. Foreground text and controls MUST remain fully opaque.
+  The background opacity MUST be independently persisted as an integer percentage from 60 through
+  100 in steps of 5, defaulting to 75, and MUST affect renderer background surfaces only while
+  translucency or frosted glass is active.
 - **SET-012**: Translucency MUST use a transparent native main-window surface and translucent
   renderer surfaces. Native backing changes between solid and transparent MUST require an
   application restart and MUST NOT restart terminal sessions. The requested setting MUST remain

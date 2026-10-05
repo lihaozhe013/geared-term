@@ -138,7 +138,7 @@ async function checkTransparentViewport(page: Page, expectWebgl: boolean): Promi
       return alpha === undefined ? 1 : Number(alpha);
     });
 
-  expect(await workspaceAlpha()).toBeCloseTo(0.85);
+  await expect.poll(workspaceAlpha).toBeCloseTo(0.75);
   const settings = await page.evaluate(async () => {
     const geared = (
       window as unknown as {
@@ -198,6 +198,13 @@ test('keeps the default terminal background transparent with the WebGL renderer'
 
 test('preserves the theme background when window translucency is disabled', async () => {
   session = await launchApp(DOM_RENDERER_ARGS);
+  const userDataDirectory = session.userDataDirectory;
+  await session.page.evaluate(async () => {
+    const settings = await window.geared.getSettings();
+    await window.geared.saveSettings({ ...settings, windowEffect: 'solid' });
+  });
+  await session.app.close();
+  session = await launchApp(DOM_RENDERER_ARGS, { userDataDirectory });
   await openLocalTab(session.app);
   const terminal = session.page.locator('.terminal-wrapper:not([hidden])');
   await expect(session.page.locator('.terminal-surface')).toHaveAttribute(
@@ -208,6 +215,6 @@ test('preserves the theme background when window translucency is disabled', asyn
   await expect(terminal.locator('.xterm-viewport')).toHaveCSS('background-color', 'rgb(0, 0, 0)');
   await expect(terminal.locator('.xterm-scrollable-element')).toHaveCSS(
     'background-color',
-    'rgb(30, 30, 46)'
+    'rgb(38, 38, 36)'
   );
 });

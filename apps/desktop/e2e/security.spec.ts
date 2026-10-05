@@ -31,5 +31,5 @@ test('denies window.open popups from the renderer', async () => {
     window.open('https://example.com/popup', '_blank', 'noopener')
   );
   expect(opened).toBeNull();
-  await expect(page.locator('.titlebar-app')).toHaveText('Geared Term');
+  await expect(page.locator('.compact-menu-trigger')).toBeVisible();
 });
