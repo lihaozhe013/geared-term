@@ -664,6 +664,10 @@ not currently implemented is stated as such instead of being treated as complete
   and Windows 11 build 22621 or newer). Unsupported platforms MUST identify the limitation and fall
   back to translucency. Linux MUST NOT claim native blur support without a compositor-specific,
   verified implementation.
+- **SET-014**: When window translucency or frosted glass is active, the xterm default viewport
+  background MUST remain transparent in both DOM and WebGL renderers. Explicit ANSI and true-color
+  cell backgrounds MUST retain their configured colors, and terminal foreground text MUST remain
+  fully opaque. Launch-time transparency capability MUST be resolved before `Terminal.open()`.
 
 The theme directory is `<userData>/themes/` (the working directory in development). Each `*.json`
 file there MUST contain a single user theme object with a `name` and a `colors` object holding

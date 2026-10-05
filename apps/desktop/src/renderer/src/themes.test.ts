@@ -176,6 +176,22 @@ describe('themes', () => {
     expect(theme.extendedAnsi).toEqual(['#fab387', '#f5e0dc']);
   });
 
+  it('makes only the default background transparent when window translucency is enabled', () => {
+    const mocha = builtinThemes['Catppuccin Mocha'];
+    expect(mocha).toBeDefined();
+    if (!mocha) return;
+
+    const opaque = buildXtermTheme(mocha);
+    const transparent = buildXtermTheme(mocha, true);
+
+    expect(opaque.background).toBe(mocha.background);
+    expect(transparent.background).toBe(`${mocha.background}00`);
+    expect(transparent.foreground).toBe(mocha.foreground);
+    expect(transparent.cursor).toBe(mocha.cursor);
+    expect(transparent.selectionBackground).toBe(mocha.selection);
+    expect(transparent.green).toBe(opaque.green);
+  });
+
   it('derives a full 16-color ANSI palette for themes without one', () => {
     const derived = derivePalette({
       background: '#101018',

@@ -507,7 +507,6 @@ export function TerminalPane({
     terminal.options.lineHeight = settings.terminalLineHeight;
     terminal.options.cursorStyle = settings.terminalCursor;
     terminal.options.fontFamily = fontFamilyFor(settings);
-    terminal.options.allowTransparency = allowTransparency;
     terminal.options.theme = buildXtermTheme(palette, allowTransparency);
     fitRef.current?.fit();
   }, [settings, palette, allowTransparency]);

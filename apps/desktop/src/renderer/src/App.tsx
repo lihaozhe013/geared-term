@@ -222,8 +222,9 @@ export function App(): React.JSX.Element {
   const [profiles, setProfiles] = useState<SessionProfileRecord[]>([]);
   const [profileGroups, setProfileGroups] = useState<string[]>([]);
   const [settings, setSettings] = useState<SettingsRecord>(defaultSettings);
-  const [windowEffectAtLaunch, setWindowEffectAtLaunch] =
-    useState<SettingsRecord['windowEffect']>('solid');
+  const [windowEffectAtLaunch, setWindowEffectAtLaunch] = useState<
+    SettingsRecord['windowEffect'] | null
+  >(null);
   const [alternateScreens, setAlternateScreens] = useState<Record<string, boolean>>({});
   const [userThemes, setUserThemes] = useState<UserTheme[]>([]);
   const [uiState, setUiState] = useState<UiStateRecord>(defaultUiState);
@@ -347,7 +348,11 @@ export function App(): React.JSX.Element {
     applyPalette(palette);
     applyTypography(settings.uiFontSize, settings.uiFontFamily, settings.uiScalePercent);
     applyTerminalLayout(settings.terminalPadding, settings.fullScreenTerminalPadding);
-    const activeEffect = effectiveWindowEffect(settings.windowEffect, windowEffectAtLaunch, info);
+    const activeEffect = effectiveWindowEffect(
+      settings.windowEffect,
+      windowEffectAtLaunch ?? 'solid',
+      info
+    );
     applyWindowSurface(activeEffect, settings.windowBackgroundOpacityPercent);
   }, [
     palette,
@@ -1022,40 +1027,42 @@ export function App(): React.JSX.Element {
             data-active-status={activeTab?.status ?? 'none'}
             data-alternate-screen={activeTab && alternateScreens[activeTab.id] ? 'true' : 'false'}
           >
-            {tabs.map((tab) => (
-              <TerminalPane
-                key={tab.id}
-                request={tab.request}
-                settings={settings}
-                allowTransparency={windowEffectAtLaunch !== 'solid'}
-                palette={palette}
-                active={tab.id === activeTab?.id}
-                failureCode={tab.failureCode}
-                onCloseTab={() => closeTab(tab.id)}
-                onState={(message) => handleState(tab.id, message)}
-                onHostKeyPrompt={handleHostKeyPrompt}
-                onAlternateScreen={(value) =>
-                  setAlternateScreens((current) => ({ ...current, [tab.id]: value }))
-                }
-                onTitleChange={(title) => applyTabTitle(tab.id, title)}
-                registerSftpControl={(control) => {
-                  if (control) {
-                    sftpControls.current.set(tab.id, control);
-                  } else {
-                    sftpControls.current.delete(tab.id);
-                  }
-                }}
-                registerSnapshotControl={(control) => {
-                  if (control) {
-                    snapshotControls.current.set(tab.id, control);
-                  } else {
-                    snapshotControls.current.delete(tab.id);
-                  }
-                }}
-                onAddToChat={handleAddToChat}
-                onError={setError}
-              />
-            ))}
+            {windowEffectAtLaunch === null
+              ? null
+              : tabs.map((tab) => (
+                  <TerminalPane
+                    key={tab.id}
+                    request={tab.request}
+                    settings={settings}
+                    allowTransparency={windowEffectAtLaunch !== 'solid'}
+                    palette={palette}
+                    active={tab.id === activeTab?.id}
+                    failureCode={tab.failureCode}
+                    onCloseTab={() => closeTab(tab.id)}
+                    onState={(message) => handleState(tab.id, message)}
+                    onHostKeyPrompt={handleHostKeyPrompt}
+                    onAlternateScreen={(value) =>
+                      setAlternateScreens((current) => ({ ...current, [tab.id]: value }))
+                    }
+                    onTitleChange={(title) => applyTabTitle(tab.id, title)}
+                    registerSftpControl={(control) => {
+                      if (control) {
+                        sftpControls.current.set(tab.id, control);
+                      } else {
+                        sftpControls.current.delete(tab.id);
+                      }
+                    }}
+                    registerSnapshotControl={(control) => {
+                      if (control) {
+                        snapshotControls.current.set(tab.id, control);
+                      } else {
+                        snapshotControls.current.delete(tab.id);
+                      }
+                    }}
+                    onAddToChat={handleAddToChat}
+                    onError={setError}
+                  />
+                ))}
             {tabs.length === 0 ? (
               <div className="empty-state terminal-empty">
                 <svg

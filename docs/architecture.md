@@ -261,9 +261,12 @@ the renderer's existing allowlisted menu actions; macOS keeps native traffic lig
 menu. The main process creates a transparent `BrowserWindow` only when the saved launch effect needs
 it, then selects macOS vibrancy or Windows acrylic when available. Renderer surface colors apply
 opacity without fading text. xterm enables its transparent background at startup to reveal the
-native surface. Changing between solid and transparent backing requires restart; the saved request
-is retained while live terminals continue unchanged. Auxiliary windows stay opaque. Linux reports
-frosted glass as unavailable and falls back to translucency.
+native surface, and the app overrides xterm's default black viewport background in translucent and
+frosted modes. Renderer terminals wait for launch-time window-effect metadata before opening so
+xterm's immutable transparency capability is correct on its first render. Changing between solid and
+transparent backing requires restart; the saved request is retained while live terminals continue
+unchanged. Auxiliary windows stay opaque. Linux reports frosted glass as unavailable and falls back
+to translucency.
 
 Renderer typography uses the persisted UI font settings and `uiScalePercent`. The interface scale is
 applied through CSS dimensions in the shared renderer stylesheet and scales resizable side-panel

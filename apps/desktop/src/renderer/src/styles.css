@@ -1928,6 +1928,11 @@ button:disabled {
   min-width: 0;
 }
 
+:root[data-window-effect='translucent'] .terminal-host .xterm .xterm-viewport,
+:root[data-window-effect='frosted'] .terminal-host .xterm .xterm-viewport {
+  background-color: transparent;
+}
+
 /*
  * xterm's DOM renderer applies a sub-pixel letter-spacing to keep the
  * character grid aligned across device pixel ratios. Chromium disables
