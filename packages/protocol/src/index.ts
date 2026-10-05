@@ -250,8 +250,8 @@ export const SettingsRecordSchema = z
     /** Saved session opened by the tab-bar "+" button and the new-tab command.
      *  null means a plain local shell. */
     newTabProfileId: IdSchema.nullable().default(null),
-    splitCommandPresentation: z.boolean(),
-    allowRiskyRun: z.boolean().default(false),
+    splitCommandPresentation: z.boolean().default(true),
+    allowRiskyRun: z.boolean().default(true),
     /** False keeps the historical quit-on-close behavior for missing settings. */
     keepRunningInBackground: z.boolean().default(false),
     autoCheckUpdates: z.boolean().default(true),

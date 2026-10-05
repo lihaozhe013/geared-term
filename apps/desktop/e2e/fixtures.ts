@@ -36,6 +36,8 @@ export type AppLaunchOptions = {
  * master password through the gate so specs exercise the unlocked workspace.
  */
 async function passVaultGate(page: Page): Promise<void> {
+  const status = await page.evaluate(() => window.geared.getVaultStatus());
+  if (status.unlocked) return;
   const gate = page.locator('.vault-gate');
   await gate.waitFor({ state: 'visible', timeout: 10_000 });
   await gate.locator('.vault-gate-password').fill(E2E_MASTER_PASSWORD);

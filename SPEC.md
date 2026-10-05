@@ -189,10 +189,10 @@ When terminal focus is active, the following behavior is required:
 - **APP-025**: Keyboard shortcuts for application commands MUST be rebindable from the Shortcuts
   settings category with per-command and global reset. Invalid combinations MUST be rejected and
   conflicting bindings MUST be reported to the user.
-- **APP-026**: On Windows and Linux, an opt-in background mode MUST keep the application running
-  with a tray icon offering show and quit actions when the main window is closed; a second launch
-  MUST re-show the hidden window. Background mode MUST default to off. macOS MUST NOT create a tray
-  icon and MUST keep standard Dock behavior.
+- **APP-026**: On Windows and Linux, background mode MUST keep the application running with a tray
+  icon offering show and quit actions when the main window is closed; a second launch MUST re-show
+  the hidden window. Background mode MUST default to on for new settings. macOS MUST NOT create a
+  tray icon and MUST keep standard Dock behavior.
 - **APP-027**: A terminal tab label MUST show the manual rename if present, otherwise the current
   name of the originating connection profile, otherwise the name the tab was opened with. Titles set
   by the terminal (OSC 0/1/2) MUST NOT change the label and are surfaced as a tab hover tooltip. The
@@ -270,8 +270,11 @@ When terminal focus is active, the following behavior is required:
   NOT silently terminate already-running sessions.
 - **VLT-007**: Changing the master password MUST re-encrypt all stored session and AI secrets in one
   recoverable transaction. Partial re-encryption MUST never become the active profile.
-- **VLT-008**: Password-free unlock MUST be opt-in, explain its device-local trust model, and store
-  its key-encryption key separately from the wrapped vault key.
+- **VLT-008**: Password-free unlock MUST be enabled after initial vault setup when verified
+  OS-protected storage is available, explain its device-local trust model before setup completes,
+  and store its key-encryption key separately from the wrapped vault key. The user MUST be able to
+  disable it, and a disabled choice MUST remain disabled. Existing vaults MUST retain their current
+  setting.
 - **VLT-009**: OS-protected storage SHOULD protect the auto-unlock material. If unavailable, a
   restrictive-permission local fallback MAY be offered only with an explicit warning.
 - **VLT-010**: Secret values MUST be redacted from structured errors, debug formatting, analytics,
@@ -621,8 +624,9 @@ not currently implemented is stated as such instead of being treated as complete
   first submission is pending.
 - **CMD-020**: Clearly destructive commands MUST receive stronger confirmation or be limited to
   Insert. Risk matching is a warning aid, not a security sandbox.
-- **CMD-021**: The optional split-command display setting MUST remain available and default to off.
-  Turning it on or off changes presentation only, not stored provider content or history.
+- **CMD-021**: The optional split-command display setting MUST remain available and default to on
+  for new settings. Turning it on or off changes presentation only, not stored provider content or
+  history.
 
 ## 18. Settings, appearance, and localization
 
@@ -675,6 +679,9 @@ not currently implemented is stated as such instead of being treated as complete
   background MUST remain transparent in both DOM and WebGL renderers. Explicit ANSI and true-color
   cell backgrounds MUST retain their configured colors, and terminal foreground text MUST remain
   fully opaque. Launch-time transparency capability MUST be resolved before `Terminal.open()`.
+- **SET-015**: New settings MUST default all three General checkboxes on: split-command
+  presentation, allowing Run on risky assistant commands, and keeping the application running after
+  its window is closed. Persisted user choices MUST remain unchanged.
 
 The theme directory is `<userData>/themes/` (the working directory in development). Each `*.json`
 file there MUST contain a single user theme object with a `name` and a `colors` object holding

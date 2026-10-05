@@ -83,6 +83,8 @@ const messages = {
     autoUnlock: 'Password-free unlock',
     autoUnlockHint:
       'Stores the vault key with OS-protected storage on this device. Anyone using this user account can unlock the vault without the master password.',
+    confirmDestructiveCommand:
+      'This command may delete or overwrite data. Do you want to run it in the selected terminal?',
     autoUnlockUnsupported: 'Password-free unlock is unavailable on this system.',
     autoUnlockChecking: 'Checking operating system key storage…',
     autoUnlockStatusError: 'Could not check operating system key storage.',
@@ -96,7 +98,7 @@ const messages = {
     vaultInitialized: 'Vault created.',
     gateSetupTitle: 'Set master password',
     gateSetupHint:
-      'The master password encrypts saved sessions and AI keys on this device. It cannot be recovered if forgotten.',
+      'The master password encrypts saved sessions and AI keys on this device. When OS-protected storage is available, later launches will unlock automatically for this user account. Anyone using this account can access saved secrets. You can turn this off in Security & Vault. The master password cannot be recovered if forgotten.',
     gateUnlockTitle: 'Unlock Geared Term',
     gateUnlockHint: 'Enter the master password to unlock the vault and continue.',
     gateCreate: 'Create and enter',
@@ -343,7 +345,8 @@ const messages = {
     shortcutTabPrevious: 'Previous tab',
     newTab: 'New tab',
     newTabOpens: 'What does + open',
-    newTabOpensHint: 'Choose default tab target for the tab bar "+" button and the new-tab command (Ctrl+T)',
+    newTabOpensHint:
+      'Choose default tab target for the tab bar "+" button and the new-tab command (Ctrl+T)',
     newTabTargetLocalShell: 'Local shell',
     shortcutTerminalZoomIn: 'Increase terminal font size',
     shortcutTerminalZoomOut: 'Decrease terminal font size',
@@ -643,6 +646,7 @@ const messages = {
     autoUnlock: '免密解锁',
     autoUnlockHint:
       '将保险库密钥保存在本设备的系统受保护存储中。使用该系统账户的任何人都可以在不输入主密码的情况下解锁保险库。',
+    confirmDestructiveCommand: '此命令可能删除或覆盖数据。确定要在当前终端中运行吗？',
     autoUnlockUnsupported: '当前系统不支持免密解锁。',
     autoUnlockChecking: '正在检查系统密钥存储…',
     autoUnlockStatusError: '无法检查系统密钥存储状态。',
@@ -653,7 +657,8 @@ const messages = {
     autoUnlockRetry: '重新检查',
     vaultInitialized: '保险库已创建。',
     gateSetupTitle: '设置主密码',
-    gateSetupHint: '主密码用于加密本机上保存的会话与 AI 密钥，遗忘后无法恢复。',
+    gateSetupHint:
+      '主密码用于加密本机上保存的会话与 AI 密钥。如果系统受保护存储可用，后续启动将默认通过当前系统账户免密解锁；任何能使用此账户的人都能访问已保存的密钥。可在“安全与保险库”中关闭免密解锁。主密码遗忘后无法恢复。',
     gateUnlockTitle: '解锁 Geared Term',
     gateUnlockHint: '输入主密码以解锁保险库并继续。',
     gateCreate: '创建并进入',

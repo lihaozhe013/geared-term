@@ -244,7 +244,8 @@ The vault uses Node's audited `crypto` primitives in the main process
 - master-password rotation rebuilds all secret rows in one database transaction with compensating
   rollback on failure.
 
-Password-free unlock requires a verified OS-backed `safeStorage` round-trip. Linux uses Electron's
+Password-free unlock is enabled automatically after new-vault setup only when a verified OS-backed
+`safeStorage` round-trip succeeds. Existing vaults keep their saved choice. Linux uses Electron's
 asynchronous key provider and accepts only OS-protected `v11`/`v12` tags for new encryption. Legacy
 `v10` material is readable only after the current provider passes that protected round-trip. Key
 storage, vault lifecycle, and retry semantics are recorded in
@@ -285,10 +286,10 @@ edges and do not affect the terminal column or panel-width persistence.
   validated against the current remote state and report `conflict` instead of overwriting blindly.
 - **Terminal snapshot editor** (`terminal-snapshot-window.ts`): the disposable viewport draft window
   specified by TERM-023; one window at a time, drafts are discarded on close.
-- **Tray and background mode** (`tray.ts`): on Windows and Linux an opt-in
-  (`keepRunningInBackground`) keeps the app alive with a tray icon offering Show/Quit when the main
-  window is closed; a second launch re-shows the hidden window. macOS has no tray icon and keeps
-  standard Dock behavior.
+- **Tray and background mode** (`tray.ts`): on Windows and Linux the default-enabled
+  (`keepRunningInBackground`) preference keeps the app alive with a tray icon offering Show/Quit
+  when the main window is closed; a second launch re-shows the hidden window. macOS has no tray icon
+  and keeps standard Dock behavior.
 - **Update UI**: the About section of the settings window drives `updates:get-status`,
   `updates:check`, `updates:install`, and `updates:open-release` and renders the shared
   `UpdateStatus` state machine (Section 8).

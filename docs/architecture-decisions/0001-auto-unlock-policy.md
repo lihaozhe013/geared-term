@@ -6,17 +6,20 @@
 
 ## Context
 
-Password-free unlock lets users start Geared Term without typing the master password. The
-requirement is opt-in, must explain its device-local trust model, and must store the key-encryption
-key (KEK) separately from the wrapped vault key. OS-protected storage is preferred; a local fallback
-may only be offered with an explicit warning.
+Password-free unlock lets users start Geared Term without typing the master password. New vaults
+enable it by default only after OS-protected storage passes a verification probe. The setup flow
+must explain the device-local trust model, and the key-encryption key (KEK) must be stored
+separately from the wrapped vault key. No local fallback is offered.
 
 ## Decision
 
-1. **Enablement.** Password-free unlock is off by default. While the vault is unlocked, the user can
-   enable it from the credential-vault box in the profile editor. The UI displays the trust model:
-   the vault key is protected by the OS account only, and anyone with access to that user profile
-   can read saved secrets.
+1. **Enablement.** After the user creates a new vault with a master password, the main process
+   automatically enables password-free unlock when its OS-storage probe succeeds. If storage is
+   unsupported or enrollment fails, vault creation still succeeds and the master-password path
+   remains available. The setup flow discloses that anyone with access to the OS user account can
+   use saved secrets. The user can disable password-free unlock in Security & Vault; a disabled
+   choice remains disabled. Existing vaults retain their current choice and are not enrolled during
+   upgrade.
 2. **Key material.** Enabling generates a random 32-byte KEK. The KEK is encrypted by Electron
    `safeStorage` and written to `vault-auto.key` (mode 0600). The vault key is wrapped with the KEK
    (AES-256-GCM, purpose-bound AAD `geared-term:v1:auto-unlock-wrap`) and written to
@@ -45,15 +48,17 @@ may only be offered with an explicit warning.
 
 ## Security review
 
-The change adds no preload methods or IPC channels. Linux key material uses Electron's asynchronous
-OS key providers, and encrypted output is checked for an OS-protected version tag before it is
-stored or decrypted. The explicit weak-backend rejection remains in place, and no key material or
-probe plaintext is sent to the renderer or diagnostics. The main process checks that the same
-unlocked vault generation is still active immediately before it writes the two existing mode-0600
-files.
+Default enrollment adds no preload methods or IPC channels and introduces no new secret-storage
+format. Linux key material uses Electron's asynchronous OS key providers, and encrypted output is
+checked for an OS-protected version tag before it is stored or decrypted. Weak backends remain
+rejected, and no key material or probe plaintext is sent to the renderer or diagnostics. The main
+process checks that the same unlocked vault generation is still active immediately before it writes
+the two existing mode-0600 files. If enrollment fails, it logs only a fixed failure code and leaves
+the password unlock path available.
 
 ## Consequences
 
 - A stolen `vault-auto.key` is useless off-device as long as the OS key service is intact.
+- Users of new vaults must disable password-free unlock if the operating system account is shared.
 - On systems without an OS key service, users keep the password path; no weak fallback exists.
 - `AppStorage` accepts a `SafeStorageAdapter` so the behavior is testable without Electron.

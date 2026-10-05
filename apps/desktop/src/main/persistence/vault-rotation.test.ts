@@ -118,7 +118,6 @@ describe('auto unlock', () => {
     await first.load();
     expect(await first.autoUnlockStatus()).toMatchObject({ supported: true, enabled: false });
     await first.initializeVault('master-password');
-    await first.enableAutoUnlock();
     expect((await first.autoUnlockStatus()).enabled).toBe(true);
     first.lockVault();
     expect((await first.autoUnlockStatus()).enabled).toBe(false);
@@ -158,7 +157,7 @@ describe('auto unlock', () => {
     const storage = new AppStorage(directory, testLogger(), adapter);
     await storage.load();
     await storage.initializeVault('old-password');
-    await storage.enableAutoUnlock();
+    expect((await storage.autoUnlockStatus()).enabled).toBe(true);
     await storage.rotateVault('old-password', 'new-password');
     expect((await storage.autoUnlockStatus()).enabled).toBe(true);
 
@@ -178,16 +177,20 @@ describe('auto unlock', () => {
     const waitingForEncryption = new Promise<void>((resolve) => {
       resumeEncryption = resolve;
     });
+    let shouldWaitForEncryption = false;
     const storage = new AppStorage(
       directory,
       testLogger(),
       fakeSafeStorage(false, async () => {
+        if (!shouldWaitForEncryption) return;
         signalStarted();
         await waitingForEncryption;
       })
     );
     await storage.load();
     await storage.initializeVault('master-password');
+    storage.disableAutoUnlock();
+    shouldWaitForEncryption = true;
 
     const enabling = storage.enableAutoUnlock();
     await started;

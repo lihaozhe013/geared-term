@@ -229,6 +229,14 @@ export class AppStorage {
     this.vault.initialize(password);
     this.vaultStateSnapshot = { ...this.vaultStateSnapshot, verifier: this.vault.createVerifier() };
     await this.vaultState.save(this.vaultStateSnapshot);
+    try {
+      await this.enableAutoUnlock();
+    } catch {
+      this.logger.warn('system', 'Password-free unlock was not enabled during vault setup', {
+        stage: 'setup',
+        failure: 'auto_unlock_enable_failed'
+      });
+    }
   }
 
   public async unlockVault(password: string): Promise<void> {

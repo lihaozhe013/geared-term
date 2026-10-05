@@ -62,6 +62,10 @@ test('rejects command actions whose revision is stale', async () => {
 test('rejects unsafe or destructive run actions', async () => {
   const { page } = session;
   await waitForRunning(page);
+  await page.evaluate(async () => {
+    const settings = await window.geared.getSettings();
+    await window.geared.saveSettings({ ...settings, allowRiskyRun: false });
+  });
   const sessionId = await activeSessionId(page);
   const payload = 'Remove-Item -Recurse -Force C:\\';
   await expect(
@@ -118,6 +122,10 @@ test('inserts commands into the terminal through the gated action', async () => 
 test('runs destructive commands once allowRiskyRun is enabled', async () => {
   const { page } = session;
   await waitForRunning(page);
+  await page.evaluate(async () => {
+    const settings = await window.geared.getSettings();
+    await window.geared.saveSettings({ ...settings, allowRiskyRun: false });
+  });
   const sessionId = await activeSessionId(page);
   const payload = 'echo geared-e2e-risky; rm -rf /tmp/opencode/geared-e2e-missing';
   const runDestructive = () =>

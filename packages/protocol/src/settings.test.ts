@@ -57,6 +57,21 @@ describe('SettingsRecordSchema automatic updates', () => {
   });
 });
 
+describe('SettingsRecordSchema project defaults', () => {
+  it('defaults presentation and general preferences for newly missing fields', () => {
+    const parsed = SettingsRecordSchema.parse(baseSettings);
+    expect(parsed.allowRiskyRun).toBe(true);
+    expect(parsed.minimalMode).toBe(true);
+    expect(parsed.windowEffect).toBe('frosted');
+    expect(parsed.windowBackgroundOpacityPercent).toBe(75);
+  });
+
+  it('defaults to Claude Dark when a saved record has no theme', () => {
+    const { theme: _theme, ...withoutTheme } = baseSettings;
+    expect(SettingsRecordSchema.parse(withoutTheme).theme).toBe('Claude Dark');
+  });
+});
+
 describe('SettingsRecordSchema terminal padding', () => {
   it('defaults to the shell inset for records saved before the field existed', () => {
     expect(SettingsRecordSchema.parse(baseSettings).terminalPadding).toBe(14);
@@ -130,9 +145,9 @@ describe('SettingsRecordSchema new tab profile ID', () => {
     expect(
       SettingsRecordSchema.parse({ ...baseSettings, newTabProfileId: 'profile-1' }).newTabProfileId
     ).toBe('profile-1');
-    expect(
-      SettingsRecordSchema.safeParse({ ...baseSettings, newTabProfileId: 42 }).success
-    ).toBe(false);
+    expect(SettingsRecordSchema.safeParse({ ...baseSettings, newTabProfileId: 42 }).success).toBe(
+      false
+    );
   });
 });
 

@@ -6,8 +6,16 @@ import { SettingsSchema, defaultSettings } from './schema';
 import { VersionedJsonStore } from './json-store';
 
 describe('versioned JSON store', () => {
-  it('keeps background sessions opt-in for fresh installs', () => {
-    expect(defaultSettings.keepRunningInBackground).toBe(false);
+  it('uses the project defaults for fresh settings', () => {
+    expect(defaultSettings).toMatchObject({
+      theme: 'Claude Dark',
+      splitCommandPresentation: true,
+      allowRiskyRun: true,
+      keepRunningInBackground: true,
+      minimalMode: true,
+      windowEffect: 'frosted',
+      windowBackgroundOpacityPercent: 75
+    });
   });
 
   it('writes validated data atomically and recovers the previous version', async () => {

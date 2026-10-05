@@ -87,7 +87,7 @@ test('keeps the process resident and restores the window when the app relaunches
   session = await launchApp(DOM_RENDERER_ARGS, { headless: false });
   const { app, page } = session;
 
-  // Fresh installs opt in to background mode explicitly.
+  // Fresh installs keep sessions alive in the background by default.
   const settings = await page.evaluate(() =>
     (
       window as unknown as {
@@ -95,8 +95,7 @@ test('keeps the process resident and restores the window when the app relaunches
       }
     ).geared.getSettings()
   );
-  expect(settings.keepRunningInBackground).toBe(false);
-  await setBackgroundMode(true);
+  expect(settings.keepRunningInBackground).toBe(true);
 
   await openLocalTab(app);
   await expect(page.locator('.terminal-surface')).toHaveAttribute('data-active-status', 'running', {
