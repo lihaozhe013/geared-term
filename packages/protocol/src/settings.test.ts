@@ -124,6 +124,18 @@ describe('SettingsRecordSchema interface scale', () => {
   });
 });
 
+describe('SettingsRecordSchema new tab profile ID', () => {
+  it('defaults to null and validates profile IDs', () => {
+    expect(SettingsRecordSchema.parse(baseSettings).newTabProfileId).toBeNull();
+    expect(
+      SettingsRecordSchema.parse({ ...baseSettings, newTabProfileId: 'profile-1' }).newTabProfileId
+    ).toBe('profile-1');
+    expect(
+      SettingsRecordSchema.safeParse({ ...baseSettings, newTabProfileId: 42 }).success
+    ).toBe(false);
+  });
+});
+
 describe('SettingsRecordSchema terminal context menu preference', () => {
   it('defaults to showing the terminal context menu and validates explicit values', () => {
     expect(SettingsRecordSchema.parse(baseSettings).showTerminalContextMenuOnRightClick).toBe(true);

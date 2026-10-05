@@ -35,6 +35,7 @@ import {
 } from './TerminalPane';
 import { TabBar } from './terminal/tab-bar';
 import { tabShortcutsFor } from './terminal/tab-context-menu';
+import { resolveNewTabTarget } from './terminal/new-tab';
 import { applyTerminalTabState, shouldAutoCloseTerminalTab } from './terminal/tab-state';
 import { filePanelMode } from './terminal/file-panel';
 import { formatChatInsert } from './terminal/extract';
@@ -76,6 +77,7 @@ const defaultSettings: SettingsRecord = {
   fullScreenTerminalPadding: 14,
   terminalCursor: 'bar',
   defaultTerm: 'xterm-256color',
+  newTabProfileId: null,
   splitCommandPresentation: true,
   allowRiskyRun: false,
   autoCheckUpdates: true,
@@ -477,6 +479,20 @@ export function App(): React.JSX.Element {
     },
     [t]
   );
+
+  const addNewTab = useCallback((): void => {
+    const target = resolveNewTabTarget(settings.newTabProfileId, profiles);
+    if (target.kind === 'local') {
+      const tab = createLocalTab(settings.defaultTerm, t('localShell'));
+      setTabs((current) => [...current, tab]);
+      setActiveTabId(tab.id);
+      setError(null);
+      return;
+    }
+    // Saved profile target — reuse the existing openProfile path so that
+    // credential gating and error handling stay consistent.
+    openProfile(target.profile);
+  }, [settings.defaultTerm, settings.newTabProfileId, profiles, openProfile, t]);
 
   const toggleSidebar = useCallback((): void => {
     const next = { ...uiState, sidebarCollapsed: !uiState.sidebarCollapsed };
@@ -934,9 +950,21 @@ export function App(): React.JSX.Element {
       onReorder={reorderTabs}
       onRename={renameTab}
       onDuplicate={duplicateTab}
-      onNewTab={addLocalTab}
+      onNewTab={addNewTab}
       onCloseOthers={closeOtherTabs}
       onCloseAll={closeAllTabs}
+      newTabProfileId={settings.newTabProfileId}
+      newTabProfiles={profiles}
+      onNewTabTarget={(target) => {
+        if (target.kind === 'local') {
+          const tab = createLocalTab(settings.defaultTerm, t('localShell'));
+          setTabs((current) => [...current, tab]);
+          setActiveTabId(tab.id);
+          setError(null);
+        } else {
+          openProfile(target.profile);
+        }
+      }}
     />
   );
 

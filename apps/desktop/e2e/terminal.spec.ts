@@ -140,6 +140,15 @@ test('closes the tab automatically when the shell exits', async () => {
   await waitForRunning(page);
 });
 
+test('clicks the tab bar + button to open a new local tab', async () => {
+  const { page } = session;
+  await newLocalTabViaMenu(session);
+  await waitForRunning(page);
+  await expect(terminalTabs(page)).toHaveCount(1);
+  await page.locator('.tab-new').click();
+  await expect(terminalTabs(page)).toHaveCount(2);
+});
+
 test('opens, switches, and closes terminal tabs in isolation', async () => {
   const { page } = session;
   await newLocalTabViaMenu(session);

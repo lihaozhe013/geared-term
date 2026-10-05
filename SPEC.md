@@ -208,6 +208,12 @@ When terminal focus is active, the following behavior is required:
   provide keyboard and pointer access without sending menu navigation keys to the terminal.
 - **APP-030**: Switching between standard and minimal chrome MUST preserve open tabs, terminal
   processes, terminal state, and active transfers.
+- **APP-031**: The tab bar MUST expose a clickable `+` button that creates a new terminal tab using
+  the user's configured `newTabProfileId` setting (`null` = a local shell, a saved profile ID = that
+  session). The button MUST also open a one-off picker on right-click listing the saved profiles and
+  the local-shell option. A missing saved profile MUST fall back to a local shell rather than fail.
+- **APP-032**: The new-tab keyboard command (`tab.new`, default `Ctrl/Cmd+T`) and the native menu
+  item `new-local` MUST honor `newTabProfileId`; they MUST NOT remain hard-coded to a local shell.
 
 ## 8. Sessions and profiles
 

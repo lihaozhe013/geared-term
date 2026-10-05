@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { CircleAlert } from 'lucide-react';
+import { CircleAlert, Plus } from 'lucide-react';
 import { ContextMenu } from '../sftp/context-menu';
 import { buildTabContextMenu, type TabMenuLabels, type TabMenuShortcuts } from './tab-context-menu';
+import { resolveNewTabTarget } from './new-tab';
+import type { SessionProfileRecord } from '@geared-term/protocol';
+import type { NewTabTarget } from './new-tab';
 
 export type TabEntry = {
   id: string;
@@ -23,6 +26,11 @@ type TabBarProps = {
   onNewTab: () => void;
   onCloseOthers: (id: string) => void;
   onCloseAll: () => void;
+  /** Saved session target (null = local shell). Used by the new-tab button's
+   *  right-click menu to offer one-off creation of a saved-session tab. */
+  newTabProfileId: string | null;
+  newTabProfiles: SessionProfileRecord[];
+  onNewTabTarget: (target: NewTabTarget) => void;
 };
 
 export function TabBar({
@@ -37,12 +45,16 @@ export function TabBar({
   onDuplicate,
   onNewTab,
   onCloseOthers,
-  onCloseAll
+  onCloseAll,
+  newTabProfileId,
+  newTabProfiles,
+  onNewTabTarget
 }: TabBarProps): React.JSX.Element {
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<{ id: string; after: boolean } | null>(null);
   const [renaming, setRenaming] = useState<{ id: string; value: string } | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; id: string } | null>(null);
+  const [newTabMenu, setNewTabMenu] = useState<{ x: number; y: number } | null>(null);
   const renameInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -91,6 +103,18 @@ export function TabBar({
         }
       })
     : [];
+
+  const newTabMenuItems = (
+    [
+      ['local', labels.newTab],
+      ...newTabProfiles.map((profile) => [profile.id, profile.name] as [string, string])
+    ] as const
+  ).map(([value, label], index) => ({
+    id: `new-tab-target-${value}`,
+    label,
+    separatorBefore: index === 0,
+    run: () => onNewTabTarget(resolveNewTabTarget(value === 'local' ? null : value, newTabProfiles))
+  }));
 
   return (
     <div className="tab-bar" role="tablist" aria-label="Terminal tabs">
@@ -184,6 +208,27 @@ export function TabBar({
       })}
       {menu ? (
         <ContextMenu x={menu.x} y={menu.y} items={menuItems} onClose={() => setMenu(null)} />
+      ) : null}
+      <button
+        type="button"
+        className="tab-new"
+        aria-label={labels.newTab}
+        title={labels.newTab}
+        onClick={() => onNewTab()}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          setNewTabMenu({ x: event.clientX, y: event.clientY });
+        }}
+      >
+        <Plus size={14} aria-hidden="true" />
+      </button>
+      {newTabMenu ? (
+        <ContextMenu
+          x={newTabMenu.x}
+          y={newTabMenu.y}
+          items={newTabMenuItems}
+          onClose={() => setNewTabMenu(null)}
+        />
       ) : null}
     </div>
   );

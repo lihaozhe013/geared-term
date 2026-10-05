@@ -1668,6 +1668,24 @@ button:disabled {
   min-width: 0;
 }
 
+.tab-new {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: calc(26px * var(--gt-ui-scale, 1));
+  height: calc(26px * var(--gt-ui-scale, 1));
+  border-radius: var(--gt-radius-md);
+  border: 1px solid var(--gt-border);
+  color: var(--gt-text-dim);
+  background: var(--gt-panel-alt);
+  cursor: pointer;
+}
+.tab-new:hover {
+  background: var(--gt-hover);
+  color: var(--gt-text);
+}
+
 .tab-bar {
   display: flex;
   min-width: 0;

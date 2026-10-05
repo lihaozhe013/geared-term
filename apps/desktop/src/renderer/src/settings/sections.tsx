@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { groupThemeNames, normalizeTerminalFontFallbacks } from '@geared-term/protocol';
 import type {
   AppInfo,
@@ -459,10 +459,15 @@ export function TerminalSection({
   onSave: (patch: Partial<SettingsRecord>) => Promise<void>;
   t: Translate;
 }): React.JSX.Element {
+  const [profiles, setProfiles] = useState<import('@geared-term/protocol').SessionProfileRecord[]>([]);
   const [draft, setDraft] = useState({
     defaultTerm: settings.defaultTerm,
-    terminalCursor: settings.terminalCursor
+    terminalCursor: settings.terminalCursor,
+    newTabProfileId: settings.newTabProfileId
   });
+  useEffect(() => {
+    void window.geared.listProfiles().then(setProfiles);
+  }, []);
   const [status, setStatus] = useState<string | null>(null);
   const update = (patch: Partial<typeof draft>): void => {
     setDraft((current) => ({ ...current, ...patch }));
@@ -482,6 +487,23 @@ export function TerminalSection({
         />
         <span>{t('terminalContextMenuOnRightClick')}</span>
       </label>
+      <Row label={t('newTabOpens')} hint={t('newTabOpensHint')}>
+        <select
+          className="settings-select"
+          value={draft.newTabProfileId ?? ''}
+          onChange={(event) => {
+            const value = event.target.value || null;
+            update({ newTabProfileId: value as string | null });
+          }}
+        >
+          <option value="">{t('newTabTargetLocalShell')}</option>
+          {profiles.map((p) => (
+            <option value={p.id} key={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+      </Row>
       <Row label={t('defaultTerm')}>
         <select
           className="settings-select"

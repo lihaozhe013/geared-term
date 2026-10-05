@@ -247,6 +247,9 @@ export const SettingsRecordSchema = z
     fullScreenTerminalPadding: z.number().int().min(0).max(32).default(14),
     terminalCursor: z.enum(['block', 'underline', 'bar']),
     defaultTerm: z.enum(['xterm-256color', 'xterm', 'vt520', 'linux', 'screen']),
+    /** Saved session opened by the tab-bar "+" button and the new-tab command.
+     *  null means a plain local shell. */
+    newTabProfileId: IdSchema.nullable().default(null),
     splitCommandPresentation: z.boolean(),
     allowRiskyRun: z.boolean().default(false),
     /** False keeps the historical quit-on-close behavior for missing settings. */
