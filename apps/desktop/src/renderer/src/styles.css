@@ -302,6 +302,10 @@ svg.lucide {
   flex: 0 0 auto;
 }
 
+.minimal-settings-button {
+  align-self: center;
+}
+
 .app-shell-minimal .update-notice-card {
   top: calc(36px * var(--gt-ui-scale, 1) + 12px);
 }
