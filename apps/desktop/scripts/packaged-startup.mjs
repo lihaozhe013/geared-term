@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, lstatSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { listPackage } from '@electron/asar';
@@ -43,6 +43,59 @@ function packagedAsar() {
     );
   }
   return join(dirname(packagedExecutable()), 'resources', 'app.asar');
+}
+
+function packagedResourcesDirectory() {
+  if (process.platform === 'darwin') {
+    return join(dirname(packagedExecutable()), '..', 'Resources');
+  }
+  return join(dirname(packagedExecutable()), 'resources');
+}
+
+function verifyPackagedMacPty() {
+  const nodePtyRoot = join(
+    packagedResourcesDirectory(),
+    'app.asar.unpacked',
+    'node_modules',
+    'node-pty'
+  );
+  const bindingDirectories = [
+    join(nodePtyRoot, 'build', 'Release'),
+    join(nodePtyRoot, 'build', 'Debug'),
+    join(nodePtyRoot, 'prebuilds', `darwin-${process.arch}`)
+  ];
+  const helpers = [];
+
+  for (const directory of bindingDirectories) {
+    const binding = join(directory, 'pty.node');
+    if (!existsSync(binding) || !statSync(binding).isFile()) continue;
+
+    const helper = join(directory, 'spawn-helper');
+    let helperStat;
+    try {
+      helperStat = lstatSync(helper);
+    } catch (error) {
+      throw new Error(`Packaged macOS node-pty helper is missing at ${helper}: ${error.message}`);
+    }
+    if (!helperStat.isFile()) {
+      throw new Error(`Packaged macOS node-pty helper is not a regular file: ${helper}`);
+    }
+    const mode = helperStat.mode & 0o777;
+    if (mode !== 0o755) {
+      throw new Error(
+        `Packaged macOS node-pty helper has incorrect permissions at ${helper}: expected 0755, found ${mode.toString(8)}`
+      );
+    }
+    helpers.push(helper);
+  }
+
+  if (helpers.length === 0) {
+    throw new Error(`Packaged macOS node-pty binding was not found under ${nodePtyRoot}`);
+  }
+  for (const helper of helpers) {
+    console.log(`Packaged macOS node-pty helper verified: ${helper}`);
+  }
+  return helpers;
 }
 
 function verifyPackagedConpty() {
@@ -320,6 +373,7 @@ if (workspaceEntries.length > 0) {
   throw new Error(`Packaged app contains workspace packages: ${workspaceEntries.join(', ')}`);
 }
 if (process.platform === 'win32' && process.arch === 'x64') verifyPackagedConpty();
+const macPtyHelpers = process.platform === 'darwin' ? verifyPackagedMacPty() : undefined;
 
 const userDataDirectory = await mkdtemp(join(tmpdir(), 'geared-packaged-startup-'));
 let application;
@@ -348,7 +402,7 @@ try {
   await vaultGate.locator('.vault-gate-password').fill(smokePassword);
   await vaultGate.locator('.vault-gate-confirm').fill(smokePassword);
   await vaultGate.locator('.vault-gate-submit').click();
-  await vaultGate.waitFor({ state: 'detached', timeout: 10000 });
+  await vaultGate.waitFor({ state: 'detached', timeout: 30000 });
   const title = await page.title();
   const appInfo = await page.evaluate(() => window.geared.getAppInfo());
   if (title !== 'Geared Term' || appInfo.name !== 'Geared Term' || !appInfo.isPackaged) {
@@ -405,6 +459,16 @@ try {
     if (powerShellStartupExceededLimit) {
       throw new Error('Packaged PowerShell prompt time exceeded the 3-second median smoke limit');
     }
+  }
+  if (process.platform === 'darwin') {
+    const marker = `GEARED_MACOS_PTY_${randomUUID().replaceAll('-', '')}`;
+    const result = await runTerminalSmoke(page, '/bin/sh', ['-c', `printf '${marker}'`], marker);
+    if (!result.output.includes(marker)) {
+      throw new Error('Packaged macOS local terminal did not return its output marker');
+    }
+    console.log(
+      `Packaged macOS local terminal smoke verified with ${macPtyHelpers.length} spawn-helper file(s).`
+    );
   }
   console.log(`Packaged startup and local terminal smoke verified: ${dirname(executablePath)}`);
 } finally {

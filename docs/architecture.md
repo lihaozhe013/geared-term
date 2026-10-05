@@ -122,6 +122,13 @@ Other platforms and Windows ARM64 continue to use the existing PTY backend. A lo
 retires the session before the renderer closes its port, so that renderer cleanup cannot kill an
 already exited process.
 
+macOS local PTY startup requires the executable `spawn-helper` shipped beside each usable `node-pty`
+binding. The install and native preparation script restores mode `0755` before development and
+builds. It replaces a hard-linked helper with a package-local copy before changing permissions, so
+the pnpm dependency store remains untouched. The macOS `afterPack` hook validates each target-arch
+helper before signing, and packaged startup smoke verifies its path and permissions and launches a
+shell through the application terminal bridge.
+
 ## 4. Session state machine
 
 All backends share this state model:

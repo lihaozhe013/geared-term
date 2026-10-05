@@ -1,3 +1,1 @@
-const { stageDevelopment } = require('./conpty-assets.cjs');
-
-stageDevelopment();
+require('./prepare-native.cjs');

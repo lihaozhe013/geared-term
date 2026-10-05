@@ -2,6 +2,7 @@ const { spawnSync } = require('node:child_process');
 const { join } = require('node:path');
 const { Arch } = require('electron-builder');
 const { stagePackaged } = require('./conpty-assets.cjs');
+const { preparePackaged } = require('./node-pty-assets.cjs');
 
 function signingAuthorities(appPath) {
   const result = spawnSync('/usr/bin/codesign', ['-dvvv', appPath], { encoding: 'utf8' });
@@ -34,5 +35,16 @@ module.exports = async (context) => {
     return;
   }
   if (context.electronPlatformName !== 'darwin') return;
-  await signMacAppAdHoc(join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`));
+  const appPath = join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`);
+  const nodePtyRoot = join(
+    appPath,
+    'Contents',
+    'Resources',
+    'app.asar.unpacked',
+    'node_modules',
+    'node-pty'
+  );
+  const architecture = Arch[context.arch];
+  preparePackaged({ nodePtyRoot, platform: 'darwin', arch: architecture });
+  await signMacAppAdHoc(appPath);
 };
