@@ -1,0 +1,40 @@
+:root[data-window-effect='translucent'],
+:root[data-window-effect='frosted'] {
+  background-color: transparent;
+  --gt-window-surface: color-mix(
+    in srgb,
+    var(--gt-background, #0d1117) var(--gt-window-opacity),
+    transparent
+  );
+  --gt-window-panel: color-mix(
+    in srgb,
+    var(--gt-panel, #111822) var(--gt-window-opacity),
+    transparent
+  );
+  --gt-window-divider: color-mix(
+    in srgb,
+    var(--gt-border, #2a3140) var(--gt-window-opacity),
+    transparent
+  );
+}
+
+:root[data-window-effect='translucent'] .workspace,
+:root[data-window-effect='frosted'] .workspace,
+:root[data-window-effect='translucent'] .workspace > .terminal-card,
+:root[data-window-effect='frosted'] .workspace > .terminal-card {
+  background: transparent;
+}
+
+:root[data-window-effect='translucent'] .terminal-surface,
+:root[data-window-effect='frosted'] .terminal-surface {
+  background: var(--gt-window-panel, var(--gt-background, #0d1117));
+}
+
+:root[data-window-effect='translucent'] .assistant-panel,
+:root[data-window-effect='frosted'] .assistant-panel,
+:root[data-window-effect='translucent'] .sftp-panel,
+:root[data-window-effect='frosted'] .sftp-panel,
+:root[data-window-effect='translucent'] .environment-panel,
+:root[data-window-effect='frosted'] .environment-panel {
+  background: transparent;
+}

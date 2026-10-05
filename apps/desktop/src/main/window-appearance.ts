@@ -4,12 +4,19 @@ import type { SettingsRecord } from '@geared-term/protocol';
 export type WindowEffect = SettingsRecord['windowEffect'];
 
 export function windowAppearanceOptions(
-  effect: WindowEffect
-): Pick<BrowserWindowConstructorOptions, 'transparent' | 'backgroundColor'> {
+  effect: WindowEffect,
+  platform: NodeJS.Platform = process.platform
+): Pick<
+  BrowserWindowConstructorOptions,
+  'transparent' | 'backgroundColor' | 'vibrancy' | 'visualEffectState'
+> {
   const transparent = effect !== 'solid';
   return {
     transparent,
-    backgroundColor: transparent ? '#00000000' : '#111318'
+    backgroundColor: transparent ? '#00000000' : '#111318',
+    ...(platform === 'darwin' && effect === 'frosted'
+      ? { vibrancy: 'under-window', visualEffectState: 'followWindow' }
+      : {})
   };
 }
 

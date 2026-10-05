@@ -379,7 +379,8 @@ function createWindow(): BrowserWindow {
   const bounds = restoredBounds();
   const settings = storage.settingsSnapshot();
   mainWindowEffectAtLaunch = settings.windowEffect;
-  const appearanceOptions = windowAppearanceOptions(settings.windowEffect);
+  const systemVersion = getSystemRelease();
+  const appearanceOptions = windowAppearanceOptions(settings.windowEffect, process.platform);
   const window = new BrowserWindow({
     width: bounds?.width ?? 1280,
     height: bounds?.height ?? 800,
@@ -401,12 +402,23 @@ function createWindow(): BrowserWindow {
     window,
     settings.windowEffect,
     process.platform,
-    getSystemRelease()
+    systemVersion
   );
-  logger.info('appearance', 'Main window appearance selected', {
+  logger.info('appearance', 'Main window appearance configured', {
     requested: settings.windowEffect,
     effective: effectiveEffect,
-    frostedGlassSupported: isFrostedGlassSupported(process.platform, getSystemRelease())
+    nativeMaterial:
+      effectiveEffect === 'frosted' && process.platform === 'darwin'
+        ? 'under-window vibrancy'
+        : effectiveEffect === 'frosted' && process.platform === 'win32'
+          ? 'acrylic'
+          : 'none',
+    platform: process.platform,
+    systemVersion,
+    electronVersion: process.versions.electron,
+    transparentBacking: appearanceOptions.transparent,
+    backgroundOpacityPercent: settings.windowBackgroundOpacityPercent,
+    frostedGlassSupported: isFrostedGlassSupported(process.platform, systemVersion)
   });
   hideNativeMenuBar(window);
   forwardWindowControlState(window);
@@ -675,7 +687,12 @@ function registerIpc(): void {
         );
         logger.info('appearance', 'Main window appearance updated', {
           requested: saved.windowEffect,
-          effective
+          effective,
+          platform: process.platform,
+          systemVersion: getSystemRelease(),
+          electronVersion: process.versions.electron,
+          transparentBacking: mainWindowEffectAtLaunch !== 'solid',
+          backgroundOpacityPercent: saved.windowBackgroundOpacityPercent
         });
       }
       if (process.platform === 'darwin') {

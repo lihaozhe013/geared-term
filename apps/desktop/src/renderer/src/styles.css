@@ -37,26 +37,6 @@
   text-rendering: optimizeLegibility;
 }
 
-:root[data-window-effect='translucent'],
-:root[data-window-effect='frosted'] {
-  background-color: transparent;
-  --gt-window-surface: color-mix(
-    in srgb,
-    var(--gt-background, #0d1117) var(--gt-window-opacity),
-    transparent
-  );
-  --gt-window-panel: color-mix(
-    in srgb,
-    var(--gt-panel, #111822) var(--gt-window-opacity),
-    transparent
-  );
-  --gt-window-divider: color-mix(
-    in srgb,
-    var(--gt-border, #2a3140) var(--gt-window-opacity),
-    transparent
-  );
-}
-
 * {
   box-sizing: border-box;
 }

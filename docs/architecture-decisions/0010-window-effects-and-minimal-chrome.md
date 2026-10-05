@@ -21,7 +21,8 @@ changes native resize and maximize behavior, and xterm must enable transparency 
   `allowTransparency` capability. Preserve the requested setting, report that restart is required,
   and do not recreate terminal sessions.
 - Apply opacity to renderer surface tints, never to the whole native window, so foreground text and
-  controls retain full contrast. Keep theme colors opaque in storage.
+  controls retain full contrast. Give each visible workspace region one tinted background owner;
+  nested layout containers and panels remain transparent. Keep theme colors opaque in storage.
 - Use Electron vibrancy on macOS and the native acrylic material on Windows 11 22H2 or newer. Use
   ordinary window translucency on supported compositor sessions. Electron has no general Linux
   backdrop-blur API; Linux reports frosted glass as unavailable and falls back to translucency.
@@ -44,6 +45,9 @@ changes native resize and maximize behavior, and xterm must enable transparency 
 - Linux frosted glass remains unavailable without a verified compositor-specific implementation.
 - Renderer surface changes must be inspected over real desktop content; screenshots in an opaque or
   headless BrowserWindow cannot establish native translucency.
+- Renderer tests composite the main workspace over a solid test background at multiple opacity
+  values to catch nested tint accumulation. Native frosted appearance remains unverified until macOS
+  desktop screenshots cover both window focus states and normal, maximized, and fullscreen layouts.
 
 ## Security review
 
@@ -57,8 +61,12 @@ already owned by the main process.
 
 - `pnpm typecheck` and `pnpm build` pass for the implementation.
 - Main-process construction sets launch-time backing and native material using platform capability
-  checks. Existing settings IPC remains the only settings write path; no preload operation was
-  added.
+  checks, and macOS launch vibrancy follows the system window focus state. Existing settings IPC
+  remains the only settings write path; no preload operation was added.
+- Playwright `window-effects.spec.ts` composites the side panel, terminal, and top bar over a fixed
+  color in standard and minimal mode at 60%, 75%, and 100%; main-process unit tests verify macOS
+  material and focus-state configuration.
 - Cross-platform packaged visual smoke checks remain open for resize, maximize/restore, fullscreen,
-  and native material behavior. Linux translucency also needs verification on named compositor
-  sessions. Unsupported Linux blur is reported and falls back to translucency.
+  native material behavior, and macOS Reduce Transparency state. Linux translucency also needs
+  verification on named compositor sessions. Unsupported Linux blur is reported and falls back to
+  translucency.
