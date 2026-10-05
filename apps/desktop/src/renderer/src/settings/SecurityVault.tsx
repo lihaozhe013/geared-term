@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AutoUnlockStatus, VaultStatus } from '@geared-term/protocol';
 import { Lock, Unlock } from 'lucide-react';
 import { Row, Section } from './primitives';
@@ -14,6 +14,25 @@ export function SecurityVaultSection({ t }: { t: Translate }): React.JSX.Element
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [autoUnlockChecking, setAutoUnlockChecking] = useState(false);
+  const [autoUnlockCheckError, setAutoUnlockCheckError] = useState<string | null>(null);
+  const autoUnlockRequest = useRef(0);
+
+  const refreshAutoUnlock = useCallback(async (): Promise<void> => {
+    const request = ++autoUnlockRequest.current;
+    setAutoUnlockChecking(true);
+    setAutoUnlockCheckError(null);
+    try {
+      const next = await window.geared.getAutoUnlockStatus();
+      if (request === autoUnlockRequest.current) setAutoUnlock(next);
+    } catch (reason) {
+      if (request === autoUnlockRequest.current) {
+        setAutoUnlockCheckError(reason instanceof Error ? reason.message : t('errVaultStatus'));
+      }
+    } finally {
+      if (request === autoUnlockRequest.current) setAutoUnlockChecking(false);
+    }
+  }, [t]);
 
   useEffect(() => {
     void window.geared
@@ -22,12 +41,18 @@ export function SecurityVaultSection({ t }: { t: Translate }): React.JSX.Element
       .catch((reason: unknown) =>
         setError(reason instanceof Error ? reason.message : t('errVaultStatus'))
       );
-    void window.geared
-      .getAutoUnlockStatus()
-      .then(setAutoUnlock)
-      .catch(() => undefined);
-    return window.geared.onVaultChanged(setVault);
-  }, []);
+    void refreshAutoUnlock();
+    const unsubscribeVault = window.geared.onVaultChanged((next) => {
+      setVault(next);
+      void refreshAutoUnlock();
+    });
+    window.addEventListener('focus', refreshAutoUnlock);
+    return () => {
+      autoUnlockRequest.current += 1;
+      window.removeEventListener('focus', refreshAutoUnlock);
+      unsubscribeVault();
+    };
+  }, [refreshAutoUnlock]);
 
   const run = async (action: () => Promise<VaultStatus>): Promise<void> => {
     setBusy(true);
@@ -173,10 +198,11 @@ export function SecurityVaultSection({ t }: { t: Translate }): React.JSX.Element
             <input
               type="checkbox"
               checked={Boolean(autoUnlock?.enabled)}
-              disabled={!autoUnlock?.supported || busy}
+              disabled={busy || (!autoUnlock?.supported && !autoUnlock?.enabled)}
               onChange={(event) => {
                 const next = event.target.checked;
                 setBusy(true);
+                setError(null);
                 const action = next
                   ? window.geared.enableAutoUnlock()
                   : window.geared.disableAutoUnlock();
@@ -185,14 +211,39 @@ export function SecurityVaultSection({ t }: { t: Translate }): React.JSX.Element
                   .catch((reason: unknown) =>
                     setError(reason instanceof Error ? reason.message : t('errVaultOperation'))
                   )
-                  .finally(() => setBusy(false));
+                  .finally(() => {
+                    setBusy(false);
+                    void refreshAutoUnlock();
+                  });
               }}
             />
             <span>{t('autoUnlock')}</span>
           </label>
-          <p className="settings-hint">
-            {autoUnlock && !autoUnlock.supported ? t('autoUnlockUnsupported') : t('autoUnlockHint')}
+          <p className="settings-hint" role="status">
+            {autoUnlockChecking && !autoUnlock
+              ? t('autoUnlockChecking')
+              : autoUnlockCheckError
+                ? t('autoUnlockStatusError')
+                : autoUnlock?.reasonCode === 'service_unavailable'
+                  ? t('autoUnlockServiceUnavailable')
+                  : autoUnlock?.reasonCode === 'insecure_storage'
+                    ? t('autoUnlockInsecureStorage')
+                    : autoUnlock?.reasonCode === 'verification_failed'
+                      ? t('autoUnlockVerificationFailed')
+                      : autoUnlock && !autoUnlock.supported
+                        ? (autoUnlock.reason ?? t('autoUnlockUnsupported'))
+                        : t('autoUnlockHint')}
           </p>
+          {autoUnlockCheckError || (autoUnlock && !autoUnlock.supported) ? (
+            <button
+              type="button"
+              className="secondary-button settings-apply"
+              disabled={autoUnlockChecking || busy}
+              onClick={() => void refreshAutoUnlock()}
+            >
+              {autoUnlockChecking ? t('autoUnlockChecking') : t('autoUnlockRetry')}
+            </button>
+          ) : null}
         </>
       ) : null}
 

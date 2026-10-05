@@ -111,6 +111,7 @@ import { LocalTerminalManager } from './local-terminal';
 import { resolveTerminalLigatureSequences } from './ligatures';
 import { commandRevision, parseCommandBlock } from '@geared-term/command-parser';
 import { AppStorage } from './persistence/app-storage';
+import { createSafeStorageAdapter } from './vault/safe-storage-adapter';
 import { loadUserThemes } from './persistence/user-themes';
 import {
   listLocalDirectory,
@@ -599,16 +600,16 @@ function registerIpc(): void {
     sendToRenderer('vault:changed', VaultStatusSchema.parse(status));
     return status;
   });
-  ipcMain.handle('vault:auto-unlock-status', () =>
-    AutoUnlockStatusSchema.parse(storage.autoUnlockStatus())
+  ipcMain.handle('vault:auto-unlock-status', async () =>
+    AutoUnlockStatusSchema.parse(await storage.autoUnlockStatus())
   );
-  ipcMain.handle('vault:enable-auto-unlock', () => {
-    storage.enableAutoUnlock();
-    return AutoUnlockStatusSchema.parse(storage.autoUnlockStatus());
+  ipcMain.handle('vault:enable-auto-unlock', async () => {
+    await storage.enableAutoUnlock();
+    return AutoUnlockStatusSchema.parse(await storage.autoUnlockStatus());
   });
-  ipcMain.handle('vault:disable-auto-unlock', () => {
+  ipcMain.handle('vault:disable-auto-unlock', async () => {
     storage.disableAutoUnlock();
-    return AutoUnlockStatusSchema.parse(storage.autoUnlockStatus());
+    return AutoUnlockStatusSchema.parse(await storage.autoUnlockStatus());
   });
 
   ipcMain.handle('profile:list', () =>
@@ -1329,13 +1330,11 @@ if (hasSingleInstanceLock) {
       ? join(process.cwd(), 'debug-logs')
       : join(app.getPath('userData'), 'logs');
     logger = createLogger(logDirectory);
-    storage = new AppStorage(app.getPath('userData'), logger, {
-      isEncryptionAvailable: () => safeStorage.isEncryptionAvailable(),
-      encryptString: (plaintext) => safeStorage.encryptString(plaintext),
-      decryptString: (encrypted) => safeStorage.decryptString(encrypted),
-      selectedStorageBackend: () =>
-        process.platform === 'linux' ? safeStorage.getSelectedStorageBackend() : undefined
-    });
+    storage = new AppStorage(
+      app.getPath('userData'),
+      logger,
+      createSafeStorageAdapter(safeStorage)
+    );
     await storage.load();
     environmentManager = new EnvironmentManager(storage, logger, (record) =>
       sendToRenderer('environment:updated', EnvironmentRecordSchema.parse(record))

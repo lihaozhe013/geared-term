@@ -244,8 +244,11 @@ The vault uses Node's audited `crypto` primitives in the main process
 - master-password rotation rebuilds all secret rows in one database transaction with compensating
   rollback on failure.
 
-Password-free unlock requires real OS-backed `safeStorage`; the rejected fallbacks and lock
-semantics are recorded in [ADR 0001](architecture-decisions/0001-auto-unlock-policy.md).
+Password-free unlock requires a verified OS-backed `safeStorage` round-trip. Linux uses Electron's
+asynchronous key provider and accepts only OS-protected `v11`/`v12` tags for new encryption. Legacy
+`v10` material is readable only after the current provider passes that protected round-trip. Key
+storage, vault lifecycle, and retry semantics are recorded in
+[ADR 0001](architecture-decisions/0001-auto-unlock-policy.md).
 
 ## 7. Auxiliary windows and background mode
 

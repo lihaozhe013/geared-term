@@ -77,9 +77,15 @@ export const VaultRotateRequestSchema = z
   .object({ oldPassword: z.string().min(1).max(1024), newPassword: z.string().min(1).max(1024) })
   .strict();
 export const VaultStatusSchema = z.object({ initialized: z.boolean(), unlocked: z.boolean() });
+export const AutoUnlockReasonCodeSchema = z.enum([
+  'service_unavailable',
+  'insecure_storage',
+  'verification_failed'
+]);
 export const AutoUnlockStatusSchema = z.object({
   supported: z.boolean(),
   reason: z.string().max(512).optional(),
+  reasonCode: AutoUnlockReasonCodeSchema.optional(),
   enabled: z.boolean()
 });
 

@@ -3,14 +3,19 @@ import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 export type SafeStorageAdapter = {
-  isEncryptionAvailable(): boolean;
-  encryptString(plaintext: string): Buffer;
-  decryptString(encrypted: Buffer): string;
-  /** Linux only: name of the selected backend, when the platform exposes it. */
-  selectedStorageBackend?(): string | null | undefined;
+  support(): Promise<AutoUnlockSupport>;
+  encryptString(plaintext: string): Promise<Buffer>;
+  decryptString(encrypted: Buffer): Promise<string>;
 };
 
-export type AutoUnlockSupport = { supported: boolean; reason?: string };
+export type AutoUnlockReasonCode =
+  'service_unavailable' | 'insecure_storage' | 'verification_failed';
+
+export type AutoUnlockSupport = {
+  supported: boolean;
+  reason?: string;
+  reasonCode?: AutoUnlockReasonCode;
+};
 
 export type AutoUnlockState = AutoUnlockSupport & { enabled: boolean };
 
@@ -40,56 +45,60 @@ export class AutoUnlockStore {
     return join(this.rootDirectory, 'vault-auto.json');
   }
 
-  public support(): AutoUnlockSupport {
+  public async support(): Promise<AutoUnlockSupport> {
     if (!this.safeStorage) {
       return { supported: false, reason: 'OS-protected storage is unavailable in this build' };
     }
     try {
-      if (!this.safeStorage.isEncryptionAvailable()) {
-        return { supported: false, reason: 'OS-protected storage is unavailable' };
-      }
+      return await this.safeStorage.support();
     } catch {
-      return { supported: false, reason: 'OS-protected storage is unavailable' };
+      return {
+        supported: false,
+        reasonCode: 'service_unavailable',
+        reason:
+          'OS-protected storage is unavailable. Check that the system key service is unlocked.'
+      };
     }
-    if (process.platform === 'linux') {
-      const backend = this.safeStorage.selectedStorageBackend?.();
-      // The basic_text backend obfuscates at best and defeats the device-local
-      // trust model; password-free unlock stays off rather than degrade it.
-      if (backend === 'basic_text') {
-        return {
-          supported: false,
-          reason: 'No OS key service is available; password-free unlock is disabled'
-        };
-      }
-    }
-    return { supported: true };
   }
 
   public isEnabled(): boolean {
     return existsSync(this.keyPath) && existsSync(this.wrappedPath);
   }
 
-  public status(): AutoUnlockState {
-    return { ...this.support(), enabled: this.isEnabled() };
+  public async status(): Promise<AutoUnlockState> {
+    return { ...(await this.support()), enabled: this.isEnabled() };
   }
 
-  public enable(vaultKey: Buffer): void {
-    const support = this.support();
+  public async enable(getVaultKey: () => Buffer, isStillValid: () => boolean): Promise<void> {
+    const support = await this.support();
     if (!support.supported) {
       throw new Error(support.reason ?? 'Password-free unlock is not supported here');
     }
     const storage = this.safeStorage;
     if (!storage) throw new Error('Password-free unlock is not supported here');
     const kek = randomBytes(keyLength);
-    const wrapped = this.wrap(vaultKey, kek);
+    let materialWriteStarted = false;
     try {
-      writeFileSync(this.keyPath, storage.encryptString(kek.toString('base64')), { mode: 0o600 });
+      const encryptedKek = await storage.encryptString(kek.toString('base64'));
+      if (!isStillValid())
+        throw new Error('Vault was locked or changed before auto-unlock finished');
+      const vaultKey = getVaultKey();
+      let wrapped: WrappedKey;
+      try {
+        wrapped = this.wrap(vaultKey, kek);
+      } finally {
+        vaultKey.fill(0);
+      }
+      if (!isStillValid())
+        throw new Error('Vault was locked or changed before auto-unlock finished');
+      materialWriteStarted = true;
+      writeFileSync(this.keyPath, encryptedKek, { mode: 0o600 });
       writeFileSync(this.wrappedPath, `${JSON.stringify(wrapped, null, 2)}\n`, {
         encoding: 'utf8',
         mode: 0o600
       });
     } catch (error) {
-      this.removeFiles();
+      if (materialWriteStarted) this.removeFiles();
       throw error;
     } finally {
       kek.fill(0);
@@ -101,12 +110,12 @@ export class AutoUnlockStore {
   }
 
   /** Returns the recovered vault key, or undefined when unavailable or corrupt. */
-  public loadVaultKey(): Buffer | undefined {
+  public async loadVaultKey(): Promise<Buffer | undefined> {
     if (!this.isEnabled()) return undefined;
     const storage = this.safeStorage;
     if (!storage) return undefined;
     try {
-      const kek = Buffer.from(storage.decryptString(readFileSync(this.keyPath)), 'base64');
+      const kek = Buffer.from(await storage.decryptString(readFileSync(this.keyPath)), 'base64');
       try {
         return this.unwrap(readFileSync(this.wrappedPath, 'utf8'), kek);
       } finally {

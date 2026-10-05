@@ -20,7 +20,11 @@ import {
 } from '@geared-term/protocol';
 import type { Logger } from '../logging';
 import { createVaultMetadata, Vault, type VaultMetadata } from '../vault/vault';
-import { AutoUnlockStore, type SafeStorageAdapter } from '../vault/auto-unlock';
+import {
+  AutoUnlockStore,
+  type AutoUnlockReasonCode,
+  type SafeStorageAdapter
+} from '../vault/auto-unlock';
 import { normalizeEndpoint } from '../ai/endpoint';
 import { ProfileDatabase, newSecretId } from './profile-database';
 import { VersionedJsonStore } from './json-store';
@@ -58,6 +62,7 @@ export class AppStorage {
   private readonly autoUnlock: AutoUnlockStore;
   /** Set when the user locks the vault; blocks auto-unlock for this process (VLT-006). */
   private autoUnlockSuppressed = false;
+  private vaultGeneration = 0;
 
   public constructor(rootDirectory: string, logger: Logger, safeStorage?: SafeStorageAdapter) {
     this.rootDirectory = rootDirectory;
@@ -118,15 +123,21 @@ export class AppStorage {
 
   private async tryAutoUnlock(): Promise<void> {
     if (this.autoUnlockSuppressed || this.vault.isUnlocked || !this.autoUnlock.isEnabled()) return;
-    const key = this.autoUnlock.loadVaultKey();
-    if (!key) {
-      this.logger.warn('system', 'Auto-unlock material was unreadable; password required', {});
-      return;
-    }
+    let key: Buffer | undefined;
     try {
+      key = await this.autoUnlock.loadVaultKey();
+      if (!key) {
+        this.logger.warn('system', 'Auto-unlock material was unreadable; password required', {});
+        return;
+      }
       this.vault.applyKey(key);
-    } catch (error) {
-      this.logger.warn('system', 'Auto-unlock failed', { error: String(error) });
+    } catch {
+      this.logger.warn('system', 'Auto-unlock failed', {
+        stage: 'restore',
+        failure: 'key_restore_failed'
+      });
+    } finally {
+      key?.fill(0);
     }
   }
 
@@ -228,23 +239,48 @@ export class AppStorage {
   }
 
   public lockVault(): void {
+    this.vaultGeneration += 1;
     this.vault.lock();
     this.autoUnlockSuppressed = true;
   }
 
-  public autoUnlockStatus(): { supported: boolean; reason?: string; enabled: boolean } {
-    const state = this.autoUnlock.status();
+  public async autoUnlockStatus(): Promise<{
+    supported: boolean;
+    reason?: string;
+    reasonCode?: AutoUnlockReasonCode;
+    enabled: boolean;
+  }> {
+    const state = await this.autoUnlock.status();
     return {
       supported: state.supported,
       reason: state.reason,
+      reasonCode: state.reasonCode,
       enabled: state.enabled && !this.autoUnlockSuppressed
     };
   }
 
-  public enableAutoUnlock(): void {
+  public async enableAutoUnlock(): Promise<void> {
     if (!this.vault.isUnlocked) throw new Error('Vault is locked');
-    this.autoUnlock.enable(this.vault.exportKey());
+    const expectedVault = this.vault;
+    const expectedGeneration = this.vaultGeneration;
+    await this.autoUnlock.enable(
+      () => {
+        if (!this.isVaultGenerationCurrent(expectedVault, expectedGeneration)) {
+          throw new Error('Vault was locked or changed before auto-unlock finished');
+        }
+        return expectedVault.exportKey();
+      },
+      () => this.isVaultGenerationCurrent(expectedVault, expectedGeneration)
+    );
     this.autoUnlockSuppressed = false;
+  }
+
+  private isVaultGenerationCurrent(expectedVault: Vault, expectedGeneration: number): boolean {
+    return (
+      this.vault === expectedVault &&
+      this.vaultGeneration === expectedGeneration &&
+      expectedVault.isUnlocked
+    );
   }
 
   public disableAutoUnlock(): void {
@@ -298,14 +334,26 @@ export class AppStorage {
       throw error;
     }
     this.vaultStateSnapshot = nextState;
+    this.vaultGeneration += 1;
     this.vault = nextVault;
     if (this.autoUnlock.isEnabled()) {
       try {
-        this.autoUnlock.enable(this.vault.exportKey());
-      } catch (error) {
+        const expectedGeneration = this.vaultGeneration;
+        await this.autoUnlock.enable(
+          () => {
+            if (!this.isVaultGenerationCurrent(nextVault, expectedGeneration)) {
+              throw new Error('Vault was locked or changed before auto-unlock finished');
+            }
+            return nextVault.exportKey();
+          },
+          () => this.isVaultGenerationCurrent(nextVault, expectedGeneration)
+        );
+        this.autoUnlockSuppressed = false;
+      } catch {
         this.autoUnlock.disable();
         this.logger.warn('system', 'Auto-unlock was disabled during password rotation', {
-          error: String(error)
+          stage: 'password_rotation',
+          failure: 'key_rewrap_failed'
         });
       }
     }

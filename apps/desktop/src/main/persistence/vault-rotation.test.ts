@@ -17,11 +17,24 @@ function testLogger(): Logger {
   } as unknown as Logger;
 }
 
-function fakeSafeStorage(shouldFail = false): SafeStorageAdapter {
+function fakeSafeStorage(
+  shouldFail = false,
+  waitForEncrypt?: () => Promise<void>
+): SafeStorageAdapter {
   return {
-    isEncryptionAvailable: () => !shouldFail,
-    encryptString: (plaintext) => Buffer.from(`enc:${plaintext}`, 'utf8'),
-    decryptString: (encrypted) => {
+    support: async () =>
+      shouldFail
+        ? {
+            supported: false,
+            reasonCode: 'service_unavailable',
+            reason: 'OS-protected storage is unavailable'
+          }
+        : { supported: true },
+    encryptString: async (plaintext) => {
+      await waitForEncrypt?.();
+      return Buffer.from(`enc:${plaintext}`, 'utf8');
+    },
+    decryptString: async (encrypted) => {
       const text = encrypted.toString('utf8');
       if (!text.startsWith('enc:')) throw new Error('not encrypted');
       return text.slice(4);
@@ -103,12 +116,12 @@ describe('auto unlock', () => {
     const adapter = fakeSafeStorage();
     const first = new AppStorage(directory, testLogger(), adapter);
     await first.load();
-    expect(first.autoUnlockStatus()).toMatchObject({ supported: true, enabled: false });
+    expect(await first.autoUnlockStatus()).toMatchObject({ supported: true, enabled: false });
     await first.initializeVault('master-password');
-    first.enableAutoUnlock();
-    expect(first.autoUnlockStatus().enabled).toBe(true);
+    await first.enableAutoUnlock();
+    expect((await first.autoUnlockStatus()).enabled).toBe(true);
     first.lockVault();
-    expect(first.autoUnlockStatus().enabled).toBe(false);
+    expect((await first.autoUnlockStatus()).enabled).toBe(false);
 
     const second = new AppStorage(directory, testLogger(), adapter);
     await second.load();
@@ -117,7 +130,7 @@ describe('auto unlock', () => {
     expect(second.readSecret(ref)).toBe('post-restart');
 
     second.disableAutoUnlock();
-    expect(second.autoUnlockStatus().enabled).toBe(false);
+    expect((await second.autoUnlockStatus()).enabled).toBe(false);
     expect(existsSync(join(directory, 'vault-auto.key'))).toBe(false);
 
     const third = new AppStorage(directory, testLogger(), adapter);
@@ -130,8 +143,12 @@ describe('auto unlock', () => {
     const storage = new AppStorage(directory, testLogger(), fakeSafeStorage(true));
     await storage.load();
     await storage.initializeVault('master-password');
-    expect(storage.autoUnlockStatus()).toMatchObject({ supported: false, enabled: false });
-    expect(() => storage.enableAutoUnlock()).toThrow(/OS-protected storage is unavailable/);
+    expect(await storage.autoUnlockStatus()).toMatchObject({
+      supported: false,
+      enabled: false,
+      reasonCode: 'service_unavailable'
+    });
+    await expect(storage.enableAutoUnlock()).rejects.toThrow(/OS-protected storage is unavailable/);
     expect(existsSync(join(directory, 'vault-auto.key'))).toBe(false);
   });
 
@@ -141,13 +158,44 @@ describe('auto unlock', () => {
     const storage = new AppStorage(directory, testLogger(), adapter);
     await storage.load();
     await storage.initializeVault('old-password');
-    storage.enableAutoUnlock();
+    await storage.enableAutoUnlock();
     await storage.rotateVault('old-password', 'new-password');
-    expect(storage.autoUnlockStatus().enabled).toBe(true);
+    expect((await storage.autoUnlockStatus()).enabled).toBe(true);
 
     const restarted = new AppStorage(directory, testLogger(), adapter);
     await restarted.load();
     expect(restarted.vaultStatus().unlocked).toBe(true);
     void readFile;
+  });
+
+  it('does not write auto-unlock material if the vault is locked during key service initialization', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'geared-term-auto-lock-race-'));
+    let signalStarted!: () => void;
+    let resumeEncryption!: () => void;
+    const started = new Promise<void>((resolve) => {
+      signalStarted = resolve;
+    });
+    const waitingForEncryption = new Promise<void>((resolve) => {
+      resumeEncryption = resolve;
+    });
+    const storage = new AppStorage(
+      directory,
+      testLogger(),
+      fakeSafeStorage(false, async () => {
+        signalStarted();
+        await waitingForEncryption;
+      })
+    );
+    await storage.load();
+    await storage.initializeVault('master-password');
+
+    const enabling = storage.enableAutoUnlock();
+    await started;
+    storage.lockVault();
+    resumeEncryption();
+
+    await expect(enabling).rejects.toThrow(/Vault was locked or changed/u);
+    expect(existsSync(join(directory, 'vault-auto.key'))).toBe(false);
+    expect(existsSync(join(directory, 'vault-auto.json'))).toBe(false);
   });
 });

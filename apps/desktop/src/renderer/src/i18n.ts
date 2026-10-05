@@ -84,6 +84,15 @@ const messages = {
     autoUnlockHint:
       'Stores the vault key with OS-protected storage on this device. Anyone using this user account can unlock the vault without the master password.',
     autoUnlockUnsupported: 'Password-free unlock is unavailable on this system.',
+    autoUnlockChecking: 'Checking operating system key storage…',
+    autoUnlockStatusError: 'Could not check operating system key storage.',
+    autoUnlockServiceUnavailable:
+      'OS-protected storage is unavailable. Check that your system keychain or keyring is unlocked, then retry. You may need to restart Geared Term.',
+    autoUnlockInsecureStorage:
+      'The selected storage backend does not protect data with the operating system.',
+    autoUnlockVerificationFailed:
+      'Encrypted data could not be verified with the operating system key service.',
+    autoUnlockRetry: 'Check again',
     vaultInitialized: 'Vault created.',
     gateSetupTitle: 'Set master password',
     gateSetupHint:
@@ -631,6 +640,13 @@ const messages = {
     autoUnlockHint:
       '将保险库密钥保存在本设备的系统受保护存储中。使用该系统账户的任何人都可以在不输入主密码的情况下解锁保险库。',
     autoUnlockUnsupported: '当前系统不支持免密解锁。',
+    autoUnlockChecking: '正在检查系统密钥存储…',
+    autoUnlockStatusError: '无法检查系统密钥存储状态。',
+    autoUnlockServiceUnavailable:
+      '系统密钥存储暂不可用。请检查钥匙串或密钥环是否已解锁后重试，必要时重启 Geared Term。',
+    autoUnlockInsecureStorage: '所选存储后端无法通过操作系统保护数据。',
+    autoUnlockVerificationFailed: '无法使用系统密钥服务验证加密数据。',
+    autoUnlockRetry: '重新检查',
     vaultInitialized: '保险库已创建。',
     gateSetupTitle: '设置主密码',
     gateSetupHint: '主密码用于加密本机上保存的会话与 AI 密钥，遗忘后无法恢复。',
