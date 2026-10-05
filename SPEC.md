@@ -196,6 +196,16 @@ When terminal focus is active, the following behavior is required:
   by the terminal (OSC 0/1/2) MUST NOT change the label and are surfaced as a tab hover tooltip. The
   window title MUST follow the active tab's label (`<label> — Geared Term`) and fall back to the
   application name when no tab is open.
+- **APP-028**: Minimal mode MUST be independently persisted and default to off. When enabled, the
+  standard title/menu chrome MUST be replaced by one compact top row containing an application-menu
+  button immediately before the tab strip, a draggable area, and the platform's window controls.
+  macOS MUST retain its native traffic lights and system application menu. Disabling minimal mode
+  MUST restore the standard chrome immediately.
+- **APP-029**: The minimal-mode application menu MUST expose the existing File, Edit, View, Window,
+  and Help actions and MUST route actions through the existing allowlisted menu operation. It MUST
+  provide keyboard and pointer access without sending menu navigation keys to the terminal.
+- **APP-030**: Switching between standard and minimal chrome MUST preserve open tabs, terminal
+  processes, terminal state, and active transfers.
 
 ## 8. Sessions and profiles
 
@@ -638,6 +648,20 @@ not currently implemented is stated as such instead of being treated as complete
 - **SET-010**: The terminal context menu on right-click MUST be independently persisted as a boolean
   setting and default to enabled. Settings, renderer menu, and native application menu MUST reflect
   the same stored value.
+- **SET-011**: `windowEffect` MUST be independently persisted with `solid`, `translucent`, and
+  `frosted` values, defaulting to `solid`. Effects MUST apply to the main window only; auxiliary
+  windows MUST remain opaque. Foreground text and controls MUST remain fully opaque. The background
+  opacity MUST be independently persisted as an integer percentage from 60 through 100 in steps of
+  5, defaulting to 85, and MUST affect renderer background surfaces only while translucency or
+  frosted glass is active.
+- **SET-012**: Translucency MUST use a transparent native main-window surface and translucent
+  renderer surfaces. Native backing changes between solid and transparent MUST require an
+  application restart and MUST NOT restart terminal sessions. The requested setting MUST remain
+  saved while the current run continues using its launch-time backing.
+- **SET-013**: Frosted glass MUST use a native material only on supported platforms (macOS vibrancy
+  and Windows 11 build 22621 or newer). Unsupported platforms MUST identify the limitation and fall
+  back to translucency. Linux MUST NOT claim native blur support without a compositor-specific,
+  verified implementation.
 
 The theme directory is `<userData>/themes/` (the working directory in development). Each `*.json`
 file there MUST contain a single user theme object with a `name` and a `colors` object holding

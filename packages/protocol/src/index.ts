@@ -31,6 +31,8 @@ export const AppInfoSchema = z.object({
   version: z.string().min(1),
   isPackaged: z.boolean(),
   platform: z.enum(['win32', 'darwin', 'linux', 'freebsd', 'openbsd', 'sunos', 'aix']),
+  systemVersion: z.string().max(128).default(''),
+  mainWindowEffectAtLaunch: z.enum(['solid', 'translucent', 'frosted']).default('solid'),
   installChannel: InstallChannelSchema.default('manual')
 });
 
@@ -249,6 +251,9 @@ export const SettingsRecordSchema = z
     uiFontFamily: z.string().max(256).default(''),
     uiFontSize: z.number().min(10).max(24).default(13),
     uiScalePercent: z.number().int().min(75).max(150).multipleOf(5).default(100),
+    minimalMode: z.boolean().default(false),
+    windowEffect: z.enum(['solid', 'translucent', 'frosted']).default('solid'),
+    windowBackgroundOpacityPercent: z.number().int().min(60).max(100).multipleOf(5).default(85),
     showTerminalContextMenuOnRightClick: z.boolean().default(true),
     terminalFontFamily: z.string().min(1).max(256).default('Cascadia Code'),
     terminalFontLigatures: z.boolean().default(false),

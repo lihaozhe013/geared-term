@@ -53,8 +53,10 @@ import {
 import { LocalFilesPanel } from './LocalFilesPanel';
 import { VaultGate } from './VaultGate';
 import { WindowTitleBar } from './WindowTitleBar';
+import { MinimalWindowChrome } from './MinimalWindowChrome';
 import { UpdateNoticeCard } from './UpdateNoticeCard';
 import { useUpdateNotice } from './useUpdateNotice';
+import { applyWindowSurface, effectiveWindowEffect } from './appearance/window-effect';
 
 type TerminalRequest = LocalTerminalRequest | SshTerminalRequest | SshProfileTerminalRequest;
 type TabStatus = 'starting' | 'awaiting-user' | 'running' | 'exited' | 'failed' | 'closed';
@@ -89,6 +91,9 @@ const defaultSettings: SettingsRecord = {
   uiFontFamily: '',
   uiFontSize: 13,
   uiScalePercent: 100,
+  minimalMode: false,
+  windowEffect: 'solid',
+  windowBackgroundOpacityPercent: 85,
   showTerminalContextMenuOnRightClick: true,
   terminalFontFamily: 'Cascadia Code',
   terminalFontLigatures: true,
@@ -223,6 +228,8 @@ export function App(): React.JSX.Element {
   const [profiles, setProfiles] = useState<SessionProfileRecord[]>([]);
   const [profileGroups, setProfileGroups] = useState<string[]>([]);
   const [settings, setSettings] = useState<SettingsRecord>(defaultSettings);
+  const [windowEffectAtLaunch, setWindowEffectAtLaunch] =
+    useState<SettingsRecord['windowEffect']>('solid');
   const [alternateScreens, setAlternateScreens] = useState<Record<string, boolean>>({});
   const [userThemes, setUserThemes] = useState<UserTheme[]>([]);
   const [uiState, setUiState] = useState<UiStateRecord>(defaultUiState);
@@ -272,6 +279,7 @@ export function App(): React.JSX.Element {
         setProfileGroups(savedGroups);
         setUiState(savedUiState);
         setSettings(savedSettings);
+        setWindowEffectAtLaunch(appInfo.mainWindowEffectAtLaunch);
       })
       .catch((reason: unknown) =>
         setError(
@@ -345,13 +353,19 @@ export function App(): React.JSX.Element {
     applyPalette(palette);
     applyTypography(settings.uiFontSize, settings.uiFontFamily, settings.uiScalePercent);
     applyTerminalLayout(settings.terminalPadding, settings.fullScreenTerminalPadding);
+    const activeEffect = effectiveWindowEffect(settings.windowEffect, windowEffectAtLaunch, info);
+    applyWindowSurface(activeEffect, settings.windowBackgroundOpacityPercent);
   }, [
     palette,
     settings.uiFontFamily,
     settings.uiFontSize,
     settings.uiScalePercent,
     settings.terminalPadding,
-    settings.fullScreenTerminalPadding
+    settings.fullScreenTerminalPadding,
+    settings.windowEffect,
+    settings.windowBackgroundOpacityPercent,
+    windowEffectAtLaunch,
+    info
   ]);
 
   const discoverWsl = useCallback(async (): Promise<void> => {
@@ -827,6 +841,12 @@ export function App(): React.JSX.Element {
           .catch(() => undefined);
         return;
       }
+      if (command === 'toggle-minimal-mode') {
+        void handlers
+          .saveSettings({ ...handlers.settings, minimalMode: !handlers.settings.minimalMode })
+          .catch(() => undefined);
+        return;
+      }
       if (command.startsWith('theme:')) {
         const name = command.slice(6);
         void handlers.saveSettings({ ...handlers.settings, theme: name }).catch(() => undefined);
@@ -882,25 +902,67 @@ export function App(): React.JSX.Element {
   const interfaceScale = settings.uiScalePercent / 100;
 
   const activeLabel = activeTab ? tabDisplayLabel(activeTab, profiles) : undefined;
+  const tabBar = (
+    <TabBar
+      tabs={tabs.map((tab) => ({
+        id: tab.id,
+        label: tabDisplayLabel(tab, profiles),
+        tooltip: tab.dynamicTitle?.trim() || undefined,
+        failureLabel: tab.failureCode ? t('sshFailureTab') : undefined
+      }))}
+      activeTabId={activeTabId}
+      labels={{
+        rename: t('tabRename'),
+        duplicate: t('tabDuplicate'),
+        newTab: t('shortcutTabNew'),
+        close: t('shortcutTabClose'),
+        closeOthers: t('tabCloseOthers'),
+        closeAll: t('tabCloseAll')
+      }}
+      shortcuts={tabMenuShortcuts}
+      onActivate={setActiveTabId}
+      onClose={closeTab}
+      onReorder={reorderTabs}
+      onRename={renameTab}
+      onDuplicate={duplicateTab}
+      onNewTab={addLocalTab}
+      onCloseOthers={closeOtherTabs}
+      onCloseAll={closeAllTabs}
+    />
+  );
 
   useEffect(() => {
     document.title = activeLabel ? `${activeLabel} — Geared Term` : 'Geared Term';
   }, [activeLabel]);
 
   return (
-    <main className="app-shell">
-      <WindowTitleBar
-        title="Geared Term"
-        sessionLabel={activeLabel}
-        platform={info?.platform}
-        language={settings.language}
-        theme={settings.theme}
-        themeNames={themeNames}
-        isDevelopment={!info?.isPackaged}
-        onOpenSettings={() => void window.geared.openSettings()}
-        keybindings={settings.keybindings}
-        showTerminalContextMenuOnRightClick={settings.showTerminalContextMenuOnRightClick}
-      />
+    <main className={`app-shell${settings.minimalMode ? ' app-shell-minimal' : ''}`}>
+      {!settings.minimalMode ? (
+        <WindowTitleBar
+          title="Geared Term"
+          sessionLabel={activeLabel}
+          platform={info?.platform}
+          language={settings.language}
+          theme={settings.theme}
+          themeNames={themeNames}
+          isDevelopment={!info?.isPackaged}
+          onOpenSettings={() => void window.geared.openSettings()}
+          keybindings={settings.keybindings}
+          showTerminalContextMenuOnRightClick={settings.showTerminalContextMenuOnRightClick}
+        />
+      ) : (
+        <MinimalWindowChrome
+          platform={info?.platform ?? window.geared.platform}
+          language={settings.language}
+          theme={settings.theme}
+          themeNames={themeNames}
+          isDevelopment={!info?.isPackaged}
+          showTerminalContextMenuOnRightClick={settings.showTerminalContextMenuOnRightClick}
+          minimalMode={settings.minimalMode}
+          keybindings={settings.keybindings}
+          tabs={tabBar}
+        />
+      )}
 
       {settings.autoCheckUpdates && updateNotice ? (
         <UpdateNoticeCard
@@ -961,33 +1023,9 @@ export function App(): React.JSX.Element {
         )}
 
         <section className="terminal-card" aria-label="Terminal workspace">
-          <TabBar
-            tabs={tabs.map((tab) => ({
-              id: tab.id,
-              label: tabDisplayLabel(tab, profiles),
-              tooltip: tab.dynamicTitle?.trim() || undefined,
-              failureLabel: tab.failureCode ? t('sshFailureTab') : undefined
-            }))}
-            activeTabId={activeTabId}
-            labels={{
-              rename: t('tabRename'),
-              duplicate: t('tabDuplicate'),
-              newTab: t('shortcutTabNew'),
-              close: t('shortcutTabClose'),
-              closeOthers: t('tabCloseOthers'),
-              closeAll: t('tabCloseAll')
-            }}
-            shortcuts={tabMenuShortcuts}
-            onActivate={setActiveTabId}
-            onClose={closeTab}
-            onReorder={reorderTabs}
-            onRename={renameTab}
-            onDuplicate={duplicateTab}
-            onNewTab={addLocalTab}
-            onCloseOthers={closeOtherTabs}
-            onCloseAll={closeAllTabs}
-          />
+          {!settings.minimalMode ? tabBar : null}
           <div
+            key="terminal-surface"
             className="terminal-surface"
             data-active-status={activeTab?.status ?? 'none'}
             data-alternate-screen={activeTab && alternateScreens[activeTab.id] ? 'true' : 'false'}
@@ -997,6 +1035,7 @@ export function App(): React.JSX.Element {
                 key={tab.id}
                 request={tab.request}
                 settings={settings}
+                allowTransparency={windowEffectAtLaunch !== 'solid'}
                 palette={palette}
                 active={tab.id === activeTab?.id}
                 failureCode={tab.failureCode}

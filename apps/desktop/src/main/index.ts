@@ -11,6 +11,7 @@ import {
 } from 'electron';
 import type { MessagePortMain } from 'electron';
 import { mkdir as fsMkdir } from 'node:fs/promises';
+import { release as getSystemRelease } from 'node:os';
 import { basename, join, posix } from 'node:path';
 import {
   AppInfoSchema,
@@ -140,6 +141,11 @@ import { buildAssistantContext } from './ai/context';
 import { UpdateManager } from './update-manager';
 import { UpdateNotificationController } from './update-notification';
 import { currentInstallChannelProbe, detectInstallChannel } from './install-channel';
+import {
+  applyNativeWindowEffect,
+  isFrostedGlassSupported,
+  windowAppearanceOptions
+} from './window-appearance';
 
 const isDevelopment = !app.isPackaged;
 // The delivery channel never changes during a run, so probe it once for the About panel and the
@@ -175,6 +181,7 @@ if (!hasSingleInstanceLock) {
 }
 let logger: Logger;
 let mainWindow: BrowserWindow | undefined;
+let mainWindowEffectAtLaunch: 'solid' | 'translucent' | 'frosted' = 'solid';
 let pendingRestore = false;
 let applicationReady = false;
 let quitRequested = false;
@@ -260,6 +267,7 @@ async function rebuildApplicationMenu(): Promise<void> {
       language: settings.language,
       theme: settings.theme,
       showTerminalContextMenuOnRightClick: settings.showTerminalContextMenuOnRightClick,
+      minimalMode: settings.minimalMode,
       themeNames: [
         ...new Set([...BUILTIN_THEME_NAMES, ...userThemes.themes.map((theme) => theme.name)])
       ],
@@ -368,6 +376,9 @@ function restoredBounds(): { x: number; y: number; width: number; height: number
 
 function createWindow(): BrowserWindow {
   const bounds = restoredBounds();
+  const settings = storage.settingsSnapshot();
+  mainWindowEffectAtLaunch = settings.windowEffect;
+  const appearanceOptions = windowAppearanceOptions(settings.windowEffect);
   const window = new BrowserWindow({
     width: bounds?.width ?? 1280,
     height: bounds?.height ?? 800,
@@ -375,8 +386,8 @@ function createWindow(): BrowserWindow {
     minWidth: 900,
     minHeight: 600,
     show: false,
-    ...windowChromeOptions(),
-    backgroundColor: '#111318',
+    ...windowChromeOptions(settings.minimalMode),
+    ...appearanceOptions,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -384,6 +395,17 @@ function createWindow(): BrowserWindow {
       sandbox: true,
       spellcheck: false
     }
+  });
+  const effectiveEffect = applyNativeWindowEffect(
+    window,
+    settings.windowEffect,
+    process.platform,
+    getSystemRelease()
+  );
+  logger.info('appearance', 'Main window appearance selected', {
+    requested: settings.windowEffect,
+    effective: effectiveEffect,
+    frostedGlassSupported: isFrostedGlassSupported(process.platform, getSystemRelease())
   });
   hideNativeMenuBar(window);
   forwardWindowControlState(window);
@@ -467,6 +489,8 @@ function registerIpc(): void {
       version: app.getVersion(),
       isPackaged: app.isPackaged,
       platform: process.platform,
+      systemVersion: getSystemRelease(),
+      mainWindowEffectAtLaunch,
       installChannel
     });
   });
@@ -633,6 +657,30 @@ function registerIpc(): void {
     const saved = SettingsRecordSchema.parse(await storage.saveSettings(settings));
     updateManager?.setAutomaticChecksEnabled(saved.autoCheckUpdates);
     updateNotification?.setEnabled(saved.autoCheckUpdates);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      const needsRestart =
+        (saved.windowEffect === 'solid') !== (mainWindowEffectAtLaunch === 'solid');
+      if (needsRestart) {
+        logger.info('appearance', 'Window effect change requires restart', {
+          requested: saved.windowEffect,
+          active: mainWindowEffectAtLaunch
+        });
+      } else {
+        const effective = applyNativeWindowEffect(
+          mainWindow,
+          saved.windowEffect,
+          process.platform,
+          getSystemRelease()
+        );
+        logger.info('appearance', 'Main window appearance updated', {
+          requested: saved.windowEffect,
+          effective
+        });
+      }
+      if (process.platform === 'darwin') {
+        mainWindow.setWindowButtonPosition({ x: 14, y: saved.minimalMode ? 9 : 13 });
+      }
+    }
     await rebuildApplicationMenu();
     trayController?.sync(saved.keepRunningInBackground, resolveMenuLocale(saved.language));
     sendToRenderer('settings:changed', saved);

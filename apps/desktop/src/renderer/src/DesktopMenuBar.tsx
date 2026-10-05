@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, ChevronRight } from 'lucide-react';
+import { Check, ChevronRight, MoreVertical } from 'lucide-react';
 import { groupThemeNames, type SettingsRecord } from '@geared-term/protocol';
 import {
   formatKeybinding,
@@ -34,10 +34,13 @@ type DesktopMenuBarProps = {
   themeNames: string[];
   isDevelopment: boolean;
   showTerminalContextMenuOnRightClick: boolean;
+  minimalMode?: boolean;
+  compact?: boolean;
   keybindings?: KeybindingOverrides;
 };
 
 type MenuLabels = {
+  applicationMenu: string;
   file: string;
   newLocal: string;
   quickConnection: string;
@@ -77,10 +80,12 @@ type MenuLabels = {
   close: string;
   help: string;
   about: string;
+  minimalMode: string;
 };
 
 const labels: Record<'en-US' | 'zh-CN', MenuLabels> = {
   'en-US': {
+    applicationMenu: 'Application menu',
     file: 'File',
     newLocal: 'New local terminal',
     quickConnection: 'Temporary SSH connection…',
@@ -119,9 +124,11 @@ const labels: Record<'en-US' | 'zh-CN', MenuLabels> = {
     maximize: 'Maximize / restore',
     close: 'Close window',
     help: 'Help',
-    about: 'About Geared Term'
+    about: 'About Geared Term',
+    minimalMode: 'Use minimal layout'
   },
   'zh-CN': {
+    applicationMenu: '应用菜单',
     file: '文件',
     newLocal: '新建本地终端',
     quickConnection: '临时 SSH 连接…',
@@ -160,7 +167,8 @@ const labels: Record<'en-US' | 'zh-CN', MenuLabels> = {
     maximize: '最大化 / 还原',
     close: '关闭窗口',
     help: '帮助',
-    about: '关于 Geared Term'
+    about: '关于 Geared Term',
+    minimalMode: '使用极简模式'
   }
 };
 
@@ -204,7 +212,8 @@ function createMenus(
   themeNames: string[],
   isDevelopment: boolean,
   bindings: KeybindingMap,
-  showTerminalContextMenuOnRightClick: boolean
+  showTerminalContextMenuOnRightClick: boolean,
+  minimalMode: boolean
 ): MenuDefinition[] {
   const t = labels[resolveLocale(language)];
   const themeGroups = groupThemeNames(themeNames, t.customThemes);
@@ -268,6 +277,11 @@ function createMenus(
           { checked: showTerminalContextMenuOnRightClick, checkable: true }
         ),
         separator('view-divider-3'),
+        action('minimal-mode', t.minimalMode, 'toggle-minimal-mode', {
+          checked: minimalMode,
+          checkable: true
+        }),
+        separator('view-divider-4'),
         action('fullscreen', t.fullScreen, 'toggle-fullscreen'),
         submenu('panels', t.panels, [
           action('sftp', t.sftp, 'toggle-sftp'),
@@ -496,6 +510,8 @@ export function DesktopMenuBar({
   themeNames,
   isDevelopment,
   showTerminalContextMenuOnRightClick,
+  minimalMode = false,
+  compact = false,
   keybindings
 }: DesktopMenuBarProps): React.JSX.Element {
   const [openMenu, setOpenMenu] = useState<string | null>(null);
@@ -511,7 +527,8 @@ export function DesktopMenuBar({
     themeNames,
     isDevelopment,
     bindings,
-    showTerminalContextMenuOnRightClick
+    showTerminalContextMenuOnRightClick,
+    minimalMode
   );
 
   const openSubmenuPath = (path: string, parentPath: string): void => {
@@ -551,6 +568,30 @@ export function DesktopMenuBar({
       if (event.key === 'Escape') {
         setOpenMenu(null);
         setOpenSubmenuPaths(new Set());
+        if (compact && openMenu === 'compact') {
+          rootRef.current?.querySelector<HTMLButtonElement>('.compact-menu-trigger')?.focus();
+        }
+      } else if (
+        compact &&
+        openMenu === 'compact' &&
+        (event.key === 'ArrowDown' || event.key === 'ArrowUp')
+      ) {
+        const entries = [
+          ...document.querySelectorAll<HTMLButtonElement>(
+            '.compact-menu-popover button:not(:disabled), [data-desktop-menu-flyout] button:not(:disabled)'
+          )
+        ].filter((entry) => entry.getClientRects().length > 0);
+        if (entries.length === 0) return;
+        event.preventDefault();
+        const currentIndex = entries.indexOf(document.activeElement as HTMLButtonElement);
+        const direction = event.key === 'ArrowDown' ? 1 : -1;
+        const nextIndex =
+          currentIndex < 0
+            ? direction > 0
+              ? 0
+              : entries.length - 1
+            : (currentIndex + direction + entries.length) % entries.length;
+        entries[nextIndex]?.focus();
       }
     };
     document.addEventListener('pointerdown', onPointerDown);
@@ -559,7 +600,7 @@ export function DesktopMenuBar({
       document.removeEventListener('pointerdown', onPointerDown);
       document.removeEventListener('keydown', onKeyDown);
     };
-  }, []);
+  }, [compact, openMenu]);
 
   const runAction = (actionName: string): void => {
     setOpenMenu(null);
@@ -570,48 +611,115 @@ export function DesktopMenuBar({
   };
 
   return (
-    <div className="desktop-menu" ref={rootRef} role="menubar" aria-label="Application menu">
-      {menus.map((menu) => {
-        const isOpen = openMenu === menu.id;
-        return (
-          <div className="desktop-menu-root" key={menu.id}>
-            <button
-              type="button"
-              className={`desktop-menu-button ${isOpen ? 'active' : ''}`}
-              role="menuitem"
-              aria-haspopup="menu"
-              aria-expanded={isOpen}
-              onClick={() => {
-                setOpenMenu(isOpen ? null : menu.id);
-                setOpenSubmenuPaths(new Set());
-              }}
-              onMouseEnter={() => {
-                if (openMenu && openMenu !== menu.id) {
-                  setOpenMenu(menu.id);
-                  setOpenSubmenuPaths(new Set());
-                }
-              }}
-            >
-              {menu.label}
-            </button>
-            {isOpen ? (
-              <div className="desktop-menu-popover" data-desktop-menu-path={menu.id} role="menu">
-                {menu.items.map((item) => (
-                  <MenuEntry
-                    key={item.id}
-                    item={item}
-                    onAction={runAction}
-                    parentPath={menu.id}
-                    openSubmenuPaths={openSubmenuPaths}
-                    onOpenSubmenu={openSubmenuPath}
-                    onCloseSubmenu={closeSubmenuPath}
-                  />
-                ))}
+    <div
+      className={`desktop-menu${compact ? ' desktop-menu-compact' : ''}`}
+      ref={rootRef}
+      role={compact ? undefined : 'menubar'}
+      aria-label={labels[resolveLocale(language)].applicationMenu}
+    >
+      {compact ? (
+        <>
+          <button
+            type="button"
+            className="compact-menu-trigger"
+            aria-label={labels[resolveLocale(language)].applicationMenu}
+            aria-haspopup="menu"
+            aria-expanded={openMenu === 'compact'}
+            title={labels[resolveLocale(language)].applicationMenu}
+            onClick={() => {
+              setOpenMenu(openMenu === 'compact' ? null : 'compact');
+              setOpenSubmenuPaths(new Set());
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                event.preventDefault();
+                setOpenMenu('compact');
+                requestAnimationFrame(() =>
+                  rootRef.current
+                    ?.querySelector<HTMLButtonElement>('.compact-menu-popover button')
+                    ?.focus()
+                );
+              }
+            }}
+          >
+            <MoreVertical size={15} aria-hidden="true" />
+          </button>
+          {openMenu === 'compact' ? (
+            <div className="compact-menu-popover" role="menu">
+              {menus.map((menu) => (
+                <section
+                  className="compact-menu-group"
+                  role="group"
+                  aria-label={menu.label}
+                  key={menu.id}
+                >
+                  <div className="compact-menu-heading" aria-hidden="true">
+                    {menu.label}
+                  </div>
+                  {menu.items.map((item) => (
+                    <MenuEntry
+                      key={item.id}
+                      item={item}
+                      onAction={runAction}
+                      parentPath={menu.id}
+                      openSubmenuPaths={openSubmenuPaths}
+                      onOpenSubmenu={openSubmenuPath}
+                      onCloseSubmenu={closeSubmenuPath}
+                    />
+                  ))}
+                </section>
+              ))}
+            </div>
+          ) : null}
+        </>
+      ) : null}
+      {!compact
+        ? menus.map((menu) => {
+            const isOpen = openMenu === menu.id;
+            return (
+              <div className="desktop-menu-root" key={menu.id}>
+                <button
+                  type="button"
+                  className={`desktop-menu-button ${isOpen ? 'active' : ''}`}
+                  role="menuitem"
+                  aria-haspopup="menu"
+                  aria-expanded={isOpen}
+                  onClick={() => {
+                    setOpenMenu(isOpen ? null : menu.id);
+                    setOpenSubmenuPaths(new Set());
+                  }}
+                  onMouseEnter={() => {
+                    if (openMenu && openMenu !== menu.id) {
+                      setOpenMenu(menu.id);
+                      setOpenSubmenuPaths(new Set());
+                    }
+                  }}
+                >
+                  {menu.label}
+                </button>
+                {isOpen ? (
+                  <div
+                    className="desktop-menu-popover"
+                    data-desktop-menu-path={menu.id}
+                    role="menu"
+                  >
+                    {menu.items.map((item) => (
+                      <MenuEntry
+                        key={item.id}
+                        item={item}
+                        onAction={runAction}
+                        parentPath={menu.id}
+                        openSubmenuPaths={openSubmenuPaths}
+                        onOpenSubmenu={openSubmenuPath}
+                        onCloseSubmenu={closeSubmenuPath}
+                      />
+                    ))}
+                  </div>
+                ) : null}
               </div>
-            ) : null}
-          </div>
-        );
-      })}
+            );
+          })
+        : null}
     </div>
   );
 }

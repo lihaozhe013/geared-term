@@ -66,6 +66,7 @@ type TerminalPaneProps = {
   request: TerminalRequest;
   settings: SettingsRecord;
   palette: Palette;
+  allowTransparency: boolean;
   active: boolean;
   onState: (state: TerminalPortMessage & { kind: 'state' }) => void;
   onHostKeyPrompt: (
@@ -104,6 +105,7 @@ export function TerminalPane({
   request,
   settings,
   palette,
+  allowTransparency,
   active,
   onState,
   onHostKeyPrompt,
@@ -196,7 +198,8 @@ export function TerminalPane({
       cursorStyle: settings.terminalCursor,
       customGlyphs: true,
       scrollback: 10_000,
-      theme: buildXtermTheme(paletteRef.current)
+      allowTransparency,
+      theme: buildXtermTheme(paletteRef.current, allowTransparency)
     });
     const fit = new FitAddon();
     terminal.loadAddon(fit);
@@ -504,9 +507,10 @@ export function TerminalPane({
     terminal.options.lineHeight = settings.terminalLineHeight;
     terminal.options.cursorStyle = settings.terminalCursor;
     terminal.options.fontFamily = fontFamilyFor(settings);
-    terminal.options.theme = buildXtermTheme(palette);
+    terminal.options.allowTransparency = allowTransparency;
+    terminal.options.theme = buildXtermTheme(palette, allowTransparency);
     fitRef.current?.fit();
-  }, [settings, palette]);
+  }, [settings, palette, allowTransparency]);
 
   useEffect(() => {
     if (!active) return;

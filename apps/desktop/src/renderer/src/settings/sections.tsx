@@ -8,6 +8,7 @@ import type {
   UpdateStatus,
   TerminalFontFallbackEntry
 } from '@geared-term/protocol';
+import { isFrostedGlassSupported } from '../appearance/window-effect';
 import { FolderOpen, FolderSync, Plus } from 'lucide-react';
 import { settingsLocale, translate } from '../i18n';
 import gearedTermMark from '../assets/geared-term-mark.png';
@@ -88,12 +89,14 @@ export function GeneralSection({
 
 export function AppearanceSection({
   settings,
+  appInfo,
   themeNames,
   invalidThemes,
   onSave,
   t
 }: {
   settings: SettingsRecord;
+  appInfo: AppInfo | null;
   themeNames: string[];
   invalidThemes: InvalidThemeFile[];
   onSave: (patch: Partial<SettingsRecord>) => Promise<void>;
@@ -154,6 +157,57 @@ export function AppearanceSection({
 
   return (
     <Section title={t('groupAppearance')}>
+      <label className="settings-check">
+        <input
+          type="checkbox"
+          checked={draft.minimalMode}
+          onChange={(event) => {
+            const minimalMode = event.target.checked;
+            update('minimalMode', minimalMode);
+            void onSave({ minimalMode }).catch(() => undefined);
+          }}
+        />
+        <span>{t('minimalMode')}</span>
+      </label>
+      <Row label={t('windowEffect')} hint={t('windowEffectDescription')}>
+        <select
+          className="settings-select"
+          value={draft.windowEffect}
+          onChange={(event) => {
+            const windowEffect = event.target.value as SettingsRecord['windowEffect'];
+            update('windowEffect', windowEffect);
+            void onSave({ windowEffect }).catch(() => undefined);
+          }}
+        >
+          <option value="solid">{t('windowEffectSolid')}</option>
+          <option value="translucent">{t('windowEffectTranslucent')}</option>
+          <option value="frosted">{t('windowEffectFrosted')}</option>
+        </select>
+      </Row>
+      <Row label={t('windowBackgroundOpacity')}>
+        <Stepper
+          value={draft.windowBackgroundOpacityPercent}
+          min={60}
+          max={100}
+          step={5}
+          format={(value) => `${value}%`}
+          onChange={(windowBackgroundOpacityPercent) => {
+            update('windowBackgroundOpacityPercent', windowBackgroundOpacityPercent);
+            void onSave({ windowBackgroundOpacityPercent }).catch(() => undefined);
+          }}
+        />
+      </Row>
+      {appInfo && settings.windowEffect === 'frosted' && !isFrostedGlassSupported(appInfo) ? (
+        <p className="settings-hint" role="status">
+          {t('frostedUnavailable')}
+        </p>
+      ) : null}
+      {appInfo &&
+      (settings.windowEffect === 'solid') !== (appInfo.mainWindowEffectAtLaunch === 'solid') ? (
+        <p className="settings-warning" role="status">
+          {t('windowRestartRequired')}
+        </p>
+      ) : null}
       <Row label={t('theme')}>
         <select
           className="settings-select"

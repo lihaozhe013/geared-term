@@ -23,6 +23,7 @@ export type MenuState = {
   language: 'system' | 'en-US' | 'zh-CN';
   theme: string;
   showTerminalContextMenuOnRightClick: boolean;
+  minimalMode: boolean;
   themeNames: string[];
   isDevelopment: boolean;
   keybindings: KeybindingOverrides;
@@ -72,6 +73,7 @@ export function executeApplicationMenuAction(action: string, window: BrowserWind
     case 'zoom-out':
     case 'zoom-reset':
     case 'toggle-terminal-context-menu':
+    case 'toggle-minimal-mode':
     case 'terminal-add-screen-to-chat':
     case 'terminal-open-screen-snapshot':
       commands.onCommand(action);
@@ -174,6 +176,7 @@ const labels = {
     zoomIn: 'Increase terminal font size',
     zoomOut: 'Decrease terminal font size',
     terminalContextMenuOnRightClick: 'Show terminal context menu on right-click',
+    minimalMode: 'Use minimal layout',
     toggleFullscreen: 'Toggle full screen',
     panels: 'Panels',
     sftp: 'Files',
@@ -220,6 +223,7 @@ const labels = {
     zoomIn: '增大终端字号',
     zoomOut: '减小终端字号',
     terminalContextMenuOnRightClick: '\u542f\u7528\u7ec8\u7aef\u53f3\u952e\u83dc\u5355',
+    minimalMode: '使用极简模式',
     toggleFullscreen: '切换全屏',
     panels: '面板',
     sftp: '文件',
@@ -363,6 +367,13 @@ export function buildApplicationMenu(state: MenuState, commands: MenuCommands): 
           label: t.terminalContextMenuOnRightClick,
           checked: state.showTerminalContextMenuOnRightClick,
           click: () => commands.onCommand('toggle-terminal-context-menu')
+        },
+        {
+          id: 'minimal-mode',
+          type: 'checkbox',
+          label: t.minimalMode,
+          checked: state.minimalMode,
+          click: () => commands.onCommand('toggle-minimal-mode')
         },
         { type: 'separator' },
         { role: 'togglefullscreen', label: t.toggleFullscreen },

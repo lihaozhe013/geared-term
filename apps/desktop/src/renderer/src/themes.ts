@@ -571,9 +571,9 @@ export function buildSearchDecorations(palette: Palette): ISearchDecorationOptio
   };
 }
 
-export function buildXtermTheme(palette: Palette): ITheme {
+export function buildXtermTheme(palette: Palette, allowTransparency = false): ITheme {
   const theme: ITheme = {
-    background: palette.background,
+    background: allowTransparency ? `${palette.background}00` : palette.background,
     foreground: palette.foreground,
     cursor: palette.cursor,
     selectionBackground: palette.selection,

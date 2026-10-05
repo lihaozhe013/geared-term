@@ -236,6 +236,7 @@ export function SettingsWindow(): React.JSX.Element {
             {category === 'appearance' ? (
               <AppearanceSection
                 settings={settings}
+                appInfo={info}
                 themeNames={themeNames}
                 invalidThemes={invalidThemes}
                 onSave={save}

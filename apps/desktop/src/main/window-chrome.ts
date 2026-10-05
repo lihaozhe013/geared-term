@@ -9,14 +9,16 @@ function applicationIconPath(): string {
 }
 
 /** Shared hidden-title-bar configuration for every application window. */
-export function windowChromeOptions(): Pick<
+export function windowChromeOptions(
+  minimalMode = false
+): Pick<
   BrowserWindowConstructorOptions,
   'autoHideMenuBar' | 'icon' | 'titleBarStyle' | 'trafficLightPosition'
 > {
   if (process.platform === 'darwin') {
     return {
       titleBarStyle: 'hidden',
-      trafficLightPosition: { x: 14, y: 13 }
+      trafficLightPosition: { x: 14, y: minimalMode ? 9 : 13 }
     };
   }
 
