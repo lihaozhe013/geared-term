@@ -65,15 +65,7 @@ export async function openSettingsWindow(
 ): Promise<Page> {
   const { app, page } = session;
   const settingsWindowPromise = app.waitForEvent('window');
-  if (await page.locator('.minimal-chrome').isVisible()) {
-    await page.locator('.compact-menu-trigger').click();
-    await page
-      .locator('.compact-menu-popover')
-      .getByRole('menuitem', { name: /^(Settings|设置)/u })
-      .click();
-  } else {
-    await page.getByRole('button', { name: 'Settings' }).click();
-  }
+  await page.getByRole('button', { name: 'Settings' }).click();
   const settingsWindow = await settingsWindowPromise;
   await settingsWindow.waitForLoadState('domcontentloaded');
   if (category) await settingsWindow.getByRole('button', { name: category }).click();

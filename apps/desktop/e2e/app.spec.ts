@@ -23,6 +23,28 @@ test('loads the main window hidden by default and connects the secure bridge', a
   await expect(page.locator('.compact-menu-trigger')).toBeVisible();
 });
 
+test('places the minimal-mode settings button beside the platform window controls', async () => {
+  const positions = await session.page.locator('.minimal-chrome').evaluate((chrome) => {
+    const children = Array.from(chrome.children);
+    return {
+      platform: window.geared.platform,
+      childCount: children.length,
+      settingsIndex: children.findIndex((child) =>
+        child.classList.contains('minimal-settings-button')
+      ),
+      controlsIndex: children.findIndex((child) => child.classList.contains('window-controls'))
+    };
+  });
+
+  expect(positions.settingsIndex).toBeGreaterThanOrEqual(0);
+  if (positions.platform === 'darwin') {
+    expect(positions.controlsIndex).toBe(-1);
+    expect(positions.settingsIndex).toBe(positions.childCount - 1);
+  } else {
+    expect(positions.settingsIndex).toBe(positions.controlsIndex - 1);
+  }
+});
+
 test('keeps the renderer sandboxed behind a frozen preload allowlist', async () => {
   const { page } = session;
   const boundary = await page.evaluate(() => {

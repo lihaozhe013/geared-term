@@ -998,6 +998,7 @@ export function App(): React.JSX.Element {
           minimalMode={settings.minimalMode}
           keybindings={settings.keybindings}
           tabs={tabBar}
+          onOpenSettings={() => void window.geared.openSettings()}
         />
       )}
 

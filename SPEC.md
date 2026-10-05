@@ -200,9 +200,11 @@ When terminal focus is active, the following behavior is required:
   application name when no tab is open.
 - **APP-028**: Minimal mode MUST be independently persisted and default to on for new settings. When
   enabled, the standard title/menu chrome MUST be replaced by one compact top row containing an
-  application-menu button immediately before the tab strip, a draggable area, and the platform's
-  window controls. macOS MUST retain its native traffic lights and system application menu.
-  Disabling minimal mode MUST restore the standard chrome immediately.
+  application-menu button immediately before the tab strip, a draggable area, a settings button at
+  the far right, and the platform's window controls. On Windows and Linux, the settings button MUST
+  appear immediately before the window controls. macOS MUST retain its native traffic lights and
+  system application menu, with the settings button at the far right. The settings button MUST open
+  the existing settings window. Disabling minimal mode MUST restore the standard chrome immediately.
 - **APP-029**: The minimal-mode application menu MUST expose the existing File, Edit, View, Window,
   and Help actions and MUST route actions through the existing allowlisted menu operation. It MUST
   provide keyboard and pointer access without sending menu navigation keys to the terminal.

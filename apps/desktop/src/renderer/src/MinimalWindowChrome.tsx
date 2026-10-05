@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Settings } from 'lucide-react';
 import type { SettingsRecord } from '@geared-term/protocol';
 import type { KeybindingOverrides } from '@geared-term/keybindings';
 import { DesktopMenuBar } from './DesktopMenuBar';
@@ -13,7 +14,8 @@ export function MinimalWindowChrome({
   showTerminalContextMenuOnRightClick,
   minimalMode,
   keybindings,
-  tabs
+  tabs,
+  onOpenSettings
 }: {
   platform: NodeJS.Platform;
   language: SettingsRecord['language'];
@@ -24,6 +26,7 @@ export function MinimalWindowChrome({
   minimalMode: boolean;
   keybindings: KeybindingOverrides;
   tabs: ReactNode;
+  onOpenSettings: () => void;
 }): React.JSX.Element {
   const isMac = platform === 'darwin';
   return (
@@ -40,6 +43,15 @@ export function MinimalWindowChrome({
       />
       <div className="minimal-tab-viewport">{tabs}</div>
       <div className="minimal-drag-region" aria-hidden="true" />
+      <button
+        type="button"
+        className="icon-button minimal-settings-button"
+        aria-label="Settings"
+        title="Settings"
+        onClick={onOpenSettings}
+      >
+        <Settings size={15} aria-hidden="true" />
+      </button>
       {!isMac ? <WindowControls /> : null}
     </header>
   );
