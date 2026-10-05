@@ -2,7 +2,7 @@
 
 > Status: Current implementation baseline
 >
-> Last updated: 2026-09-23
+> Last updated: 2026-10-05
 >
 > Target repository: `geared-term`
 
@@ -666,8 +666,8 @@ not currently implemented is stated as such instead of being treated as complete
 - **SET-011**: `windowEffect` MUST be independently persisted with `solid`, `translucent`, and
   `frosted` values, defaulting to `frosted` for new settings. Effects MUST apply to the main window
   only; auxiliary windows MUST remain opaque. Foreground text and controls MUST remain fully opaque.
-  The background opacity MUST be independently persisted as an integer percentage from 60 through
-  100 in steps of 5, defaulting to 75, and MUST affect renderer background surfaces only while
+  The background opacity MUST be independently persisted as an integer percentage from 0 through 100
+  in steps of 5, defaulting to 25, and MUST affect renderer background surfaces only while
   translucency or frosted glass is active.
 - **SET-012**: Translucency MUST use a transparent native main-window surface and translucent
   renderer surfaces. Native backing changes between solid and transparent MUST require an

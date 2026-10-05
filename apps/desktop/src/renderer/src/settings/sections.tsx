@@ -187,7 +187,7 @@ export function AppearanceSection({
       <Row label={t('windowBackgroundOpacity')}>
         <Stepper
           value={draft.windowBackgroundOpacityPercent}
-          min={60}
+          min={0}
           max={100}
           step={5}
           format={(value) => `${value}%`}

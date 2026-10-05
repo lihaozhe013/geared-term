@@ -12,8 +12,9 @@ changes native resize and maximize behavior, and xterm must enable transparency 
 ## Decision
 
 - Persist `minimalMode`, `windowEffect`, and `windowBackgroundOpacityPercent` in the existing
-  version-1 settings record. Defaults for new settings are `true`, `frosted`, and `75`; opacity is
-  an integer from 60 through 100 in increments of 5. Zod defaults keep existing settings valid.
+  version-1 settings record. Defaults for new settings are `true`, `frosted`, and `25`; opacity is
+  an integer from 0 through 100 in increments of 5. Zero removes the renderer theme tint and 100
+  fully covers the native backdrop. Zod defaults keep existing settings valid.
 - Apply effects only to the main window. Auxiliary windows remain solid so settings are available to
   recover from a poor main-window appearance choice.
 - Create the main BrowserWindow with a transparent native surface only when its saved startup effect
@@ -35,8 +36,10 @@ changes native resize and maximize behavior, and xterm must enable transparency 
 
 ## Consequences
 
-- Existing installs keep their saved effect and layout; new settings start with minimal chrome and
-  frosted glass at 75% background opacity.
+- Existing installs keep their saved effect, opacity, and layout; new settings start with minimal
+  chrome and frosted glass at 25% background opacity. No settings migration is required. Builds
+  predating this range change reject saved opacity values below 60%, so raise the value to at least
+  60% before downgrading to one of those builds.
 - Selecting translucency/frosted glass from a solid-started window requires restarting the
   application. Opacity and transitions between translucent and supported frosted glass can apply
   live when the window started with transparency enabled.
@@ -45,9 +48,13 @@ changes native resize and maximize behavior, and xterm must enable transparency 
 - Linux frosted glass remains unavailable without a verified compositor-specific implementation.
 - Renderer surface changes must be inspected over real desktop content; screenshots in an opaque or
   headless BrowserWindow cannot establish native translucency.
-- Renderer tests composite the main workspace over a solid test background at multiple opacity
-  values to catch nested tint accumulation. Native frosted appearance remains unverified until macOS
-  desktop screenshots cover both window focus states and normal, maximized, and fullscreen layouts.
+- Existing Playwright `window-effects.spec.ts` coverage composites the side panel, terminal, and top
+  bar over a fixed color in standard and minimal mode at 60%, 75%, and 100%. Automated coverage for
+  the expanded lower range is pending.
+- An isolated macOS desktop comparison at 25% opacity confirms the under-window material can show
+  blurred desktop color. The full development and packaged matrix for focus changes, resize,
+  maximize/restore, and fullscreen recovery remains open. Linux translucency also needs verification
+  on named compositor sessions. Unsupported Linux blur is reported and falls back to translucency.
 
 ## Security review
 
@@ -59,13 +66,15 @@ already owned by the main process.
 
 ## Verification
 
-- `pnpm typecheck` and `pnpm build` pass for the implementation.
+- Type checking, build, and automated tests have not been run for this update; manual verification
+  remains with the user.
 - Main-process construction sets launch-time backing and native material using platform capability
   checks, and macOS launch vibrancy follows the system window focus state. Existing settings IPC
   remains the only settings write path; no preload operation was added.
-- Playwright `window-effects.spec.ts` composites the side panel, terminal, and top bar over a fixed
-  color in standard and minimal mode at 60%, 75%, and 100%; main-process unit tests verify macOS
-  material and focus-state configuration.
+- Existing Playwright `window-effects.spec.ts` coverage composites the side panel, terminal, and top
+  bar over a fixed color in standard and minimal mode at 60%, 75%, and 100%. Main-process unit tests
+  cover macOS material and focus-state configuration. Tests for the expanded range were not added or
+  run in this update.
 - Cross-platform packaged visual smoke checks remain open for resize, maximize/restore, fullscreen,
   native material behavior, and macOS Reduce Transparency state. Linux translucency also needs
   verification on named compositor sessions. Unsupported Linux blur is reported and falls back to

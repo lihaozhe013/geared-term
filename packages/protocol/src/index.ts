@@ -262,7 +262,7 @@ export const SettingsRecordSchema = z
     uiScalePercent: z.number().int().min(75).max(150).multipleOf(5).default(100),
     minimalMode: z.boolean().default(true),
     windowEffect: z.enum(['solid', 'translucent', 'frosted']).default('frosted'),
-    windowBackgroundOpacityPercent: z.number().int().min(60).max(100).multipleOf(5).default(75),
+    windowBackgroundOpacityPercent: z.number().int().min(0).max(100).multipleOf(5).default(25),
     showTerminalContextMenuOnRightClick: z.boolean().default(true),
     terminalFontFamily: z.string().min(1).max(256).default('Cascadia Code'),
     terminalFontLigatures: z.boolean().default(false),
