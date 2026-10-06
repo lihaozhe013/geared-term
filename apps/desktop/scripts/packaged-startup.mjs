@@ -219,7 +219,10 @@ async function runTerminalSmoke(page, shell, args, marker, timeoutMs = 15000) {
 
 async function runPowerShellPromptSmoke(page, timeoutMs = 20000) {
   const startedAt = await page.evaluate(() => performance.now());
-  await page.getByRole('button', { name: 'New local terminal' }).click();
+  await page
+    .locator('.terminal-empty')
+    .getByRole('button', { name: 'New local terminal' })
+    .click();
   await expect(page.locator('.terminal-surface')).toHaveAttribute('data-active-status', 'running', {
     timeout: timeoutMs
   });
