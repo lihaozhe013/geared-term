@@ -131,14 +131,15 @@ async function checkTransparentViewport(page: Page, expectWebgl: boolean): Promi
     )
     .toBe(true);
 
-  const workspaceAlpha = async (): Promise<number> =>
-    page.locator('.workspace').evaluate((element) => {
+  const terminalPanelAlpha = async (): Promise<number> =>
+    page.locator('.terminal-surface').evaluate((element) => {
       const color = getComputedStyle(element).backgroundColor;
       const alpha = color.match(/\/\s*([\d.]+)\s*\)$/u)?.[1];
       return alpha === undefined ? 1 : Number(alpha);
     });
 
-  await expect.poll(workspaceAlpha).toBeCloseTo(0.75);
+  await expect(page.locator('.workspace')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await expect.poll(terminalPanelAlpha).toBeCloseTo(0.25);
   const settings = await page.evaluate(async () => {
     const geared = (
       window as unknown as {
@@ -157,7 +158,7 @@ async function checkTransparentViewport(page: Page, expectWebgl: boolean): Promi
     });
     return current;
   });
-  await expect.poll(workspaceAlpha).toBeCloseTo(0.6);
+  await expect.poll(terminalPanelAlpha).toBeCloseTo(0.6);
   await expect(terminal).toHaveAttribute('data-session-id', sessionId!);
   await expect(terminal.locator('.xterm-viewport')).toHaveCSS(
     'background-color',
@@ -176,7 +177,7 @@ async function checkTransparentViewport(page: Page, expectWebgl: boolean): Promi
       windowBackgroundOpacityPercent: 100
     });
   }, settings);
-  await expect.poll(workspaceAlpha).toBeCloseTo(1);
+  await expect.poll(terminalPanelAlpha).toBeCloseTo(1);
   await expect(terminal).toHaveAttribute('data-session-id', sessionId!);
 
   await openLocalTab(session.app);

@@ -18,6 +18,7 @@ import type {
   SessionProfileSaveRequest,
   ProfileOrderRequest,
   SettingsRecord,
+  SettingsPatch,
   SftpDownloadRequest,
   SftpListRequest,
   SftpListResult,
@@ -160,7 +161,9 @@ declare global {
       getUiState: () => Promise<UiStateRecord>;
       saveUiState: (input: UiStateRecord) => Promise<UiStateRecord>;
       getSettings: () => Promise<SettingsRecord>;
+      patchSettings: (patch: SettingsPatch) => Promise<SettingsRecord>;
       saveSettings: (input: SettingsRecord) => Promise<SettingsRecord>;
+      listSystemFonts: () => Promise<string[]>;
       beginKeyCapture: () => Promise<SftpOperationResult>;
       endKeyCapture: () => Promise<SftpOperationResult>;
       openSettings: (category?: string) => Promise<SftpOperationResult>;

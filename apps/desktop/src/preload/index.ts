@@ -27,7 +27,9 @@ import {
   SessionProfileRecordSchema,
   SessionProfileSaveRequestSchema,
   SettingsOpenRequestSchema,
+  SettingsPatchSchema,
   SettingsRecordSchema,
+  SystemFontNamesSchema,
   SftpDownloadRequestSchema,
   SftpListRequestSchema,
   SftpListResultSchema,
@@ -96,6 +98,7 @@ import {
   type ProfileOrderRequest,
   type VaultRotateRequest,
   type VaultStatus,
+  type SettingsPatch,
   type SettingsRecord,
   type SftpListRequest,
   type SftpSendCdRequest,
@@ -386,10 +389,16 @@ const api = Object.freeze({
     return UiStateRecordSchema.parse(await ipcRenderer.invoke('ui:save-state', state));
   },
   getSettings: async () => SettingsRecordSchema.parse(await ipcRenderer.invoke('settings:get')),
+  patchSettings: async (input: SettingsPatch) => {
+    const patch = SettingsPatchSchema.parse(input);
+    return SettingsRecordSchema.parse(await ipcRenderer.invoke('settings:patch', patch));
+  },
   saveSettings: async (input: SettingsRecord) => {
     const settings = SettingsRecordSchema.parse(input);
     return SettingsRecordSchema.parse(await ipcRenderer.invoke('settings:save', settings));
   },
+  listSystemFonts: async () =>
+    SystemFontNamesSchema.parse(await ipcRenderer.invoke('settings:system-fonts', {})),
   beginKeyCapture: async () => {
     return SftpOperationResultSchema.parse(await ipcRenderer.invoke('app:begin-key-capture', {}));
   },

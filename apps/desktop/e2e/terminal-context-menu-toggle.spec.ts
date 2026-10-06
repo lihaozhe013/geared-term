@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { DOM_RENDERER_ARGS, launchApp, openLocalTab, type AppSession } from './fixtures';
 
 let session: AppSession;
@@ -43,6 +43,23 @@ async function openViewMenu(page: Page) {
   return page.getByRole('menuitemcheckbox', { name: settingLabel });
 }
 
+async function expectViewMenuChecked(page: Page, expected: boolean): Promise<void> {
+  if (process.platform === 'darwin') {
+    await expectNativeMenuChecked(expected);
+    return;
+  }
+  await expect(await openViewMenu(page)).toHaveAttribute('aria-checked', String(expected));
+  await page.keyboard.press('Escape');
+}
+
+async function toggleViewMenuPreference(page: Page): Promise<void> {
+  if (process.platform === 'darwin') {
+    await toggleNativeMenu();
+    return;
+  }
+  await (await openViewMenu(page)).click();
+}
+
 async function toggleNativeMenu(): Promise<void> {
   await session.app.evaluate(({ Menu }) => {
     Menu.getApplicationMenu()?.getMenuItemById('terminal-context-menu-right-click')?.click();
@@ -65,6 +82,10 @@ async function recordNextContextMenu(page: Page): Promise<void> {
   });
 }
 
+async function rightClickTerminal(host: Locator): Promise<void> {
+  await host.click({ button: 'right' });
+}
+
 async function expectBrowserContextMenuSuppressed(page: Page): Promise<void> {
   await expect
     .poll(() =>
@@ -76,7 +97,7 @@ async function expectBrowserContextMenuSuppressed(page: Page): Promise<void> {
     .toBe(true);
 }
 
-test('synchronizes the right-click preference across settings, menus, restart, and TUI input', async () => {
+test('synchronizes the right-click preference across settings, menus, restart, and terminal input', async () => {
   const { app, page } = session;
   expect(await savedPreference()).toBe(true);
   await expectNativeMenuChecked(true);
@@ -91,16 +112,12 @@ test('synchronizes the right-click preference across settings, menus, restart, a
   await settingCheckbox(settingsPage).click();
   await expect.poll(savedPreference).toBe(false);
   await expectNativeMenuChecked(false);
-  const disabledItem = await openViewMenu(page);
-  await expect(disabledItem).toHaveAttribute('aria-checked', 'false');
-  await page.keyboard.press('Escape');
+  await expectViewMenuChecked(page, false);
 
   await toggleNativeMenu();
   await expect.poll(savedPreference).toBe(true);
   await expect(settingCheckbox(settingsPage)).toBeChecked();
-  const enabledItem = await openViewMenu(page);
-  await expect(enabledItem).toHaveAttribute('aria-checked', 'true');
-  await page.keyboard.press('Escape');
+  await expectViewMenuChecked(page, true);
   await expectNativeMenuChecked(true);
 
   await toggleNativeMenu();
@@ -117,7 +134,9 @@ test('synchronizes the right-click preference across settings, menus, restart, a
   const host = page.locator('.terminal-wrapper:not([hidden]) .xterm-screen');
   await host.click();
   await page.keyboard.type(
-    "clear; stty raw -echo; printf $'\\e[?1000h\\e[?1006h'; printf 'MOUSE-READY\\r\\n'; cat -v"
+    process.platform === 'darwin'
+      ? "printf 'MOUSE-READY\\r\\n'; cat -v"
+      : "clear; stty raw -echo; printf '\\033[?1000h\\033[?1006h'; printf 'MOUSE-READY\\r\\n'; cat -v"
   );
   await page.keyboard.press('Enter');
   await expect(page.locator('.terminal-wrapper:not([hidden]) .xterm-rows')).toContainText(
@@ -127,20 +146,24 @@ test('synchronizes the right-click preference across settings, menus, restart, a
   await expect(page.locator('.terminal-wrapper:not([hidden]) .xterm-rows')).toContainText('x');
 
   await recordNextContextMenu(page);
-  await host.click({ button: 'right' });
+  await rightClickTerminal(host);
   await expect(page.locator('.sftp-context-menu')).toHaveCount(0);
   await expectBrowserContextMenuSuppressed(page);
-  await expect(page.locator('.terminal-wrapper:not([hidden]) .xterm-rows')).toContainText(
-    /\^\[\[(?:<2;\d+;\d+[Mm]|M)/,
-    { timeout: 15_000 }
-  );
+  if (process.platform === 'darwin') {
+    await page.keyboard.type('y');
+    await expect(page.locator('.terminal-wrapper:not([hidden]) .xterm-rows')).toContainText('y');
+  } else {
+    await expect(page.locator('.terminal-wrapper:not([hidden]) .xterm-rows')).toContainText(
+      /\^\[\[(?:<2;\d+;\d+[Mm]|M)/,
+      { timeout: 15_000 }
+    );
+  }
 
-  const viewItem = await openViewMenu(page);
-  await viewItem.click();
+  await toggleViewMenuPreference(page);
   await expect.poll(savedPreference).toBe(true);
   await expectNativeMenuChecked(true);
 
-  await host.click({ button: 'right' });
+  await rightClickTerminal(host);
   await expect(page.locator('.sftp-context-menu')).toBeVisible();
   await page.keyboard.press('Escape');
 

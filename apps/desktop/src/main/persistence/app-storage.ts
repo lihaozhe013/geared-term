@@ -217,8 +217,9 @@ export class AppStorage {
   }
 
   public async saveSettings(value: Settings): Promise<Settings> {
-    this.settingsValue = SettingsSchema.parse(value);
-    await this.settings.save(this.settingsValue);
+    const nextSettings = SettingsSchema.parse(value);
+    await this.settings.save(nextSettings);
+    this.settingsValue = nextSettings;
     return this.settingsSnapshot();
   }
 

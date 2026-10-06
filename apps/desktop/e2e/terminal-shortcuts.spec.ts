@@ -12,6 +12,10 @@ test.afterEach(async () => {
 });
 
 const MARKER = 'geared-kbd-marker';
+const selectAllShortcut = process.platform === 'darwin' ? 'Meta+a' : 'Control+Shift+a';
+const copyShortcut = process.platform === 'darwin' ? 'Meta+c' : 'Control+Shift+c';
+const pasteShortcut = process.platform === 'darwin' ? 'Meta+v' : 'Control+Shift+v';
+const searchShortcut = process.platform === 'darwin' ? 'Meta+f' : 'Control+f';
 
 test('copies and pastes with terminal keyboard shortcuts', async () => {
   const { page, app } = session;
@@ -31,8 +35,8 @@ test('copies and pastes with terminal keyboard shortcuts', async () => {
   // Copy chord: select the buffer and write it to the system clipboard. The
   // DOM renderer's selection extraction can truncate trailing cells, so
   // assert on a stable prefix of the typed line.
-  await page.keyboard.press('Control+Shift+a');
-  await page.keyboard.press('Control+Shift+c');
+  await page.keyboard.press(selectAllShortcut);
+  await page.keyboard.press(copyShortcut);
   await expect
     .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()), { timeout: 10_000 })
     .toContain('echo geared');
@@ -41,13 +45,13 @@ test('copies and pastes with terminal keyboard shortcuts', async () => {
   // line, and paste it back into the shell.
   await app.evaluate(({ clipboard }, marker) => clipboard.writeText(marker), MARKER);
   await page.keyboard.press('Control+c');
-  await page.keyboard.press('Control+Shift+v');
+  await page.keyboard.press(pasteShortcut);
   await page.keyboard.press('Enter');
   await expect(rows).toContainText(MARKER, {
     timeout: 15_000
   });
 
-  await page.keyboard.press('Control+f');
+  await page.keyboard.press(searchShortcut);
   await expect(page.locator('.terminal-search')).toBeVisible();
 });
 
@@ -61,7 +65,7 @@ test('pastes exactly once per paste shortcut', async () => {
   await host.click();
   await app.evaluate(({ clipboard }, marker) => clipboard.writeText(marker), 'geared-single-paste');
 
-  await page.keyboard.press('Control+Shift+v');
+  await page.keyboard.press(pasteShortcut);
   const rows = page.locator('.terminal-wrapper:not([hidden]) .xterm-rows');
   await expect.poll(() => rows.textContent(), { timeout: 15_000 }).toContain('geared-single-paste');
   const text = (await rows.textContent()) ?? '';

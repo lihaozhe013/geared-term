@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SettingsRecordSchema } from './index';
+import { SettingsPatchSchema, SettingsRecordSchema, mergeSettingsPatch } from './index';
 
 const baseSettings = {
   schemaVersion: 1,
@@ -42,6 +42,28 @@ describe('SettingsRecordSchema keybindings', () => {
       defaultAiConnectionId: 'connection-primary'
     });
     expect(parsed.defaultAiConnectionId).toBe('connection-primary');
+  });
+});
+
+describe('SettingsPatchSchema', () => {
+  it('keeps patches sparse and merges them into the current record', () => {
+    const current = SettingsRecordSchema.parse({ ...baseSettings, uiFontSize: 18 });
+    const patch = SettingsPatchSchema.parse({ theme: 'Dracula' });
+
+    expect(patch).toEqual({ theme: 'Dracula' });
+    expect(mergeSettingsPatch(current, patch)).toMatchObject({
+      theme: 'Dracula',
+      uiFontSize: 18,
+      terminalPadding: 14,
+      globalAiInstructions: ''
+    });
+  });
+
+  it('rejects empty, unknown, versioned, and invalid settings patches', () => {
+    expect(SettingsPatchSchema.safeParse({}).success).toBe(false);
+    expect(SettingsPatchSchema.safeParse({ schemaVersion: 1 }).success).toBe(false);
+    expect(SettingsPatchSchema.safeParse({ unexpected: true }).success).toBe(false);
+    expect(SettingsPatchSchema.safeParse({ uiScalePercent: 77 }).success).toBe(false);
   });
 });
 

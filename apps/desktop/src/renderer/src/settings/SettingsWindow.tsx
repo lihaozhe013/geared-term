@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   BUILTIN_THEME_NAMES,
   type AppInfo,
   type InvalidThemeFile,
   type RuntimeInfo,
   type SettingsRecord,
+  type SettingsPatch,
   type UpdateStatus,
   type UserTheme
 } from '@geared-term/protocol';
@@ -54,7 +55,14 @@ export function SettingsWindow(): React.JSX.Element {
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null);
   const [category, setCategory] = useState<Category>('general');
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState(false);
+  const [retryPatch, setRetryPatch] = useState<Partial<SettingsPatch>>({});
+  const settingsRef = useRef<SettingsRecord | null>(null);
+  const saveSequence = useRef(0);
+  const pendingPatch = useRef(new Map<keyof SettingsPatch, { sequence: number; value: unknown }>());
+  const retryPatchRef = useRef<Partial<SettingsPatch>>({});
   const t: Translate = makeTranslate(settings?.language ?? 'system');
+  settingsRef.current = settings;
 
   useEffect(() => {
     void Promise.all([
@@ -64,6 +72,7 @@ export function SettingsWindow(): React.JSX.Element {
       window.geared.getRuntimeInfo()
     ])
       .then(([savedSettings, themes, appInfo, runtimeInfo]) => {
+        settingsRef.current = savedSettings;
         setSettings(savedSettings);
         setUserThemes(themes.themes);
         setInvalidThemes(themes.invalid);
@@ -76,7 +85,14 @@ export function SettingsWindow(): React.JSX.Element {
   }, []);
 
   useEffect(() => {
-    const offChanged = window.geared.onSettingsChanged((changed) => setSettings(changed));
+    const offChanged = window.geared.onSettingsChanged((changed) => {
+      const pending = Object.fromEntries(
+        [...pendingPatch.current].map(([key, entry]) => [key, entry.value])
+      ) as Partial<SettingsPatch>;
+      const visible = { ...changed, ...pending };
+      settingsRef.current = visible;
+      setSettings(visible);
+    });
     const offNavigate = window.geared.onSettingsNavigate((next) => {
       if (next === 'general' || next === 'appearance' || next === 'terminal' || next === 'sftp') {
         setCategory(next);
@@ -117,13 +133,56 @@ export function SettingsWindow(): React.JSX.Element {
     applyTerminalLayout(settings.terminalPadding, settings.fullScreenTerminalPadding);
   }, [palette, settings]);
 
-  const save = async (patch: Partial<SettingsRecord>): Promise<void> => {
-    if (!settings) return;
-    try {
-      setSettings(await window.geared.saveSettings({ ...settings, ...patch }));
-    } catch (reason) {
-      setLoadError(reason instanceof Error ? reason.message : t('errSaveSettings'));
+  const save = useCallback(async (patch: Partial<SettingsPatch>): Promise<boolean> => {
+    if (!settingsRef.current) return false;
+    const sequence = ++saveSequence.current;
+    for (const [key, value] of Object.entries(patch) as Array<[keyof SettingsPatch, unknown]>) {
+      pendingPatch.current.set(key, { sequence, value });
     }
+    const visible = { ...settingsRef.current, ...patch };
+    settingsRef.current = visible;
+    setSettings(visible);
+    setSaveError(Object.keys(retryPatchRef.current).length > 0);
+
+    try {
+      const saved = await window.geared.patchSettings(patch as SettingsPatch);
+      for (const key of Object.keys(patch) as Array<keyof SettingsPatch>) {
+        if (pendingPatch.current.get(key)?.sequence === sequence) pendingPatch.current.delete(key);
+        delete retryPatchRef.current[key];
+      }
+      const pending = Object.fromEntries(
+        [...pendingPatch.current].map(([key, entry]) => [key, entry.value])
+      ) as Partial<SettingsPatch>;
+      const next = { ...saved, ...pending };
+      settingsRef.current = next;
+      setSettings(next);
+      setRetryPatch({ ...retryPatchRef.current });
+      setSaveError(Object.keys(retryPatchRef.current).length > 0);
+      return true;
+    } catch {
+      for (const [key, value] of Object.entries(patch) as Array<[keyof SettingsPatch, unknown]>) {
+        if (pendingPatch.current.get(key)?.sequence !== sequence) continue;
+        retryPatchRef.current[key] = value as never;
+        pendingPatch.current.delete(key);
+      }
+      const saved = await window.geared.getSettings().catch(() => settingsRef.current);
+      if (saved) {
+        const pending = Object.fromEntries(
+          [...pendingPatch.current].map(([key, entry]) => [key, entry.value])
+        ) as Partial<SettingsPatch>;
+        const next = { ...saved, ...pending };
+        settingsRef.current = next;
+        setSettings(next);
+      }
+      setRetryPatch({ ...retryPatchRef.current });
+      setSaveError(Object.keys(retryPatchRef.current).length > 0);
+      return false;
+    }
+  }, []);
+
+  const retrySave = (): void => {
+    const patch = retryPatchRef.current;
+    if (Object.keys(patch).length > 0) void save(patch);
   };
 
   const platform = info?.platform ?? window.geared.platform;
@@ -230,6 +289,16 @@ export function SettingsWindow(): React.JSX.Element {
         </nav>
         <section className="settings-content">
           <div className="settings-content-inner">
+            {saveError ? (
+              <div className="settings-save-error" role="alert">
+                <span>{t('errSaveSettings')}</span>
+                {Object.keys(retryPatch).length > 0 ? (
+                  <button type="button" className="toolbar-button" onClick={retrySave}>
+                    {t('retrySettingsSave')}
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
             {category === 'general' ? (
               <GeneralSection settings={settings} onSave={save} t={t} />
             ) : null}

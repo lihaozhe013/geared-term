@@ -27,6 +27,7 @@ apps/
         files/                 validated local filesystem operations
         persistence/           SQLite profile store, JSON stores, vault rotation facade
         sftp/                  SFTP service, transfers, cd tracking, remote commands, editor file
+        settings/              serialized settings writes and system font discovery
         ssh/                   ssh2 session, host keys, authentication
         vault/                 encrypted secret storage
         wsl/                   distribution discovery and launch
@@ -164,6 +165,12 @@ A single schema library (Zod) in `packages/protocol` validates:
 The schema layer rejects unknown privileged operations and invalid identifiers before a main service
 is called. TypeScript types are inferred from the schemas rather than duplicated.
 
+Ordinary settings use a strict sparse patch through `settings:patch`; the main process merges
+patches in order with the latest persisted record and broadcasts each successful write. The
+compatible full record save API uses the same queue. Installed font-family names are scanned and
+cached in the main process; the Settings-only font-list request accepts no path and returns no file
+metadata.
+
 ## 6. Persistence and vault
 
 ### 6.1 Storage layout
@@ -285,6 +292,10 @@ Renderer typography uses the persisted UI font settings and `uiScalePercent`. Th
 applied through CSS dimensions in the shared renderer stylesheet and scales resizable side-panel
 widths at render time; persisted panel widths remain logical design widths. Terminal font size and
 terminal padding are applied independently.
+
+UI, terminal-primary, and ordered fallback font families use a shared fuzzy-search picker. Search
+does not save; choosing a discovered font or confirming a custom family saves immediately. SFTP
+remote-file commands and global AI instructions retain their explicit save actions.
 
 Collapsed side panels occupy zero grid width. Their expand controls sit at the centered workspace
 edges and do not affect the terminal column or panel-width persistence.

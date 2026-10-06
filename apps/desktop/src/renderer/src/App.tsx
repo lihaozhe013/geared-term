@@ -9,6 +9,7 @@ import type {
   SshProfileTerminalRequest,
   SshFailureCode,
   SshTerminalRequest,
+  SettingsPatch,
   SettingsRecord,
   TerminalPortMessage,
   UiStateRecord,
@@ -716,9 +717,9 @@ export function App(): React.JSX.Element {
   }, [activeTab?.request, uiState, t]);
 
   const saveSettings = useCallback(
-    async (nextSettings: SettingsRecord): Promise<void> => {
+    async (nextSettings: SettingsPatch): Promise<void> => {
       try {
-        setSettings(await window.geared.saveSettings(nextSettings));
+        setSettings(await window.geared.patchSettings(nextSettings));
         setError(null);
       } catch (reason) {
         setError(reason instanceof Error ? reason.message : t('errSaveSettings'));
@@ -747,9 +748,7 @@ export function App(): React.JSX.Element {
     const next =
       delta === 'reset' ? 14 : Math.min(32, Math.max(8, current.terminalFontSize + delta));
     if (next === current.terminalFontSize) return;
-    void menuHandlers.current
-      .saveSettings({ ...current, terminalFontSize: next })
-      .catch(() => undefined);
+    void menuHandlers.current.saveSettings({ terminalFontSize: next }).catch(() => undefined);
   }, []);
 
   const menuHandlers = useRef({
@@ -859,7 +858,6 @@ export function App(): React.JSX.Element {
       if (command === 'toggle-terminal-context-menu') {
         void handlers
           .saveSettings({
-            ...handlers.settings,
             showTerminalContextMenuOnRightClick:
               !handlers.settings.showTerminalContextMenuOnRightClick
           })
@@ -868,20 +866,18 @@ export function App(): React.JSX.Element {
       }
       if (command === 'toggle-minimal-mode') {
         void handlers
-          .saveSettings({ ...handlers.settings, minimalMode: !handlers.settings.minimalMode })
+          .saveSettings({ minimalMode: !handlers.settings.minimalMode })
           .catch(() => undefined);
         return;
       }
       if (command.startsWith('theme:')) {
         const name = command.slice(6);
-        void handlers.saveSettings({ ...handlers.settings, theme: name }).catch(() => undefined);
+        void handlers.saveSettings({ theme: name }).catch(() => undefined);
         return;
       }
       if (command.startsWith('language:')) {
         const value = command.slice(9) as SettingsRecord['language'];
-        void handlers
-          .saveSettings({ ...handlers.settings, language: value })
-          .catch(() => undefined);
+        void handlers.saveSettings({ language: value }).catch(() => undefined);
       }
     });
   }, []);
@@ -1214,7 +1210,6 @@ export function App(): React.JSX.Element {
                 allowRiskyRun={settings.allowRiskyRun}
                 onToggleSplitCommand={() => {
                   void saveSettings({
-                    ...settings,
                     splitCommandPresentation: !settings.splitCommandPresentation
                   }).catch(() => undefined);
                 }}

@@ -47,7 +47,7 @@ export function ShortcutsSection({
   t
 }: {
   settings: SettingsRecord;
-  onSave: (patch: Partial<SettingsRecord>) => Promise<void>;
+  onSave: (patch: Partial<SettingsRecord>) => Promise<boolean>;
   t: Translate;
 }): React.JSX.Element {
   const platform = useMemo(() => normalizePlatform(window.geared.platform), []);

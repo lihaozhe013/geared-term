@@ -2211,6 +2211,91 @@ button:disabled {
   min-width: calc(160px * var(--gt-interface-scale, 1));
 }
 
+.settings-fallback-row > .font-picker {
+  flex: 1;
+  min-width: calc(160px * var(--gt-interface-scale, 1));
+}
+
+.font-picker {
+  position: relative;
+  min-width: 0;
+}
+
+.font-picker-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(8px * var(--gt-interface-scale, 1));
+  text-align: left;
+  cursor: pointer;
+}
+
+.font-picker-trigger span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.font-picker-popover {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  display: grid;
+  width: max(100%, calc(260px * var(--gt-interface-scale, 1)));
+  gap: calc(5px * var(--gt-interface-scale, 1));
+  padding: calc(7px * var(--gt-interface-scale, 1));
+  border: 1px solid var(--gt-border-strong, #344157);
+  border-radius: var(--gt-radius-md);
+  background: var(--gt-panel-alt, #161e2a);
+  box-shadow: var(--gt-shadow-modal);
+}
+
+.font-picker-options {
+  display: grid;
+  max-height: calc(240px * var(--gt-interface-scale, 1));
+  overflow: auto;
+}
+
+.font-picker-option,
+.font-picker-custom {
+  width: 100%;
+  min-height: calc(28px * var(--gt-interface-scale, 1));
+  padding: calc(5px * var(--gt-interface-scale, 1)) calc(7px * var(--gt-interface-scale, 1));
+  border: 0;
+  border-radius: var(--gt-radius-sm);
+  color: var(--gt-text-dim, #d8e0ee);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.font-picker-option.active,
+.font-picker-option:hover,
+.font-picker-custom:hover {
+  color: var(--gt-text, #e4eaf3);
+  background: var(--gt-hover, #202a39);
+}
+
+.font-picker-custom {
+  border-top: 1px solid var(--gt-divider, #202a39);
+}
+
+.font-picker-message {
+  margin: 0;
+  padding: calc(7px * var(--gt-interface-scale, 1));
+  color: var(--gt-text-muted, #71809a);
+  font-size: var(--gt-fs-sm);
+  overflow-wrap: anywhere;
+}
+
+.font-picker-error {
+  display: grid;
+  justify-items: start;
+  gap: calc(5px * var(--gt-interface-scale, 1));
+}
+
 .settings-fallback-row label {
   display: flex;
   align-items: center;
@@ -3042,6 +3127,18 @@ button:disabled {
 
 .settings-status {
   margin: 0;
+  font-size: var(--gt-fs-sm);
+}
+
+.settings-save-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(8px * var(--gt-interface-scale, 1));
+  padding: calc(8px * var(--gt-interface-scale, 1));
+  border: 1px solid var(--gt-danger, #f4a5a5);
+  border-radius: var(--gt-radius-md);
+  color: var(--gt-danger, #f4a5a5);
   font-size: var(--gt-fs-sm);
 }
 

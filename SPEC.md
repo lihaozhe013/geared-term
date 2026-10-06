@@ -684,6 +684,18 @@ not currently implemented is stated as such instead of being treated as complete
 - **SET-015**: New settings MUST default all three General checkboxes on: split-command
   presentation, allowing Run on risky assistant commands, and keeping the application running after
   its window is closed. Persisted user choices MUST remain unchanged.
+- **SET-016**: Ordinary settings changes MUST be persisted and applied without an Apply or Save
+  action. SFTP remote-file commands and global AI instructions MUST retain explicit Apply or Save
+  actions. AI connection records and vault operations MUST retain their existing explicit workflows.
+  Window backing changes that require restart MUST remain persisted and show the restart notice;
+  terminal defaults MUST affect newly created sessions without changing existing sessions.
+- **SET-017**: UI font family, terminal primary font, and ordered terminal fallback fonts MUST offer
+  a fuzzy-search picker over font-family names discovered from standard system font directories.
+  Font discovery MUST run in the main process, MUST NOT accept renderer-supplied paths, and MUST
+  return names without file paths. Search text alone MUST NOT change settings. Selecting a
+  discovered font or explicitly confirming a custom name MUST immediately persist and apply it.
+  Existing font names that discovery cannot read MUST remain usable as custom names; discovery MUST
+  support TTF and OTF files.
 
 The theme directory is `<userData>/themes/` (the working directory in development). Each `*.json`
 file there MUST contain a single user theme object with a `name` and a `colors` object holding

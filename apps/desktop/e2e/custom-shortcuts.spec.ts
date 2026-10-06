@@ -12,6 +12,8 @@ test.afterEach(async () => {
 });
 
 const MARKER = 'geared-custom-kbd';
+const selectAllShortcut = process.platform === 'darwin' ? 'Meta+a' : 'Control+Shift+a';
+const displayedClearBinding = process.platform === 'darwin' ? '⌃⇧L' : 'Ctrl+Shift+L';
 
 async function saveKeybindings(page: Page, keybindings: Record<string, string>): Promise<void> {
   await page.evaluate((overrides) => {
@@ -42,7 +44,7 @@ test('applies a customized copy binding to the terminal', async () => {
   await page.keyboard.type(`echo ${MARKER}`);
   await expect.poll(() => rows.textContent(), { timeout: 15_000 }).toContain(MARKER);
 
-  await page.keyboard.press('Control+Shift+a');
+  await page.keyboard.press(selectAllShortcut);
   await page.keyboard.press('Control+Alt+c');
   await expect
     .poll(() => app.evaluate(({ clipboard }) => clipboard.readText()), { timeout: 10_000 })
@@ -77,7 +79,7 @@ test('records a new binding through the shortcuts settings section', async () =>
   await row.locator('.kbd-capture').click();
   await expect(row.locator('.kbd-capture')).toHaveText('Press keys…');
   await settings.keyboard.press('Control+Shift+L');
-  await expect(row.locator('.kbd-capture')).toHaveText('Ctrl+Shift+L');
+  await expect(row.locator('.kbd-capture')).toHaveText(displayedClearBinding);
 
   await expect
     .poll(() =>

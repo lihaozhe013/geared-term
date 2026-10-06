@@ -4,9 +4,7 @@
 
 import type { SessionProfileRecord } from '@geared-term/protocol';
 
-export type NewTabTarget =
-  | { kind: 'local' }
-  | { kind: 'profile'; profile: SessionProfileRecord };
+export type NewTabTarget = { kind: 'local' } | { kind: 'profile'; profile: SessionProfileRecord };
 
 export function resolveNewTabTarget(
   profileId: string | null | undefined,

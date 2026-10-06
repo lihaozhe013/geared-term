@@ -33,3 +33,10 @@ test('denies window.open popups from the renderer', async () => {
   expect(opened).toBeNull();
   await expect(page.locator('.compact-menu-trigger')).toBeVisible();
 });
+
+test('restricts installed-font discovery to the Settings window', async () => {
+  const { page } = session;
+  await expect(page.evaluate(() => window.geared.listSystemFonts())).rejects.toThrow(
+    'Only Settings can list installed fonts'
+  );
+});

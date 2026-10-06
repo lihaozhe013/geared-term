@@ -43,7 +43,10 @@ import {
   SessionProfileRecordSchema,
   SessionProfileSaveRequestSchema,
   SettingsOpenRequestSchema,
+  SettingsPatchSchema,
   SettingsRecordSchema,
+  SystemFontNamesSchema,
+  mergeSettingsPatch,
   SftpListRequestSchema,
   SftpListResultSchema,
   SftpMkdirRequestSchema,
@@ -128,6 +131,8 @@ import { HistoryWindowManager } from './history-window';
 import { RemoteEditorWindowManager } from './remote-editor-window';
 import { TerminalSnapshotWindowManager } from './terminal-snapshot-window';
 import { SettingsWindowManager, type SettingsCategory } from './settings-window';
+import { listSystemFonts } from './settings/system-fonts';
+import { SerialTaskQueue } from './settings/serial-task-queue';
 import { TrayController } from './tray';
 import {
   forwardWindowControlState,
@@ -142,6 +147,7 @@ import { buildAssistantContext } from './ai/context';
 import { UpdateManager } from './update-manager';
 import { UpdateNotificationController } from './update-notification';
 import { currentInstallChannelProbe, detectInstallChannel } from './install-channel';
+import type { SettingsRecord } from '@geared-term/protocol';
 import {
   applyNativeWindowEffect,
   isFrostedGlassSupported,
@@ -199,6 +205,7 @@ let transferManager: TransferManager;
 let updateManager: UpdateManager | undefined;
 let updateNotification: UpdateNotificationController | undefined;
 const aiControllers = new Map<string, AbortController>();
+const settingsWriteQueue = new SerialTaskQueue();
 const aiHistory = new AiHistoryStore(isDevelopment ? process.cwd() : app.getPath('userData'));
 const themesDirectory = join(isDevelopment ? process.cwd() : app.getPath('userData'), 'themes');
 
@@ -283,6 +290,51 @@ async function rebuildApplicationMenu(): Promise<void> {
       onOpenSettings: (category) => settingsWindow.open(category)
     }
   );
+}
+
+async function publishSettingsChange(settings: SettingsRecord): Promise<void> {
+  updateManager?.setAutomaticChecksEnabled(settings.autoCheckUpdates);
+  updateNotification?.setEnabled(settings.autoCheckUpdates);
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    const needsRestart =
+      (settings.windowEffect === 'solid') !== (mainWindowEffectAtLaunch === 'solid');
+    if (needsRestart) {
+      logger.info('appearance', 'Window effect change requires restart', {
+        requested: settings.windowEffect,
+        active: mainWindowEffectAtLaunch
+      });
+    } else {
+      const effective = applyNativeWindowEffect(
+        mainWindow,
+        settings.windowEffect,
+        process.platform,
+        getSystemRelease()
+      );
+      logger.info('appearance', 'Main window appearance updated', {
+        requested: settings.windowEffect,
+        effective,
+        platform: process.platform,
+        systemVersion: getSystemRelease(),
+        electronVersion: process.versions.electron,
+        transparentBacking: mainWindowEffectAtLaunch !== 'solid',
+        backgroundOpacityPercent: settings.windowBackgroundOpacityPercent
+      });
+    }
+    if (process.platform === 'darwin') {
+      mainWindow.setWindowButtonPosition({ x: 14, y: settings.minimalMode ? 9 : 13 });
+    }
+  }
+  await rebuildApplicationMenu();
+  trayController?.sync(settings.keepRunningInBackground, resolveMenuLocale(settings.language));
+  sendToRenderer('settings:changed', settings);
+}
+
+function saveSettingsInOrder(save: () => Promise<SettingsRecord>): Promise<SettingsRecord> {
+  return settingsWriteQueue.run(async () => {
+    const saved = SettingsRecordSchema.parse(await save());
+    await publishSettingsChange(saved);
+    return saved;
+  });
 }
 
 function isAllowedExternalUrl(value: string): boolean {
@@ -667,42 +719,24 @@ function registerIpc(): void {
   ipcMain.handle('settings:get', () => SettingsRecordSchema.parse(storage.settingsSnapshot()));
   ipcMain.handle('settings:save', async (_event, input: unknown) => {
     const settings = SettingsRecordSchema.parse(input);
-    const saved = SettingsRecordSchema.parse(await storage.saveSettings(settings));
-    updateManager?.setAutomaticChecksEnabled(saved.autoCheckUpdates);
-    updateNotification?.setEnabled(saved.autoCheckUpdates);
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      const needsRestart =
-        (saved.windowEffect === 'solid') !== (mainWindowEffectAtLaunch === 'solid');
-      if (needsRestart) {
-        logger.info('appearance', 'Window effect change requires restart', {
-          requested: saved.windowEffect,
-          active: mainWindowEffectAtLaunch
-        });
-      } else {
-        const effective = applyNativeWindowEffect(
-          mainWindow,
-          saved.windowEffect,
-          process.platform,
-          getSystemRelease()
-        );
-        logger.info('appearance', 'Main window appearance updated', {
-          requested: saved.windowEffect,
-          effective,
-          platform: process.platform,
-          systemVersion: getSystemRelease(),
-          electronVersion: process.versions.electron,
-          transparentBacking: mainWindowEffectAtLaunch !== 'solid',
-          backgroundOpacityPercent: saved.windowBackgroundOpacityPercent
-        });
-      }
-      if (process.platform === 'darwin') {
-        mainWindow.setWindowButtonPosition({ x: 14, y: saved.minimalMode ? 9 : 13 });
-      }
+    return saveSettingsInOrder(() => storage.saveSettings(settings));
+  });
+  ipcMain.handle('settings:patch', async (event, input: unknown) => {
+    const source = BrowserWindow.fromWebContents(event.sender);
+    if (source !== mainWindow && !settingsWindow.ownsWebContents(event.sender)) {
+      throw new Error('Only the main window and Settings can change preferences');
     }
-    await rebuildApplicationMenu();
-    trayController?.sync(saved.keepRunningInBackground, resolveMenuLocale(saved.language));
-    sendToRenderer('settings:changed', saved);
-    return saved;
+    const patch = SettingsPatchSchema.parse(input);
+    return saveSettingsInOrder(() =>
+      storage.saveSettings(mergeSettingsPatch(storage.settingsSnapshot(), patch))
+    );
+  });
+  ipcMain.handle('settings:system-fonts', async (event, input: unknown) => {
+    EmptyRequestSchema.parse(input ?? {});
+    if (!settingsWindow.ownsWebContents(event.sender)) {
+      throw new Error('Only Settings can list installed fonts');
+    }
+    return SystemFontNamesSchema.parse(await listSystemFonts());
   });
   ipcMain.handle('app:open-settings', (_event, input: unknown) => {
     const parsed = SettingsOpenRequestSchema.parse(input ?? {});

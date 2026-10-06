@@ -105,7 +105,7 @@ export function AiConnectionsSection({
   t
 }: {
   settings: SettingsRecord;
-  onSave: (patch: Partial<SettingsRecord>) => Promise<void>;
+  onSave: (patch: Partial<SettingsRecord>) => Promise<boolean>;
   t: Translate;
 }): React.JSX.Element {
   const [connections, setConnections] = useState<AiConnectionRecord[]>([]);

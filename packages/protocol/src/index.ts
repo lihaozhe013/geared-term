@@ -285,6 +285,31 @@ export const SettingsRecordSchema = z
   })
   .strict();
 
+function withoutDefault(schema: z.ZodTypeAny): z.ZodTypeAny {
+  return schema instanceof z.ZodDefault ? (schema.removeDefault() as z.ZodTypeAny) : schema;
+}
+
+const settingsPatchShape = Object.fromEntries(
+  Object.entries(SettingsRecordSchema.shape)
+    .filter(([key]) => key !== 'schemaVersion')
+    .map(([key, schema]) => [key, withoutDefault(schema)])
+) as Omit<typeof SettingsRecordSchema.shape, 'schemaVersion'>;
+
+export const SettingsPatchSchema = z
+  .object(settingsPatchShape)
+  .partial()
+  .strict()
+  .refine((patch) => Object.keys(patch).length > 0, 'At least one setting must be provided');
+
+export const SystemFontNamesSchema = z
+  .array(z.string().min(1).max(256))
+  .max(20_000)
+  .refine((names) => new Set(names).size === names.length, 'Font names must be unique');
+
+export function mergeSettingsPatch(current: SettingsRecord, patch: SettingsPatch): SettingsRecord {
+  return SettingsRecordSchema.parse({ ...current, ...SettingsPatchSchema.parse(patch) });
+}
+
 export const WslDistributionSchema = z.object({
   name: z.string().min(1).max(256),
   isDefault: z.boolean(),
@@ -1326,6 +1351,8 @@ export type SessionProfileSaveRequest = z.infer<typeof SessionProfileSaveRequest
 export type ProfileOrderRequest = z.infer<typeof ProfileOrderRequestSchema>;
 export type UiStateRecord = z.infer<typeof UiStateRecordSchema>;
 export type SettingsRecord = z.infer<typeof SettingsRecordSchema>;
+export type SettingsPatch = z.infer<typeof SettingsPatchSchema>;
+export type SystemFontNames = z.infer<typeof SystemFontNamesSchema>;
 export type UpdateNotice = z.infer<typeof UpdateNoticeSchema>;
 export type UpdateNoticeDismissRequest = z.infer<typeof UpdateNoticeDismissRequestSchema>;
 export type TerminalLigatureRequest = z.infer<typeof TerminalLigatureRequestSchema>;

@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import Database from 'better-sqlite3';
 import { AppStorage } from './app-storage';
+import { VersionedJsonStore } from './json-store';
 import type { Logger } from '../logging';
 import { normalizeEndpoint } from '../ai/endpoint';
 
@@ -27,6 +28,22 @@ function countSecretRows(directory: string): number {
 }
 
 describe('application storage', () => {
+  it('keeps the last confirmed settings when writing fails', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'geared-term-settings-write-'));
+    const storage = new AppStorage(directory, testLogger());
+    await storage.load();
+    const previous = storage.settingsSnapshot();
+    const save = vi
+      .spyOn(VersionedJsonStore.prototype, 'save')
+      .mockRejectedValueOnce(new Error('disk full'));
+
+    await expect(storage.saveSettings({ ...previous, theme: 'Dracula' })).rejects.toThrow(
+      'disk full'
+    );
+    expect(storage.settingsSnapshot()).toEqual(previous);
+    save.mockRestore();
+  });
+
   it('persists non-secret session profiles and UI state', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'geared-term-app-storage-'));
     const storage = new AppStorage(directory, testLogger());

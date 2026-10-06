@@ -13,6 +13,7 @@ import { FolderOpen, FolderSync, Plus } from 'lucide-react';
 import { settingsLocale, translate } from '../i18n';
 import gearedTermMark from '../assets/geared-term-mark.png';
 import { Row, Section, Stepper } from './primitives';
+import { FontPicker } from './FontPicker';
 
 export type Translate = (key: Parameters<typeof translate>[1]) => string;
 
@@ -21,13 +22,22 @@ export function makeTranslate(language: SettingsRecord['language']): Translate {
   return (key) => translate(language, key);
 }
 
+type EditableFallbackFont = TerminalFontFallbackEntry & { editorId: string };
+type AppearanceDraft = Omit<SettingsRecord, 'terminalFontFallbacks'> & {
+  terminalFontFallbacks: EditableFallbackFont[];
+};
+
+function persistedFallbackFonts(entries: EditableFallbackFont[]): TerminalFontFallbackEntry[] {
+  return entries.map(({ editorId: _editorId, ...entry }) => entry);
+}
+
 export function GeneralSection({
   settings,
   onSave,
   t
 }: {
   settings: SettingsRecord;
-  onSave: (patch: Partial<SettingsRecord>) => Promise<void>;
+  onSave: (patch: Partial<SettingsRecord>) => Promise<boolean>;
   t: Translate;
 }): React.JSX.Element {
   return (
@@ -99,19 +109,47 @@ export function AppearanceSection({
   appInfo: AppInfo | null;
   themeNames: string[];
   invalidThemes: InvalidThemeFile[];
-  onSave: (patch: Partial<SettingsRecord>) => Promise<void>;
+  onSave: (patch: Partial<SettingsRecord>) => Promise<boolean>;
   t: Translate;
 }): React.JSX.Element {
-  const [draft, setDraft] = useState<SettingsRecord>(() => ({
+  const [draft, setDraft] = useState<AppearanceDraft>(() => ({
     ...settings,
-    terminalFontFallbacks: settings.terminalFontFallbacks.map((entry) => ({ ...entry }))
+    terminalFontFallbacks: settings.terminalFontFallbacks.map((entry) => ({
+      ...entry,
+      editorId: crypto.randomUUID()
+    }))
   }));
-  const [status, setStatus] = useState<string | null>(null);
+  const [fonts, setFonts] = useState<string[]>([]);
+  const [fontsLoading, setFontsLoading] = useState(false);
+  const [fontsError, setFontsError] = useState(false);
   const themeGroups = groupThemeNames(themeNames, t('customThemes'));
+
+  const loadFonts = (): void => {
+    setFontsLoading(true);
+    setFontsError(false);
+    void window.geared
+      .listSystemFonts()
+      .then(setFonts)
+      .catch(() => setFontsError(true))
+      .finally(() => setFontsLoading(false));
+  };
+
+  useEffect(() => loadFonts(), []);
+
+  useEffect(() => {
+    setDraft((current) => ({
+      ...current,
+      ...settings,
+      terminalFontFallbacks: settings.terminalFontFallbacks.map((entry, index) => ({
+        ...entry,
+        editorId: current.terminalFontFallbacks[index]?.editorId ?? crypto.randomUUID()
+      }))
+    }));
+  }, [settings]);
 
   const update = <K extends keyof SettingsRecord>(key: K, value: SettingsRecord[K]): void => {
     setDraft((current) => ({ ...current, [key]: value }));
-    setStatus(null);
+    void onSave({ [key]: value }).catch(() => undefined);
   };
 
   const updateFallback = (index: number, patch: Partial<TerminalFontFallbackEntry>): void => {
@@ -121,38 +159,40 @@ export function AppearanceSection({
         position === index ? { ...entry, ...patch } : entry
       )
     }));
+    const next = draft.terminalFontFallbacks.map((entry, position) =>
+      position === index ? { ...entry, ...patch } : entry
+    );
+    void onSave({
+      terminalFontFallbacks: normalizeTerminalFontFallbacks(
+        draft.terminalFontFamily,
+        persistedFallbackFonts(next)
+      )
+    }).catch(() => undefined);
   };
 
   const moveFallback = (index: number, direction: -1 | 1): void => {
-    setDraft((current) => {
-      const next = [...current.terminalFontFallbacks];
-      const target = index + direction;
-      if (target < 0 || target >= next.length) return current;
-      const moved = [...next];
-      const value = moved[index] as TerminalFontFallbackEntry;
-      moved.splice(index, 1);
-      moved.splice(target, 0, value);
-      return { ...current, terminalFontFallbacks: moved };
-    });
-  };
-
-  const apply = async (): Promise<void> => {
-    await onSave({
-      uiFontFamily: draft.uiFontFamily,
-      uiFontSize: draft.uiFontSize,
-      uiScalePercent: draft.uiScalePercent,
-      terminalFontFamily: draft.terminalFontFamily.trim() || 'Cascadia Code',
-      terminalFontLigatures: draft.terminalFontLigatures,
-      terminalFontSize: draft.terminalFontSize,
-      terminalLineHeight: draft.terminalLineHeight,
-      terminalPadding: draft.terminalPadding,
-      fullScreenTerminalPadding: draft.fullScreenTerminalPadding,
+    const next = [...draft.terminalFontFallbacks];
+    const target = index + direction;
+    if (target < 0 || target >= next.length) return;
+    const [value] = next.splice(index, 1);
+    if (value) next.splice(target, 0, value);
+    setDraft((current) => ({ ...current, terminalFontFallbacks: next }));
+    void onSave({
       terminalFontFallbacks: normalizeTerminalFontFallbacks(
         draft.terminalFontFamily,
-        draft.terminalFontFallbacks
+        persistedFallbackFonts(next)
       )
-    });
-    setStatus(t('appearanceStatus'));
+    }).catch(() => undefined);
+  };
+
+  const commitFallbacks = (entries: EditableFallbackFont[]): void => {
+    setDraft((current) => ({ ...current, terminalFontFallbacks: entries }));
+    void onSave({
+      terminalFontFallbacks: normalizeTerminalFontFallbacks(
+        draft.terminalFontFamily,
+        persistedFallbackFonts(entries)
+      )
+    }).catch(() => undefined);
   };
 
   return (
@@ -164,7 +204,6 @@ export function AppearanceSection({
           onChange={(event) => {
             const minimalMode = event.target.checked;
             update('minimalMode', minimalMode);
-            void onSave({ minimalMode }).catch(() => undefined);
           }}
         />
         <span>{t('minimalMode')}</span>
@@ -176,7 +215,6 @@ export function AppearanceSection({
           onChange={(event) => {
             const windowEffect = event.target.value as SettingsRecord['windowEffect'];
             update('windowEffect', windowEffect);
-            void onSave({ windowEffect }).catch(() => undefined);
           }}
         >
           <option value="solid">{t('windowEffectSolid')}</option>
@@ -193,7 +231,6 @@ export function AppearanceSection({
           format={(value) => `${value}%`}
           onChange={(windowBackgroundOpacityPercent) => {
             update('windowBackgroundOpacityPercent', windowBackgroundOpacityPercent);
-            void onSave({ windowBackgroundOpacityPercent }).catch(() => undefined);
           }}
         />
       </Row>
@@ -215,7 +252,6 @@ export function AppearanceSection({
           onChange={(event) => {
             const theme = event.target.value;
             update('theme', theme);
-            void onSave({ theme }).catch(() => undefined);
           }}
         >
           {themeGroups.map((group) => (
@@ -235,12 +271,16 @@ export function AppearanceSection({
         </p>
       ) : null}
       <Row label={t('uiFontFamily')}>
-        <input
-          className="settings-input"
+        <FontPicker
           value={draft.uiFontFamily}
-          onChange={(event) => update('uiFontFamily', event.target.value.slice(0, 256))}
-          placeholder={t('placeholderSystemDefault')}
-          spellCheck={false}
+          fonts={fonts}
+          label={t('uiFontFamily')}
+          t={t}
+          includeSystemDefault
+          loading={fontsLoading}
+          loadError={fontsError}
+          onRetry={loadFonts}
+          onCommit={(value) => update('uiFontFamily', value)}
         />
       </Row>
       <Row label={t('uiFontSize')}>
@@ -262,11 +302,15 @@ export function AppearanceSection({
         />
       </Row>
       <Row label={t('terminalFontFamily')}>
-        <input
-          className="settings-input"
+        <FontPicker
           value={draft.terminalFontFamily}
-          onChange={(event) => update('terminalFontFamily', event.target.value.slice(0, 256))}
-          spellCheck={false}
+          fonts={fonts}
+          label={t('terminalFontFamily')}
+          t={t}
+          loading={fontsLoading}
+          loadError={fontsError}
+          onRetry={loadFonts}
+          onCommit={(terminalFontFamily) => update('terminalFontFamily', terminalFontFamily)}
         />
       </Row>
       <label className="settings-check">
@@ -322,14 +366,21 @@ export function AppearanceSection({
         <p className="settings-subheading">{t('fallbackFonts')}</p>
         <div className="settings-fallbacks">
           {draft.terminalFontFallbacks.map((entry, index) => (
-            <div className="settings-fallback-row" key={index}>
-              <input
+            <div className="settings-fallback-row" key={entry.editorId}>
+              <FontPicker
                 value={entry.name}
-                aria-label={`Fallback font ${index + 1}`}
-                onChange={(event) =>
-                  updateFallback(index, { name: event.target.value.slice(0, 128) })
-                }
-                spellCheck={false}
+                fonts={fonts}
+                label={`Fallback font ${index + 1}`}
+                t={t}
+                loading={fontsLoading}
+                loadError={fontsError}
+                onRetry={loadFonts}
+                onCommit={(name) => {
+                  const next = draft.terminalFontFallbacks.map((item, position) =>
+                    position === index ? { ...item, name } : item
+                  );
+                  commitFallbacks(next);
+                }}
               />
               <label>
                 {t('fontScale')}
@@ -339,11 +390,12 @@ export function AppearanceSection({
                   max={2}
                   step={0.05}
                   value={entry.scale}
-                  onChange={(event) =>
-                    updateFallback(index, {
-                      scale: Math.min(2, Math.max(0.5, Number(event.target.value) || 1))
-                    })
-                  }
+                  onChange={(event) => {
+                    const value = event.currentTarget.valueAsNumber;
+                    if (Number.isFinite(value) && value >= 0.5 && value <= 2) {
+                      updateFallback(index, { scale: value });
+                    }
+                  }}
                 />
               </label>
               <label>
@@ -354,13 +406,12 @@ export function AppearanceSection({
                   max={10}
                   step={1}
                   value={entry.offsetX}
-                  onChange={(event) =>
-                    updateFallback(index, {
-                      offsetX: Math.round(
-                        Math.min(10, Math.max(-10, Number(event.target.value) || 0))
-                      )
-                    })
-                  }
+                  onChange={(event) => {
+                    const value = event.currentTarget.valueAsNumber;
+                    if (Number.isInteger(value) && value >= -10 && value <= 10) {
+                      updateFallback(index, { offsetX: value });
+                    }
+                  }}
                 />
               </label>
               <label>
@@ -371,13 +422,12 @@ export function AppearanceSection({
                   max={10}
                   step={1}
                   value={entry.offsetY}
-                  onChange={(event) =>
-                    updateFallback(index, {
-                      offsetY: Math.round(
-                        Math.min(10, Math.max(-10, Number(event.target.value) || 0))
-                      )
-                    })
-                  }
+                  onChange={(event) => {
+                    const value = event.currentTarget.valueAsNumber;
+                    if (Number.isInteger(value) && value >= -10 && value <= 10) {
+                      updateFallback(index, { offsetY: value });
+                    }
+                  }}
                 />
               </label>
               <button
@@ -403,8 +453,7 @@ export function AppearanceSection({
                 className="icon-button danger"
                 aria-label={t('remove')}
                 onClick={() =>
-                  update(
-                    'terminalFontFallbacks',
+                  commitFallbacks(
                     draft.terminalFontFallbacks.filter((_, position) => position !== index)
                   )
                 }
@@ -418,10 +467,13 @@ export function AppearanceSection({
               type="button"
               className="chip"
               onClick={() =>
-                update('terminalFontFallbacks', [
-                  ...draft.terminalFontFallbacks,
-                  { name: '', scale: 1, offsetX: 0, offsetY: 0 }
-                ])
+                setDraft((current) => ({
+                  ...current,
+                  terminalFontFallbacks: [
+                    ...draft.terminalFontFallbacks,
+                    { name: '', scale: 1, offsetX: 0, offsetY: 0, editorId: crypto.randomUUID() }
+                  ]
+                }))
               }
             >
               <Plus size={12} aria-hidden="true" /> {t('addFallback')}
@@ -432,19 +484,11 @@ export function AppearanceSection({
       <div className="settings-actions-row">
         <button
           type="button"
-          className="primary-button settings-apply"
-          onClick={() => void apply()}
-        >
-          {t('apply')}
-        </button>
-        <button
-          type="button"
           className="toolbar-button"
           onClick={() => void window.geared.openThemesFolder()}
         >
           <FolderOpen size={13} aria-hidden="true" /> {t('themeFolder')}
         </button>
-        {status ? <span className="settings-status status-ok">{status}</span> : null}
       </div>
     </Section>
   );
@@ -456,10 +500,12 @@ export function TerminalSection({
   t
 }: {
   settings: SettingsRecord;
-  onSave: (patch: Partial<SettingsRecord>) => Promise<void>;
+  onSave: (patch: Partial<SettingsRecord>) => Promise<boolean>;
   t: Translate;
 }): React.JSX.Element {
-  const [profiles, setProfiles] = useState<import('@geared-term/protocol').SessionProfileRecord[]>([]);
+  const [profiles, setProfiles] = useState<import('@geared-term/protocol').SessionProfileRecord[]>(
+    []
+  );
   const [draft, setDraft] = useState({
     defaultTerm: settings.defaultTerm,
     terminalCursor: settings.terminalCursor,
@@ -468,10 +514,16 @@ export function TerminalSection({
   useEffect(() => {
     void window.geared.listProfiles().then(setProfiles);
   }, []);
-  const [status, setStatus] = useState<string | null>(null);
+  useEffect(() => {
+    setDraft({
+      defaultTerm: settings.defaultTerm,
+      terminalCursor: settings.terminalCursor,
+      newTabProfileId: settings.newTabProfileId
+    });
+  }, [settings.defaultTerm, settings.terminalCursor, settings.newTabProfileId]);
   const update = (patch: Partial<typeof draft>): void => {
     setDraft((current) => ({ ...current, ...patch }));
-    setStatus(null);
+    void onSave(patch).catch(() => undefined);
   };
   return (
     <Section title={t('groupTerminal')}>
@@ -540,18 +592,6 @@ export function TerminalSection({
           ))}
         </div>
       </Row>
-      <div className="settings-actions-row">
-        <button
-          type="button"
-          className="primary-button settings-apply"
-          onClick={() => {
-            void onSave(draft).then(() => setStatus(t('terminalStatus')));
-          }}
-        >
-          {t('apply')}
-        </button>
-        {status ? <span className="settings-status status-ok">{status}</span> : null}
-      </div>
     </Section>
   );
 }
@@ -562,7 +602,7 @@ export function SftpSection({
   t
 }: {
   settings: SettingsRecord;
-  onSave: (patch: Partial<SettingsRecord>) => Promise<void>;
+  onSave: (patch: Partial<SettingsRecord>) => Promise<boolean>;
   t: Translate;
 }): React.JSX.Element {
   const [draft, setDraft] = useState(settings.remoteFileCommands);
@@ -590,7 +630,9 @@ export function SftpSection({
           type="button"
           className="primary-button settings-apply"
           onClick={() => {
-            void onSave({ remoteFileCommands: draft }).then(() => setStatus(t('sftpStatus')));
+            void onSave({ remoteFileCommands: draft }).then((saved) => {
+              if (saved) setStatus(t('sftpStatus'));
+            });
           }}
         >
           {t('apply')}
@@ -607,7 +649,7 @@ export function AiAssistantSection({
   t
 }: {
   settings: SettingsRecord;
-  onSave: (patch: Partial<SettingsRecord>) => Promise<void>;
+  onSave: (patch: Partial<SettingsRecord>) => Promise<boolean>;
   t: Translate;
 }): React.JSX.Element {
   const [draft, setDraft] = useState(settings.globalAiInstructions);
@@ -640,9 +682,9 @@ export function AiAssistantSection({
           type="button"
           className="primary-button settings-apply"
           onClick={() => {
-            void onSave({ globalAiInstructions: draft }).then(() =>
-              setStatus(t('aiInstructionsStatus'))
-            );
+            void onSave({ globalAiInstructions: draft }).then((saved) => {
+              if (saved) setStatus(t('aiInstructionsStatus'));
+            });
           }}
         >
           {t('save')}
@@ -671,7 +713,7 @@ export function AboutSection({
   info: AppInfo | null;
   runtime: RuntimeInfo | null;
   updateStatus: UpdateStatus | null;
-  onSave: (patch: Partial<SettingsRecord>) => Promise<void>;
+  onSave: (patch: Partial<SettingsRecord>) => Promise<boolean>;
   onCheckUpdates: () => Promise<void>;
   onDownloadUpdate: () => Promise<void>;
   onInstallUpdate: () => void;
