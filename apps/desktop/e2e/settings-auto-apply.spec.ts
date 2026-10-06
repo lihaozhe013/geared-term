@@ -40,6 +40,14 @@ test('applies appearance, terminal, and searched-font changes without an Apply b
   await expect
     .poll(() => session.page.evaluate(() => window.geared.getSettings()))
     .toMatchObject({ terminalFontFamily: font });
+  const expectedFontFamily = await session.page.evaluate((selectedFont) => {
+    const probe = document.createElement('span');
+    probe.style.fontFamily = `"${selectedFont.replace(/"/gu, '')}", monospace`;
+    document.body.append(probe);
+    const fontFamily = getComputedStyle(probe).fontFamily;
+    probe.remove();
+    return fontFamily;
+  }, font as string);
   await expect
     .poll(() =>
       session.page.evaluate(() => {
@@ -47,7 +55,7 @@ test('applies appearance, terminal, and searched-font changes without an Apply b
         return rows ? getComputedStyle(rows).fontFamily : '';
       })
     )
-    .toContain(`"${font}"`);
+    .toBe(expectedFontFamily);
 
   const fallbackFont = fonts.find((name) => name !== font && name.length <= 128);
   expect(fallbackFont).toBeTruthy();

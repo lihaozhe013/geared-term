@@ -8,7 +8,8 @@ test.afterEach(async () => {
 });
 
 test('composites each main-window surface exactly once at supported opacity settings', async () => {
-  session = await launchApp();
+  // Pixel sampling needs a visible Electron window; the hidden test windows can stall screenshots.
+  session = await launchApp([], { headless: false });
   const { page } = session;
   const expandPanel = page.getByRole('button', { name: 'Expand panel' });
   await expect(expandPanel).toBeVisible();
