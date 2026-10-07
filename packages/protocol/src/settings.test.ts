@@ -85,7 +85,7 @@ describe('SettingsRecordSchema project defaults', () => {
     expect(parsed.allowRiskyRun).toBe(true);
     expect(parsed.minimalMode).toBe(true);
     expect(parsed.windowEffect).toBe('frosted');
-    expect(parsed.windowBackgroundOpacityPercent).toBe(25);
+    expect(parsed.windowBackgroundOpacityPercent).toBe(100);
   });
 
   it('defaults to Claude Dark when a saved record has no theme', () => {

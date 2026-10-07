@@ -271,7 +271,7 @@ Each auxiliary window is created with the same security boundary as the main win
 is driven by business-named, validated IPC.
 
 The main window loads `minimalMode`, `windowEffect`, and `windowBackgroundOpacityPercent` from the
-existing settings store, defaulting new settings to minimal chrome, frosted glass, and 25% opacity.
+existing settings store, defaulting new settings to minimal chrome, frosted glass, and 100% opacity.
 Opacity ranges from 0% to 100% in five-percent steps; 0% leaves the native backdrop untinted and
 100% fully covers it. Minimal chrome moves the existing tab strip into a compact top row and uses
 the renderer's existing allowlisted menu actions. Its settings button opens the existing settings

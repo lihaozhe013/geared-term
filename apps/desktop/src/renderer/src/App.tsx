@@ -90,7 +90,7 @@ const defaultSettings: SettingsRecord = {
   uiScalePercent: 100,
   minimalMode: true,
   windowEffect: 'frosted',
-  windowBackgroundOpacityPercent: 25,
+  windowBackgroundOpacityPercent: 100,
   showTerminalContextMenuOnRightClick: true,
   terminalFontFamily: 'Cascadia Code',
   terminalFontLigatures: true,

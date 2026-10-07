@@ -14,7 +14,7 @@ describe('versioned JSON store', () => {
       keepRunningInBackground: true,
       minimalMode: true,
       windowEffect: 'frosted',
-      windowBackgroundOpacityPercent: 25
+      windowBackgroundOpacityPercent: 100
     });
   });
 

@@ -139,7 +139,7 @@ async function checkTransparentViewport(page: Page, expectWebgl: boolean): Promi
     });
 
   await expect(page.locator('.workspace')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-  await expect.poll(terminalPanelAlpha).toBeCloseTo(0.25);
+  await expect.poll(terminalPanelAlpha).toBeCloseTo(1);
   const settings = await page.evaluate(async () => {
     const geared = (
       window as unknown as {

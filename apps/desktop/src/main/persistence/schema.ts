@@ -80,7 +80,7 @@ export const defaultSettings: Settings = {
   uiScalePercent: 100,
   minimalMode: true,
   windowEffect: 'frosted',
-  windowBackgroundOpacityPercent: 25,
+  windowBackgroundOpacityPercent: 100,
   showTerminalContextMenuOnRightClick: true,
   terminalFontFamily: 'JetBrains Mono',
   terminalFontLigatures: true,

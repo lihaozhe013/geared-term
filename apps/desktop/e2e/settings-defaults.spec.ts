@@ -25,7 +25,7 @@ test('shows the project defaults and enables password-free unlock when supported
     keepRunningInBackground: true,
     minimalMode: true,
     windowEffect: 'frosted',
-    windowBackgroundOpacityPercent: 25
+    windowBackgroundOpacityPercent: 100
   });
 
   const autoUnlock = await page.evaluate(() => window.geared.getAutoUnlockStatus());
@@ -59,7 +59,7 @@ test('shows the project defaults and enables password-free unlock when supported
       .locator('.settings-row')
       .filter({ hasText: 'Window background opacity' })
       .locator('.stepper-value')
-  ).toHaveText('25%');
+  ).toHaveText('100%');
   await expect(
     settingsWindow.locator('.settings-row').filter({ hasText: 'Theme' }).locator('select')
   ).toHaveValue('Claude Dark');

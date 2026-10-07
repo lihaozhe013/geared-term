@@ -16,7 +16,7 @@
   --gt-radius-lg: calc(8px * var(--gt-interface-scale, 1));
   --gt-shadow-popover: 0 12px 32px rgba(0, 0, 0, 0.45);
   --gt-shadow-modal: 0 20px 70px rgba(0, 0, 0, 0.45);
-  --gt-window-opacity: 25%;
+  --gt-window-opacity: 100%;
   --gt-window-surface: var(--gt-background, #0d1117);
   --gt-window-panel: var(--gt-panel, #111822);
   --gt-window-divider: var(--gt-border, #2a3140);
