@@ -105,6 +105,13 @@ Simple and secure — by design, and by omission.
 | Linux x86-64   | AppImage and `.tar.gz`              |
 | Linux arm64    | AppImage and `.tar.gz`              |
 
+> **Known macOS local network issue (October 2026):** On one tested Mac running
+> macOS 27.0.1, the manually installed arm64 `0.1.1-beta.48` DMG cannot reach
+> local network hosts when launched from Finder, although local shells and public
+> HTTPS work. There is no verified release fix yet. Manual DMG installation,
+> clearing quarantine, and resetting Geared Term's app data did not resolve it
+> on that host. See the [investigation and temporary workaround](docs/macos-local-network-known-issue.md).
+
 ## Nightly downloads
 
 Geared Term publishes automated nightly builds for all supported platforms and architectures. Every
@@ -174,6 +181,7 @@ Notes:
 - [`SPEC.md`](SPEC.md) — normative behavior specification
 - [`docs/architecture.md`](docs/architecture.md) — implementation design and process boundaries
 - [`docs/requirements-matrix.md`](docs/requirements-matrix.md) — implementation status and evidence
+- [`docs/macos-local-network-known-issue.md`](docs/macos-local-network-known-issue.md) — macOS LAN issue and validation summary
 - [`docs/theme-sources.md`](docs/theme-sources.md) — built-in theme sources, revisions, and licenses
 
 ## License
